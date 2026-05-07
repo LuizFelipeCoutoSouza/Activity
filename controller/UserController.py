@@ -1,3 +1,4 @@
+import bcrypt
 from model.UserModel import UserModel
 
 class UserController:
@@ -41,3 +42,20 @@ class UserController:
             return True, "Usuário removido com sucesso!"
         except Exception as e:
             return False, f"Erro ao remover: {str(e)}"
+
+    @staticmethod
+    def login(email, senha):
+        if not email or not senha:
+            return False, "Preencha o email e a senha.", None
+
+        usuario = UserModel.buscar_por_email(email)
+
+        if not usuario:
+            return False, "Email não encontrado.", None
+
+        senha_correta = bcrypt.checkpw(senha.encode(), usuario["senha"].encode())
+
+        if not senha_correta:
+            return False, "Senha incorreta.", None
+
+        return True, "Login realizado com sucesso!", dict(usuario)

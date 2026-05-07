@@ -84,3 +84,16 @@ class UserModel:
         finally:
             cursor.close()
             conn.close()
+
+    @staticmethod
+    def buscar_por_email(email):
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            "SELECT id, nome, email, senha, profissao FROM usuarios WHERE email = %s;",
+            (email,)
+        )
+        usuario = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return usuario
