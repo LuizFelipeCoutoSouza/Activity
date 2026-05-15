@@ -44,7 +44,13 @@ Activity/
     ├── __init__.py
     ├── login.py                  # login_page(): e-mail/senha + botão Google OAuth
     ├── cadastro.py               # cadastro_page(): registration form with profession selectbox
-    └── home.py                   # home_page(): first authenticated page, shows user info + logout
+    ├── home.py                   # home_page(): shell autenticado — navbar, sidebar e roteamento
+    └── pages/                    # Uma página por arquivo; importadas lazily por home.py
+        ├── analises.py           # analises_page()
+        ├── conjunto_de_dados.py  # conjunto_de_dados_page()
+        ├── registro_de_pacientes.py  # registro_de_pacientes_page()
+        ├── exportar_relatorio.py # exportar_relatorio_page()
+        └── configuracoes.py      # configuracoes_page()
 ```
 
 ## Architecture
@@ -63,7 +69,9 @@ The project follows MVC with three packages. Data flows strictly downward: `view
 
 **`view/cadastro.py`** — registration form. Profession is a `st.selectbox` with fixed options: Médico, Enfermeiro, Fisioterapeuta, Pesquisador, Admin.
 
-**`view/home.py`** — primeira página autenticada (placeholder). Exibe nome e e-mail do usuário e a origem do login (`tipo_auth: "email"` ou `"google"`). O botão "Sair" chama `st.logout()` para sessões Google (limpa o token OAuth) ou limpa `st.session_state` e chama `st.rerun()` para sessões por e-mail.
+**`view/home.py`** — shell autenticado. Não contém conteúdo de página; apenas renderiza navbar (logo + avatar do usuário), sidebar (links de navegação, configurações, logout) e roteia para o arquivo correto em `view/pages/` via import lazy baseado em `st.session_state["pagina_atual"]`. O logout chama `st.logout()` para sessões Google ou limpa `st.session_state` e chama `st.rerun()` para sessões por e-mail.
+
+**`view/pages/`** — cada arquivo é uma página autenticada independente com uma única função pública (`*_page()`). Para adicionar uma nova página: criar o arquivo em `view/pages/`, adicionar um `elif` em `_conteudo()` em `home.py`, e adicionar o botão correspondente em `_sidebar()` em `home.py`.
 
 ## Authentication
 
@@ -80,10 +88,16 @@ Credenciais OAuth ficam em `.streamlit/secrets.toml` (não commitar).
 
 ## Navigation
 
-Page routing is manual via `st.session_state["pagina"]` (default: `"login"`). To add a new page:
-1. Create `view/minha_pagina.py` with a `minha_pagina_page()` function.
-2. Add an `elif` branch in `app.py` under the "Rotas protegidas" block.
-3. Trigger navigation with `st.session_state["pagina"] = "minha_pagina"; st.rerun()`.
+Há dois níveis de roteamento:
+
+**Nível 1 — `app.py`** controla qual área o usuário acessa via `st.session_state["pagina"]` (valores: `"login"`, `"cadastro"`, `"home"`). Rotas públicas são `login` e `cadastro`; todo o resto exige autenticação.
+
+**Nível 2 — `home.py`** controla qual página autenticada é exibida via `st.session_state["pagina_atual"]` (valores: `"Análises"`, `"Conjunto de dados"`, `"Registro de pacientes"`, `"Exportar relatório"`, `"Configurações"`). A sidebar altera esse valor e chama `st.rerun()`.
+
+Para adicionar uma nova página autenticada:
+1. Criar `view/pages/minha_pagina.py` com `minha_pagina_page()`.
+2. Adicionar um `elif` em `_conteudo()` em `home.py`.
+3. Adicionar o botão correspondente em `_sidebar()` em `home.py`.
 
 ## Database
 

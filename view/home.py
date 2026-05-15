@@ -83,9 +83,23 @@ def _sidebar(tipo_auth):
 # ── Conteúdo principal ────────────────────────────────────────────────────────
 
 def _conteudo():
-    pagina_atual = st.session_state.get("pagina_atual", "Análises")
-    st.title(pagina_atual)
-    st.info("Página em desenvolvimento.")
+    pagina = st.session_state.get("pagina_atual", "Análises")
+
+    if pagina == "Análises":
+        from view.pages.analises import analises_page
+        analises_page()
+    elif pagina == "Conjunto de dados":
+        from view.pages.conjunto_de_dados import conjunto_de_dados_page
+        conjunto_de_dados_page()
+    elif pagina == "Registro de pacientes":
+        from view.pages.registro_de_pacientes import registro_de_pacientes_page
+        registro_de_pacientes_page()
+    elif pagina == "Exportar relatório":
+        from view.pages.exportar_relatorio import exportar_relatorio_page
+        exportar_relatorio_page()
+    elif pagina == "Configurações":
+        from view.pages.configuracoes import configuracoes_page
+        configuracoes_page()
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────
