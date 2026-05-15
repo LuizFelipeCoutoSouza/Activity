@@ -120,8 +120,6 @@ def _logout(tipo_auth):
 def _estilos():
     st.markdown("""
     <style>
-    /* Remove o header padrão do Streamlit */
-    header[data-testid="stHeader"] { display: none; }
 
     /* Navbar */
     .navbar {

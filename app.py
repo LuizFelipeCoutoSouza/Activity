@@ -5,6 +5,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 import streamlit as st
 from model.database import init_db
 
+st.set_page_config(page_title="Activity", initial_sidebar_state="expanded")
+
 init_db()
 
 # --- Verificação de autenticação (email ou Google) ---
