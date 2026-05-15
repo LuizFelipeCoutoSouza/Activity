@@ -14,7 +14,7 @@ def login_page():
             st.write("Ana Amélia, Laila e Luiz :)")
 
     with col_direita:
-        st.header("Bem vindo de volta")
+        st.header("Bem vindo!")
         st.write("Acesse o portal fazendo o login abaixo.")
 
         email          = st.text_input("Email", placeholder="xxxx@email.com")
@@ -24,12 +24,16 @@ def login_page():
         if st.button("Login ->", use_container_width=True):
             sucesso, mensagem, usuario = UserController.login(email, senha)
             if sucesso:
-                st.success(f"✅ {mensagem} Olá, {usuario['nome']}!")
-                # Salva na sessão para uso futuro
-                st.session_state["usuario"] = usuario
-                st.session_state["logado"] = True
+                st.session_state["usuario"]        = usuario
+                st.session_state["usuario"]["tipo_auth"] = "email"
+                st.session_state["logado"]         = True
+                st.session_state["pagina"]         = "home"
+                st.rerun()
             else:
                 st.error(f"❌ {mensagem}")
+
+        if st.button("Google Auth"):
+            st.login()
 
         st.divider()
 
