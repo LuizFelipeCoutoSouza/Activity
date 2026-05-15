@@ -1,30 +1,165 @@
 import streamlit as st
 
+PAGINAS = [
+    ("📊", "Análises"),
+    ("🗃️", "Conjunto de dados"),
+    ("👥", "Registro de pacientes"),
+    ("📄", "Exportar relatório"),
+]
+
 def home_page():
-    usuario    = st.session_state.get("usuario", {})
-    nome       = usuario.get("nome", "Usuário")
-    tipo_auth  = usuario.get("tipo_auth", "email")
+    _estilos()
 
-    st.header(f"Bem-vindo, {nome}!")
+    usuario   = st.session_state.get("usuario", {})
+    tipo_auth = usuario.get("tipo_auth", "email")
 
-    if tipo_auth == "google":
-        st.caption(f"Logado via Google · {usuario.get('email', '')}")
-    else:
-        st.caption(f"Logado via e-mail · {usuario.get('email', '')}")
-
-    st.divider()
-    st.info("Página principal em desenvolvimento.")
-
-    if st.button("Sair"):
-        _logout(tipo_auth)
+    _navbar(usuario)
+    _sidebar(tipo_auth)
+    _conteudo()
 
 
-def _logout(tipo_auth: str):
-    for chave in ("logado", "usuario"):
+# ── Navbar ────────────────────────────────────────────────────────────────────
+
+def _navbar(usuario):
+    tipo_auth = usuario.get("tipo_auth", "email")
+    nome      = usuario.get("nome", "Usuário")
+    avatar    = _avatar_html(usuario, tipo_auth)
+
+    st.markdown(f"""
+    <div class="navbar">
+        <div class="navbar-brand">
+            <span class="navbar-logo">A</span>
+            Activity
+        </div>
+        <div class="navbar-user" title="{nome}">
+            {avatar}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def _avatar_html(usuario, tipo_auth):
+    picture = None
+    if tipo_auth == "google" and st.user.is_logged_in:
+        picture = getattr(st.user, "picture", None)
+
+    if picture:
+        return f'<img class="avatar-img" src="{picture}" alt="avatar">'
+
+    inicial = usuario.get("nome", "U")[0].upper()
+    return f'<div class="avatar-placeholder">{inicial}</div>'
+
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+
+def _sidebar(tipo_auth):
+    pagina_atual = st.session_state.get("pagina_atual", "Análises")
+
+    with st.sidebar:
+        st.markdown("## Activity")
+        st.divider()
+
+        for icone, nome in PAGINAS:
+            ativo = pagina_atual == nome
+            if st.button(
+                f"{icone}  {nome}",
+                use_container_width=True,
+                type="primary" if ativo else "secondary",
+                key=f"nav_{nome}",
+            ):
+                st.session_state["pagina_atual"] = nome
+                st.rerun()
+
+        st.divider()
+
+        if st.button("⚙️  Configurações", use_container_width=True, key="nav_config"):
+            st.session_state["pagina_atual"] = "Configurações"
+            st.rerun()
+
+        if st.button("🚪  Sair", use_container_width=True, key="nav_logout"):
+            _logout(tipo_auth)
+
+
+# ── Conteúdo principal ────────────────────────────────────────────────────────
+
+def _conteudo():
+    pagina_atual = st.session_state.get("pagina_atual", "Análises")
+    st.title(pagina_atual)
+    st.info("Página em desenvolvimento.")
+
+
+# ── Logout ────────────────────────────────────────────────────────────────────
+
+def _logout(tipo_auth):
+    for chave in ("logado", "usuario", "pagina_atual"):
         st.session_state.pop(chave, None)
     st.session_state["pagina"] = "login"
 
     if tipo_auth == "google":
-        st.logout()   # limpa o token OAuth e redireciona
+        st.logout()
     else:
         st.rerun()
+
+
+# ── Estilos ───────────────────────────────────────────────────────────────────
+
+def _estilos():
+    st.markdown("""
+    <style>
+    /* Remove o header padrão do Streamlit */
+    header[data-testid="stHeader"] { display: none; }
+
+    /* Navbar */
+    .navbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1.5rem;
+        background: #ffffff;
+        border-bottom: 1px solid #e8e8e8;
+        margin: -4rem -4rem 1.5rem -4rem;
+    }
+    .navbar-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #0f1117;
+    }
+    .navbar-logo {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #0068C9;
+        color: white;
+        font-weight: 800;
+        font-size: 1rem;
+    }
+    .navbar-user { display: flex; align-items: center; }
+
+    /* Avatar */
+    .avatar-img {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #e0e0e0;
+    }
+    .avatar-placeholder {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #0068C9;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
