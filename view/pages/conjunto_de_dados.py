@@ -3,6 +3,7 @@ import zipfile
 from datetime import datetime, timedelta
 
 import streamlit as st
+from st_keyup import st_keyup
 from controller.ArquivoController import ArquivoController
 
 POR_PAGINA = 5
@@ -119,9 +120,11 @@ def conjunto_de_dados_page():
     col2.metric("Tamanho total", _formatar_bytes(total_bytes))
     col3.metric("Linhas salvas", f"{total_linhas:,}")
 
-    _secao_upload(usuario_id, aberto=len(arquivos) == 0)
-    st.divider()
-    _secao_listagem(usuario_id, arquivos)
+    aba_lista, aba_upload = st.tabs(["🗃️  Meus arquivos", "⬆️  Enviar"])
+    with aba_lista:
+        _secao_listagem(usuario_id, arquivos)
+    with aba_upload:
+        _secao_upload(usuario_id)
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────
@@ -140,7 +143,7 @@ def _resumir_upload(msgs: list) -> tuple:
     return "warning", f"{n_ok} de {n} arquivo(s) enviado(s). {n_err} ignorado(s) — nome duplicado ou formato inválido."
 
 
-def _secao_upload(usuario_id: int, aberto: bool = False):
+def _secao_upload(usuario_id: int):
     counter = st.session_state.get("upload_counter", 0)
 
     # Feedback do upload anterior: sucesso via toast, erro/aviso inline
@@ -151,47 +154,46 @@ def _secao_upload(usuario_id: int, aberto: bool = False):
         else:
             getattr(st, tipo)(texto)
 
-    with st.expander("⬆️  Enviar arquivos", expanded=aberto):
-        arquivos = st.file_uploader(
-            "Selecione um ou mais arquivos .txt",
-            type=["txt"],
-            accept_multiple_files=True,
-            key=f"uploader_{counter}",
-        )
+    arquivos = st.file_uploader(
+        "Selecione um ou mais arquivos .txt",
+        type=["txt"],
+        accept_multiple_files=True,
+        key=f"uploader_{counter}",
+    )
 
-        # Descrição individual por arquivo
-        descricoes: dict = {}
-        if arquivos:
-            if len(arquivos) == 1:
-                descricoes[arquivos[0].name] = st.text_input(
-                    "Descrição (opcional)",
+    # Descrição individual por arquivo
+    descricoes: dict = {}
+    if arquivos:
+        if len(arquivos) == 1:
+            descricoes[arquivos[0].name] = st.text_input(
+                "Descrição (opcional)",
+                max_chars=200,
+                placeholder="Ex: Coleta paciente João — nov/2025",
+                key=f"desc_{counter}",
+            )
+        else:
+            st.write("**Descrição por arquivo** *(opcional)*")
+            for i, f in enumerate(arquivos):
+                descricoes[f.name] = st.text_input(
+                    f.name,
                     max_chars=200,
-                    placeholder="Ex: Coleta paciente João — nov/2025",
-                    key=f"desc_{counter}",
+                    placeholder="Descrição opcional",
+                    key=f"fdesc_{i}_{counter}",
                 )
-            else:
-                st.write("**Descrição por arquivo** *(opcional)*")
-                for i, f in enumerate(arquivos):
-                    descricoes[f.name] = st.text_input(
-                        f.name,
-                        max_chars=200,
-                        placeholder="Descrição opcional",
-                        key=f"fdesc_{i}_{counter}",
-                    )
 
-        if st.button("Enviar", type="primary", disabled=not arquivos):
-            msgs = []
-            with st.spinner("Enviando..."):
-                for f in arquivos:
-                    ok, msg = ArquivoController.fazer_upload(
-                        usuario_id, f, descricoes.get(f.name, "")
-                    )
-                    msgs.append((ok, msg))
+    if st.button("Enviar", type="primary", disabled=not arquivos):
+        msgs = []
+        with st.spinner("Enviando..."):
+            for f in arquivos:
+                ok, msg = ArquivoController.fazer_upload(
+                    usuario_id, f, descricoes.get(f.name, "")
+                )
+                msgs.append((ok, msg))
 
-            st.session_state["upload_msg"] = _resumir_upload(msgs)
-            st.session_state["upload_counter"] = counter + 1
-            st.session_state["pag_arquivos"] = 0
-            st.rerun()
+        st.session_state["upload_msg"] = _resumir_upload(msgs)
+        st.session_state["upload_counter"] = counter + 1
+        st.session_state["pag_arquivos"] = 0
+        st.rerun()
 
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
@@ -251,12 +253,8 @@ def _secao_listagem(usuario_id: int, arquivos: list):
         titulo = f"Meus arquivos ({n})"
     st.subheader(titulo)
 
-    # Widget de busca (renderizado após o cálculo para usar o valor da sessão anterior)
-    st.text_input(
-        "Buscar por nome",
-        placeholder="Nome do arquivo...",
-        key="busca_arquivo",
-    )
+    # Widget de busca — st_keyup dispara rerun a cada caractere digitado/apagado
+    st_keyup("Buscar por nome", placeholder="Nome do arquivo...", key="busca_arquivo")
 
     if busca and n_filtrado == 0:
         st.info(f"Nenhum arquivo encontrado para \"{busca}\".")
@@ -347,10 +345,16 @@ def _controles_paginacao(pagina: int, n_paginas: int):
         return
 
     st.divider()
-    col_prev, col_next = st.columns(2)
+    col_prev, col_info, col_next = st.columns([2, 3, 2])
     if col_prev.button("◀  Anterior", disabled=pagina == 0, use_container_width=True, key="pag_prev"):
         st.session_state["pag_arquivos"] = pagina - 1
         st.rerun()
+    col_info.button(
+        f"Página {pagina + 1} de {n_paginas}",
+        disabled=True,
+        use_container_width=True,
+        key="pag_info",
+    )
     if col_next.button("Próxima  ▶", disabled=pagina >= n_paginas - 1, use_container_width=True, key="pag_next"):
         st.session_state["pag_arquivos"] = pagina + 1
         st.rerun()
