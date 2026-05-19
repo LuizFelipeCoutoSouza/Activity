@@ -11,7 +11,7 @@ def get_connection():
     )
 
 def init_db():
-    """Cria a tabela de usuários se não existir."""
+    """Cria as tabelas necessárias se não existirem."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -23,6 +23,20 @@ def init_db():
             senha VARCHAR(255) NOT NULL,
             profissao VARCHAR(100) NOT NULL,
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS arquivos (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            nome VARCHAR(255) NOT NULL,
+            descricao TEXT DEFAULT '',
+            tamanho_bytes INTEGER NOT NULL,
+            num_linhas INTEGER,
+            encoding VARCHAR(50),
+            conteudo BYTEA NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
     conn.commit()
