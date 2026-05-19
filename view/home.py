@@ -8,8 +8,6 @@ PAGINAS = [
 ]
 
 def home_page():
-    _estilos()
-
     usuario   = st.session_state.get("usuario", {})
     tipo_auth = usuario.get("tipo_auth", "email")
 
@@ -21,33 +19,13 @@ def home_page():
 # ── Navbar ────────────────────────────────────────────────────────────────────
 
 def _navbar(usuario):
-    tipo_auth = usuario.get("tipo_auth", "email")
-    nome      = usuario.get("nome", "Usuário")
-    avatar    = _avatar_html(usuario, tipo_auth)
+    nome = usuario.get("nome", "Usuário")
+    inicial = nome[0].upper()
 
-    st.markdown(f"""
-    <div class="navbar">
-        <div class="navbar-brand">
-            <span class="navbar-logo">A</span>
-            Activity
-        </div>
-        <div class="navbar-user" title="{nome}">
-            {avatar}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-def _avatar_html(usuario, tipo_auth):
-    picture = None
-    if tipo_auth == "google" and st.user.is_logged_in:
-        picture = getattr(st.user, "picture", None)
-
-    if picture:
-        return f'<img class="avatar-img" src="{picture}" alt="avatar">'
-
-    inicial = usuario.get("nome", "U")[0].upper()
-    return f'<div class="avatar-placeholder">{inicial}</div>'
+    col_brand, col_user = st.columns([5, 2])
+    col_brand.markdown("**Activity**")
+    col_user.markdown(f"**{inicial}** · {nome}")
+    st.divider()
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -113,65 +91,3 @@ def _logout(tipo_auth):
         st.logout()
     else:
         st.rerun()
-
-
-# ── Estilos ───────────────────────────────────────────────────────────────────
-
-def _estilos():
-    st.markdown("""
-    <style>
-
-    /* Navbar */
-    .navbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.75rem 1.5rem;
-        background: #ffffff;
-        border-bottom: 1px solid #e8e8e8;
-        margin: -4rem -4rem 1.5rem -4rem;
-    }
-    .navbar-brand {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #0f1117;
-    }
-    .navbar-logo {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
-        background: #0068C9;
-        color: white;
-        font-weight: 800;
-        font-size: 1rem;
-    }
-    .navbar-user { display: flex; align-items: center; }
-
-    /* Avatar */
-    .avatar-img {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 2px solid #e0e0e0;
-    }
-    .avatar-placeholder {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: #0068C9;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 1rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
