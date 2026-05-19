@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import streamlit as st
 from model.database import init_db
 
-st.set_page_config(page_title="Activity", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Activity", initial_sidebar_state="expanded", layout="wide")
 
 init_db()
 

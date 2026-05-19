@@ -1,6 +1,6 @@
 import io
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import streamlit as st
 from controller.ArquivoController import ArquivoController
@@ -15,9 +15,7 @@ def _buscar_conteudo(arquivo_id: int, usuario_id: int) -> tuple:
     return ArquivoController.baixar(arquivo_id, usuario_id)
 
 
-# ── Callback de checkbox individual ──────────────────────────────────────────
-# Chamado pelo Streamlit antes do rerun quando o usuário clica num checkbox.
-# Lê o novo valor da widget key e sincroniza com o set "selecionados".
+# ── Callback de checkbox ──────────────────────────────────────────────────────
 
 def _toggle_chk(arq_id: int, gen: int):
     key = f"chk_{arq_id}_{gen}"
@@ -38,6 +36,14 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
     if not arquivo:
         st.error("Arquivo não encontrado.")
         return
+
+    # Detalhes técnicos (encoding movido para cá)
+    st.caption(
+        f"Linhas: {arquivo['num_linhas']:,} · "
+        f"Encoding: {arquivo.get('encoding') or '—'} · "
+        f"{_formatar_bytes(arquivo['tamanho_bytes'])} · "
+        f"Enviado em {arquivo['criado_em'].strftime('%d/%m/%Y %H:%M')}"
+    )
 
     nome_sem_ext = arquivo["nome"][:-4] if arquivo["nome"].lower().endswith(".txt") else arquivo["nome"]
     novo_nome = st.text_input(
@@ -72,6 +78,7 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
         if ok:
             st.cache_data.clear()
             st.session_state.pop("editando_id", None)
+            st.session_state["toast"] = ("Arquivo atualizado com sucesso.", "✅")
             st.rerun()
         else:
             st.error(msg)
@@ -93,18 +100,25 @@ def conjunto_de_dados_page():
         st.info("Esta funcionalidade está disponível apenas para usuários cadastrados com e-mail.")
         return
 
+    # Toast de feedback persistente entre reruns
+    if "toast" in st.session_state:
+        msg, icon = st.session_state.pop("toast")
+        st.toast(msg, icon=icon)
+
     if "editando_id" in st.session_state:
         _dialogo_editar(st.session_state["editando_id"], usuario_id)
 
-    _secao_upload(usuario_id)
+    # Uma única query por render
+    arquivos = ArquivoController.listar(usuario_id)
+
+    _secao_upload(usuario_id, aberto=len(arquivos) == 0)
     st.divider()
-    _secao_listagem(usuario_id)
+    _secao_listagem(usuario_id, arquivos)
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────
 
 def _resumir_upload(msgs: list) -> tuple:
-    """Consolida N resultados de upload em (tipo, texto) para exibir uma única mensagem."""
     n = len(msgs)
     n_ok = sum(1 for ok, _ in msgs if ok)
     n_err = n - n_ok
@@ -112,48 +126,59 @@ def _resumir_upload(msgs: list) -> tuple:
     if n_err == 0:
         texto = msgs[0][1] if n == 1 else f"{n_ok} arquivo(s) enviado(s) com sucesso."
         return "success", texto
-
     if n_ok == 0:
         texto = msgs[0][1] if n == 1 else "Nenhum arquivo foi enviado. Verifique se os nomes já existem ou se os arquivos são .txt."
         return "error", texto
-
     return "warning", f"{n_ok} de {n} arquivo(s) enviado(s). {n_err} ignorado(s) — nome duplicado ou formato inválido."
 
 
-def _secao_upload(usuario_id: int):
+def _secao_upload(usuario_id: int, aberto: bool = False):
     counter = st.session_state.get("upload_counter", 0)
 
-    # Mensagem do upload anterior (exibida após rerun, fora do spinner)
+    # Feedback do upload anterior: sucesso via toast, erro/aviso inline
     if "upload_msg" in st.session_state:
         tipo, texto = st.session_state.pop("upload_msg")
-        getattr(st, tipo)(texto)
+        if tipo == "success":
+            st.toast(texto, icon="✅")
+        else:
+            getattr(st, tipo)(texto)
 
-    with st.expander("⬆️  Enviar arquivos", expanded=False):
-        # Chaves dinâmicas garantem que a widget é recriada limpa após cada upload
+    with st.expander("⬆️  Enviar arquivos", expanded=aberto):
         arquivos = st.file_uploader(
             "Selecione um ou mais arquivos .txt",
             type=["txt"],
             accept_multiple_files=True,
             key=f"uploader_{counter}",
         )
-        descricao = st.text_input(
-            "Descrição (opcional)",
-            max_chars=200,
-            placeholder="Ex: Coleta paciente João — nov/2025",
-            key=f"desc_{counter}",
-        )
+
+        # Descrição individual por arquivo
+        descricoes: dict = {}
+        if arquivos:
+            if len(arquivos) == 1:
+                descricoes[arquivos[0].name] = st.text_input(
+                    "Descrição (opcional)",
+                    max_chars=200,
+                    placeholder="Ex: Coleta paciente João — nov/2025",
+                    key=f"desc_{counter}",
+                )
+            else:
+                st.write("**Descrição por arquivo** *(opcional)*")
+                for i, f in enumerate(arquivos):
+                    descricoes[f.name] = st.text_input(
+                        f.name,
+                        max_chars=200,
+                        placeholder="Descrição opcional",
+                        key=f"fdesc_{i}_{counter}",
+                    )
 
         if st.button("Enviar", type="primary", disabled=not arquivos):
             msgs = []
             with st.spinner("Enviando..."):
-                if len(arquivos) == 1:
-                    ok, msg = ArquivoController.fazer_upload(usuario_id, arquivos[0], descricao)
-                    msgs.append((ok, msg))
-                else:
-                    resultados, _ = ArquivoController.fazer_upload_em_massa(
-                        usuario_id, arquivos, descricao
+                for f in arquivos:
+                    ok, msg = ArquivoController.fazer_upload(
+                        usuario_id, f, descricoes.get(f.name, "")
                     )
-                    msgs.extend((ok, msg) for _, ok, msg in resultados)
+                    msgs.append((ok, msg))
 
             st.session_state["upload_msg"] = _resumir_upload(msgs)
             st.session_state["upload_counter"] = counter + 1
@@ -163,27 +188,23 @@ def _secao_upload(usuario_id: int):
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
 
-def _secao_listagem(usuario_id: int):
-    arquivos = ArquivoController.listar(usuario_id)
+def _secao_listagem(usuario_id: int, arquivos: list):
     n = len(arquivos)
-    st.subheader(f"Meus arquivos ({n})")
 
     if not arquivos:
+        st.subheader("Meus arquivos (0)")
         st.info("Nenhum arquivo enviado ainda. Use o painel acima para fazer upload.")
         return
 
     ids_atuais = {arq["id"] for arq in arquivos}
-
-    # Inicializa e limpa IDs de arquivos que já não existem
     sel: set = st.session_state.setdefault("selecionados", set())
     sel &= ids_atuais
-
     gen: int = st.session_state.setdefault("chk_gen", 0)
 
     # Zip pronto para download
     if "zip_pronto" in st.session_state:
         dados_zip, nome_zip, n_zip = st.session_state.pop("zip_pronto")
-        st.success(f"{n_zip} arquivo(s) compactado(s).")
+        st.toast(f"{n_zip} arquivo(s) compactado(s). Clique para baixar.", icon="✅")
         st.download_button(
             f"⬇️  Baixar  {nome_zip}",
             data=dados_zip,
@@ -193,9 +214,48 @@ def _secao_listagem(usuario_id: int):
             use_container_width=True,
         )
 
-    n_sel = len(sel)
+    # Busca — lida antes de renderizar o widget (para calcular filtro e paginação)
+    busca = st.session_state.get("busca_arquivo", "")
+    if busca != st.session_state.get("_busca_anterior", ""):
+        st.session_state["pag_arquivos"] = 0
+        st.session_state["_busca_anterior"] = busca
+
+    arquivos_filtrados = [
+        a for a in arquivos
+        if not busca or busca.lower() in a["nome"].lower()
+    ]
+    n_filtrado = len(arquivos_filtrados)
+
+    # Paginação sobre resultados filtrados
+    n_paginas = max(1, (n_filtrado + POR_PAGINA - 1) // POR_PAGINA)
+    pagina = min(max(st.session_state.get("pag_arquivos", 0), 0), n_paginas - 1)
+    st.session_state["pag_arquivos"] = pagina
+    inicio = pagina * POR_PAGINA
+    fim = min(inicio + POR_PAGINA, n_filtrado)
+    arquivos_pagina = arquivos_filtrados[inicio:fim]
+
+    # Subheader unificado: contexto de busca ou paginação em um único lugar
+    if busca:
+        titulo = f"Meus arquivos — {n_filtrado} resultado(s) para \"{busca}\""
+    elif n_paginas > 1:
+        titulo = f"Meus arquivos — página {pagina + 1} de {n_paginas} ({n} no total)"
+    else:
+        titulo = f"Meus arquivos ({n})"
+    st.subheader(titulo)
+
+    # Widget de busca (renderizado após o cálculo para usar o valor da sessão anterior)
+    st.text_input(
+        "Buscar por nome",
+        placeholder="Nome do arquivo...",
+        key="busca_arquivo",
+    )
+
+    if busca and n_filtrado == 0:
+        st.info(f"Nenhum arquivo encontrado para \"{busca}\".")
+        return
 
     # Controles de seleção
+    n_sel = len(sel)
     c1, c2, *_ = st.columns([2.5, 2.5, 6])
     if c1.button("Selecionar todos", use_container_width=True, key="btn_sel_all"):
         st.session_state["selecionados"] = ids_atuais.copy()
@@ -235,53 +295,24 @@ def _secao_listagem(usuario_id: int):
             for arq_id in ids_del:
                 ArquivoController.deletar(arq_id, usuario_id)
             st.session_state["selecionados"] -= set(ids_del)
-            st.session_state["chk_gen"] = st.session_state["chk_gen"] + 1
+            st.session_state["chk_gen"] += 1
             st.cache_data.clear()
             st.session_state.pop("bulk_delete_ids", None)
-            st.success(f"{len(ids_del)} arquivo(s) excluído(s).")
+            st.session_state["toast"] = (f"{len(ids_del)} arquivo(s) excluído(s).", "✅")
             st.rerun()
         if cd2.button("✗ Cancelar", key="canc_bulk_del", use_container_width=True):
             st.session_state.pop("bulk_delete_ids", None)
             st.rerun()
 
-    # Paginação
-    n_paginas = max(1, (n + POR_PAGINA - 1) // POR_PAGINA)
-    pagina = min(max(st.session_state.get("pag_arquivos", 0), 0), n_paginas - 1)
-    st.session_state["pag_arquivos"] = pagina
-    inicio = pagina * POR_PAGINA
-    fim = min(inicio + POR_PAGINA, n)
-    arquivos_pagina = arquivos[inicio:fim]
-
-    # Cabeçalho
-    cols_h = st.columns([0.5, 3, 1.5, 1.5, 1.5, 2, 2])
-    for col, h in zip(cols_h, ["", "Nome / Descrição", "Linhas", "Tamanho", "Encoding", "Enviado em", "Ações"]):
+    # Cabeçalho da tabela
+    cols_h = st.columns([0.5, 4, 2.5, 1.5, 3])
+    for col, h in zip(cols_h, ["", "Nome do arquivo", "Descrição", "Atualização", "Ações"]):
         col.markdown(f"**{h}**")
 
     for arq in arquivos_pagina:
         _linha_arquivo(arq, usuario_id, gen)
 
-    _controles_paginacao(pagina, n_paginas, n, inicio, fim)
-
-
-def _controles_paginacao(pagina: int, n_paginas: int, n_total: int, inicio: int, fim: int):
-    if n_paginas <= 1:
-        return
-
-    st.divider()
-    col_prev, col_info, col_next = st.columns([1, 3, 1])
-
-    if col_prev.button("◀  Anterior", disabled=pagina == 0, use_container_width=True, key="pag_prev"):
-        st.session_state["pag_arquivos"] = pagina - 1
-        st.rerun()
-
-    col_info.markdown(
-        f"Página **{pagina + 1}** de **{n_paginas}** "
-        f"&nbsp;·&nbsp; exibindo {inicio + 1}–{fim} de {n_total} arquivos"
-    )
-
-    if col_next.button("Próxima  ▶", disabled=pagina >= n_paginas - 1, use_container_width=True, key="pag_next"):
-        st.session_state["pag_arquivos"] = pagina + 1
-        st.rerun()
+    _controles_paginacao(pagina, n_paginas)
 
 
 def _preparar_zip(ids: list, usuario_id: int):
@@ -303,13 +334,26 @@ def _preparar_zip(ids: list, usuario_id: int):
     st.rerun()
 
 
+def _controles_paginacao(pagina: int, n_paginas: int):
+    if n_paginas <= 1:
+        return
+
+    st.divider()
+    col_prev, col_next = st.columns(2)
+    if col_prev.button("◀  Anterior", disabled=pagina == 0, use_container_width=True, key="pag_prev"):
+        st.session_state["pag_arquivos"] = pagina - 1
+        st.rerun()
+    if col_next.button("Próxima  ▶", disabled=pagina >= n_paginas - 1, use_container_width=True, key="pag_next"):
+        st.session_state["pag_arquivos"] = pagina + 1
+        st.rerun()
+
+
 # ── Linha de arquivo ──────────────────────────────────────────────────────────
 
 def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
     st.divider()
-    cols = st.columns([0.5, 3, 1.5, 1.5, 1.5, 2, 2])
+    cols = st.columns([0.5, 4, 2.5, 1.5, 3])
 
-    # Checkbox com chave versionada: evita conflito com estado interno do Streamlit
     cols[0].checkbox(
         "",
         value=arq["id"] in st.session_state.get("selecionados", set()),
@@ -319,46 +363,50 @@ def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
         label_visibility="collapsed",
     )
 
+    # Nome + metadados resumidos inline
     cols[1].write(f"**{arq['nome']}**")
-    if arq.get("descricao"):
-        cols[1].caption(arq["descricao"])
-
     linhas = arq.get("num_linhas")
-    cols[2].write(f"{linhas:,}" if linhas else "—")
-    cols[3].write(_formatar_bytes(arq["tamanho_bytes"]))
-    cols[4].write(arq.get("encoding") or "—")
-    cols[5].write(arq["criado_em"].strftime("%d/%m/%Y %H:%M"))
+    partes = []
+    if linhas:
+        partes.append(f"{linhas:,} linhas")
+    partes.append(_formatar_bytes(arq["tamanho_bytes"]))
+    partes.append(arq["criado_em"].strftime("%d/%m/%Y %H:%M"))
+    cols[1].caption("  ·  ".join(partes))
 
-    with cols[6]:
+    # Descrição
+    cols[2].write(arq.get("descricao") or "—")
+
+    # Atualização — exibe data apenas se o arquivo foi modificado após o envio
+    foi_atualizado = (arq["atualizado_em"] - arq["criado_em"]) > timedelta(seconds=1)
+    if foi_atualizado:
+        cols[3].write(arq["atualizado_em"].strftime("%d/%m/%Y"))
+        cols[3].caption(arq["atualizado_em"].strftime("%H:%M"))
+    else:
+        cols[3].write("—")
+
+    # Botões de ação em 3 sub-colunas iguais — tamanho uniforme via use_container_width
+    with cols[4]:
         c1, c2, c3 = st.columns(3)
 
-        dl_key = f"dl_pronto_{arq['id']}"
-        if c1.button("⬇️", key=f"dl_{arq['id']}", help="Download"):
-            st.session_state[dl_key] = True
-            st.rerun()
+        conteudo, nome_arq = _buscar_conteudo(arq["id"], usuario_id)
+        if conteudo:
+            c1.download_button(
+                "Baixar",
+                data=conteudo,
+                file_name=nome_arq,
+                mime="text/plain",
+                key=f"dl_{arq['id']}",
+                use_container_width=True,
+            )
 
-        if c2.button("✏️", key=f"ed_{arq['id']}", help="Editar"):
+        if c2.button("Editar", key=f"ed_{arq['id']}", use_container_width=True):
             st.session_state["editando_id"] = arq["id"]
             st.rerun()
 
         if st.session_state.get("confirm_delete") != arq["id"]:
-            if c3.button("🗑️", key=f"del_{arq['id']}", help="Excluir"):
+            if c3.button("Excluir", key=f"del_{arq['id']}", use_container_width=True):
                 st.session_state["confirm_delete"] = arq["id"]
                 st.rerun()
-
-    # Download individual
-    if st.session_state.get(dl_key):
-        conteudo, nome = _buscar_conteudo(arq["id"], usuario_id)
-        if conteudo:
-            st.download_button(
-                f"⬇️  Baixar  {nome}",
-                data=conteudo,
-                file_name=nome,
-                mime="text/plain",
-                key=f"dl_real_{arq['id']}",
-                use_container_width=True,
-            )
-        st.session_state.pop(dl_key, None)
 
     # Confirmação de exclusão individual
     if st.session_state.get("confirm_delete") == arq["id"]:
@@ -369,7 +417,10 @@ def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
             st.session_state.get("selecionados", set()).discard(arq["id"])
             st.cache_data.clear()
             st.session_state.pop("confirm_delete", None)
-            (st.success if ok else st.error)(msg)
+            if ok:
+                st.session_state["toast"] = (msg, "✅")
+            else:
+                st.error(msg)
             st.rerun()
         if cc2.button("✗ Cancelar", key=f"canc_{arq['id']}"):
             st.session_state.pop("confirm_delete", None)
