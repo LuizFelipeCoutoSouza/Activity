@@ -1,53 +1,56 @@
 import streamlit as st
 from controller.UserController import UserController
 
-def login_page():
-    col_esquerda, col_direita = st.columns(2, border=True, gap=None)
 
-    with col_esquerda:
+def login_page():
+    col_esq, col_dir = st.columns(2, border=True)
+
+    with col_esq:
         st.header("Activity")
         st.subheader("Faça suas análises sobre os dados de actigrafia.")
-        st.write("Organize, filtre e visualize dados de actigrafia de forma interativa e acessível. Ajudamos pesquisadores e profissionais de saúde a entregar relatórios claros, precisos e fundamentados.")
+        st.write(
+            "Organize, filtre e visualize dados de actigrafia de forma interativa "
+            "e acessível. Ajudamos pesquisadores e profissionais de saúde a entregar "
+            "relatórios claros, precisos e fundamentados."
+        )
         container = st.container(border=True)
         with container:
             st.write("Pensado e desenvolvido pela EACH-USP")
             st.write("Ana Amélia, Laila e Luiz :)")
 
-    with col_direita:
-        st.header("Bem vindo!")
+        st.divider()
+        col1, col2, col3 = st.columns(3)
+        col1.markdown("[Privacidade](https://www.google.com)")
+        col2.markdown("[Segurança](https://www.google.com)")
+        col3.markdown("[Ajuda](https://www.google.com)")
+
+    with col_dir:
+        st.header("Bem-vindo!")
         st.write("Acesse o portal fazendo o login abaixo.")
 
-        email          = st.text_input("Email", placeholder="xxxx@email.com")
-        senha          = st.text_input("Senha", placeholder="**************", type="password")
-        mante_conectado = st.checkbox("Manter conectado por 30 dias")
+        email           = st.text_input("E-mail", placeholder="xxxx@email.com")
+        senha           = st.text_input("Senha", placeholder="Sua senha", type="password")
+        manter_conectado = st.checkbox("Manter conectado por 30 dias")
 
-        if st.button("Login ->", use_container_width=True):
+        if st.button("Entrar", type="primary", use_container_width=True):
             sucesso, mensagem, usuario = UserController.login(email, senha)
             if sucesso:
-                st.session_state["usuario"]        = usuario
+                st.session_state["usuario"]              = usuario
                 st.session_state["usuario"]["tipo_auth"] = "email"
-                st.session_state["logado"]         = True
-                st.session_state["pagina"]         = "home"
+                st.session_state["logado"]               = True
+                st.session_state["pagina"]               = "home"
                 st.rerun()
             else:
-                st.error(f"❌ {mensagem}")
+                st.error(mensagem)
 
-        if st.button("Google Auth"):
+        st.caption("— ou —")
+
+        if st.button("Entrar com Google", use_container_width=True):
             st.login()
 
         st.divider()
 
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.write("Novo na plataforma?")
-            if st.button("Faça seu cadastro", use_container_width=True):
-                st.session_state["pagina"] = "cadastro"
-                st.rerun()
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown("[Protocolo de Privacidade](https://www.google.com)")
-        with col2:
-            st.markdown("[Padrões de Segurança](https://www.google.com)")
-        with col3:
-            st.markdown("[Central de Ajuda](https://www.google.com)")
+        st.write("Novo na plataforma?")
+        if st.button("Criar uma conta", use_container_width=True):
+            st.session_state["pagina"] = "cadastro"
+            st.rerun()
