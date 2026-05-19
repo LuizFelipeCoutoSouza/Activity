@@ -111,6 +111,14 @@ def conjunto_de_dados_page():
     # Uma única query por render
     arquivos = ArquivoController.listar(usuario_id)
 
+    # Métricas gerais
+    total_bytes = sum(a["tamanho_bytes"] for a in arquivos)
+    total_linhas = sum(a.get("num_linhas") or 0 for a in arquivos)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Arquivos", len(arquivos))
+    col2.metric("Tamanho total", _formatar_bytes(total_bytes))
+    col3.metric("Linhas salvas", f"{total_linhas:,}")
+
     _secao_upload(usuario_id, aberto=len(arquivos) == 0)
     st.divider()
     _secao_listagem(usuario_id, arquivos)
