@@ -1,0 +1,93 @@
+import streamlit as st
+
+PAGINAS = [
+    ("📊", "Análises"),
+    ("🗃️", "Conjunto de dados"),
+    ("👥", "Registro de pacientes"),
+    ("📄", "Exportar relatório"),
+]
+
+def home_page():
+    usuario   = st.session_state.get("usuario", {})
+    tipo_auth = usuario.get("tipo_auth", "email")
+
+    _navbar(usuario)
+    _sidebar(tipo_auth)
+    _conteudo()
+
+
+# ── Navbar ────────────────────────────────────────────────────────────────────
+
+def _navbar(usuario):
+    nome = usuario.get("nome", "Usuário")
+    inicial = nome[0].upper()
+
+    col_brand, col_user = st.columns([5, 2])
+    col_brand.markdown("**Activity**")
+    col_user.markdown(f"**{inicial}** · {nome}")
+    st.divider()
+
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+
+def _sidebar(tipo_auth):
+    pagina_atual = st.session_state.get("pagina_atual", "Análises")
+
+    with st.sidebar:
+        st.markdown("## Activity")
+        st.divider()
+
+        for icone, nome in PAGINAS:
+            ativo = pagina_atual == nome
+            if st.button(
+                f"{icone}  {nome}",
+                use_container_width=True,
+                type="primary" if ativo else "secondary",
+                key=f"nav_{nome}",
+            ):
+                st.session_state["pagina_atual"] = nome
+                st.rerun()
+
+        st.divider()
+
+        if st.button("⚙️  Configurações", use_container_width=True, key="nav_config"):
+            st.session_state["pagina_atual"] = "Configurações"
+            st.rerun()
+
+        if st.button("🚪  Sair", use_container_width=True, key="nav_logout"):
+            _logout(tipo_auth)
+
+
+# ── Conteúdo principal ────────────────────────────────────────────────────────
+
+def _conteudo():
+    pagina = st.session_state.get("pagina_atual", "Análises")
+
+    if pagina == "Análises":
+        from view.pages.analises import analises_page
+        analises_page()
+    elif pagina == "Conjunto de dados":
+        from view.pages.conjunto_de_dados import conjunto_de_dados_page
+        conjunto_de_dados_page()
+    elif pagina == "Registro de pacientes":
+        from view.pages.registro_de_pacientes import registro_de_pacientes_page
+        registro_de_pacientes_page()
+    elif pagina == "Exportar relatório":
+        from view.pages.exportar_relatorio import exportar_relatorio_page
+        exportar_relatorio_page()
+    elif pagina == "Configurações":
+        from view.pages.configuracoes import configuracoes_page
+        configuracoes_page()
+
+
+# ── Logout ────────────────────────────────────────────────────────────────────
+
+def _logout(tipo_auth):
+    for chave in ("logado", "usuario", "pagina_atual"):
+        st.session_state.pop(chave, None)
+    st.session_state["pagina"] = "login"
+
+    if tipo_auth == "google":
+        st.logout()
+    else:
+        st.rerun()
