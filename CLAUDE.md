@@ -11,104 +11,176 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Install dependencies (activate venv first)
 source .venv/bin/activate
-pip install psycopg2-binary bcrypt streamlit
+pip install -r requirements.txt
 
 # Run the app
 streamlit run app.py
 ```
 
-The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` is called at startup and creates the `usuarios` table if it doesn't exist.
+The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` is called at startup, creates tables and runs idempotent `ALTER TABLE` migrations.
+
+## Dependencies
+
+Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
+
+| Pacote | Versão | Uso |
+|---|---|---|
+| `streamlit` | 1.57.0 | Framework principal de UI |
+| `psycopg2-binary` | 2.9.12 | Driver PostgreSQL; `RealDictCursor` para SELECT como dict |
+| `bcrypt` | 5.0.0 | Hash de senhas em `UserModel.criar_usuario` e verificação no login |
+| `streamlit-keyup` | 0.3.0 | `st_keyup` — dispara rerun a cada tecla (busca em tempo real em `conjunto_de_dados.py`) |
 
 ## File Structure
 
 ```
 Activity/
-├── app.py                        # Entry point: auth guard, DB init, page routing
-├── dependencias.txt              # pip install command for project dependencies
+├── app.py                          # Entry point: auth guard, DB init, page routing
+├── requirements.txt                # Dependências diretas com versões pinadas
 ├── .streamlit/
-│   ├── config.toml               # Streamlit theme config (light theme)
-│   └── secrets.toml              # Google OAuth credentials (client_id, client_secret, etc.)
+│   ├── config.toml                 # Streamlit theme (light)
+│   └── secrets.toml                # Google OAuth credentials — NÃO COMMITAR
 │
-├── model/                        # Data layer — direct PostgreSQL access
-│   ├── __init__.py
-│   ├── database.py               # get_connection() and init_db() (creates 'usuarios' table)
-│   └── UserModel.py              # Static CRUD: criar_usuario, listar_usuarios, buscar_por_id,
-│                                 #   buscar_por_email, atualizar_usuario, deletar_usuario
+├── model/                          # Camada de dados — acesso direto ao PostgreSQL
+│   ├── database.py                 # get_connection(), init_db() — migrações idempotentes
+│   ├── UserModel.py                # CRUD de usuários + foto + senha
+│   └── ArquivoModel.py             # CRUD de arquivos .txt (salvar, listar, buscar, deletar)
 │
-├── controller/                   # Business logic layer — validation + orchestration
-│   ├── __init__.py
-│   └── UserController.py         # Static methods: cadastrar, login, listar, atualizar, deletar
-│                                 #   Returns (bool, message) or (bool, message, dict)
+├── controller/                     # Camada de negócio — validação + orquestração
+│   ├── UserController.py           # cadastrar, login, atualizar_perfil, atualizar_foto,
+│   │                               #   atualizar_senha, listar, deletar
+│   └── ArquivoController.py        # fazer_upload, listar, baixar, atualizar_metadados,
+│                                   #   substituir_arquivo, deletar
 │
-└── view/                         # Presentation layer — Streamlit UI pages
-    ├── __init__.py
-    ├── login.py                  # login_page(): e-mail/senha + botão Google OAuth
-    ├── cadastro.py               # cadastro_page(): registration form with profession selectbox
-    ├── home.py                   # home_page(): shell autenticado — navbar, sidebar e roteamento
-    └── pages/                    # Uma página por arquivo; importadas lazily por home.py
-        ├── analises.py           # analises_page()
-        ├── conjunto_de_dados.py  # conjunto_de_dados_page()
-        ├── registro_de_pacientes.py  # registro_de_pacientes_page()
-        ├── exportar_relatorio.py # exportar_relatorio_page()
-        └── configuracoes.py      # configuracoes_page()
+└── view/                           # Camada de apresentação — UI Streamlit
+    ├── ui.py                       # Utilitários compartilhados (ver seção "view/ui.py")
+    ├── login.py                    # login_page()
+    ├── cadastro.py                 # cadastro_page()
+    ├── home.py                     # home_page(): navbar, sidebar, roteamento lazy
+    └── pages/                      # Uma página por arquivo; importadas lazily por home.py
+        ├── analises.py             # analises_page()          [em desenvolvimento]
+        ├── conjunto_de_dados.py    # conjunto_de_dados_page() [implementado]
+        ├── registro_de_pacientes.py# registro_de_pacientes_page() [em desenvolvimento]
+        ├── exportar_relatorio.py   # exportar_relatorio_page() [em desenvolvimento]
+        └── configuracoes.py        # configuracoes_page()     [implementado]
 ```
 
 ## Architecture
 
-The project follows MVC with three packages. Data flows strictly downward: `view → controller → model`.
+MVC estrito. O fluxo de dados desce em uma única direção: `view → controller → model`.
 
-**`app.py`** — bootstraps the app and é a única fonte de verdade de autenticação. Executa `init_db()`, avalia `google_logado` (`st.user.is_logged_in`) e `email_logado` (`st.session_state["logado"]`), e combina os dois em `autenticado`. Se o usuário veio do callback OAuth do Google, normaliza `st.user.name/email` em `st.session_state["usuario"]`. Rotas públicas (`login`, `cadastro`) são acessíveis sem autenticação; as demais são bloqueadas com `st.stop()`.
+**`app.py`** — única fonte de verdade de autenticação. Executa `init_db()`, detecta `google_logado` (`st.user.is_logged_in`) e `email_logado` (`st.session_state["logado"]`), combinando em `autenticado`. No primeiro render pós-callback Google, normaliza `st.user.name/email` em `st.session_state["usuario"]`. Rotas públicas: `login`, `cadastro`; todo o resto exige `autenticado`.
 
-**`model/database.py`** — single source of truth for DB connection. `get_connection()` returns a raw `psycopg2` connection. Every `UserModel` method opens and closes its own connection per call (no connection pooling).
+**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as tabelas e executa as migrações de colunas novas via `ADD COLUMN IF NOT EXISTS`.
 
-**`model/UserModel.py`** — pure DB operations, no validation. Uses `RealDictCursor` for `SELECT` queries so rows are returned as dicts. Passwords are hashed here with `bcrypt` before insertion.
+**`model/UserModel.py`** — operações de BD puras, sem validação. Usa `RealDictCursor` para SELECT. O helper `_row()` converte `RealDictRow` em `dict` e transforma colunas `BYTEA` (foto_perfil) de `memoryview` para `bytes`.
 
-**`controller/UserController.py`** — all validation lives here (required fields, password match, length, CPF length, duplicate email/CPF). Calls `UserModel` methods and wraps results in `(bool, message)` tuples. `login()` additionally returns the user dict as a third element.
+**`model/ArquivoModel.py`** — operações de BD para a tabela `arquivos`. Todos os métodos filtram por `usuario_id` para garantir isolamento entre usuários.
 
-**`view/login.py`** — two-column layout. Left column: app description. Right column: login form (e-mail/senha) + botão "Google Auth" que chama `st.login()`. On e-mail login success, seta `st.session_state["logado"] = True`, `st.session_state["pagina"] = "home"` e chama `st.rerun()`. O retorno do OAuth Google é tratado inteiramente em `app.py`.
+**`controller/UserController.py`** — toda validação de usuário fica aqui (campos obrigatórios, força de senha, CPF via `re.sub(r"\D","")`, duplicatas). Retorna `(bool, str)` ou `(bool, str, dict)`.
 
-**`view/cadastro.py`** — registration form. Profession is a `st.selectbox` with fixed options: Médico, Enfermeiro, Fisioterapeuta, Pesquisador, Admin.
+**`controller/ArquivoController.py`** — validação e orquestração de arquivos. Detecta encoding automático (`utf-8-sig`, `utf-8`, `latin-1`, `cp1252`). Retorna `(bool, str)`.
 
-**`view/home.py`** — shell autenticado. Não contém conteúdo de página; apenas renderiza navbar (logo + avatar do usuário), sidebar (links de navegação, configurações, logout) e roteia para o arquivo correto em `view/pages/` via import lazy baseado em `st.session_state["pagina_atual"]`. O logout chama `st.logout()` para sessões Google ou limpa `st.session_state` e chama `st.rerun()` para sessões por e-mail.
+**`view/ui.py`** — módulo de utilitários compartilhados (ver seção dedicada abaixo).
 
-**`view/pages/`** — cada arquivo é uma página autenticada independente com uma única função pública (`*_page()`). Para adicionar uma nova página: criar o arquivo em `view/pages/`, adicionar um `elif` em `_conteudo()` em `home.py`, e adicionar o botão correspondente em `_sidebar()` em `home.py`.
+**`view/login.py`** — layout dois colunas. Coluna esquerda: descrição do app. Coluna direita: form e-mail/senha + botão Google (`st.login()`). Sucesso: seta `st.session_state["logado"]`, `["usuario"]`, `["pagina"]` e chama `st.rerun()`.
+
+**`view/cadastro.py`** — formulário de cadastro. Usa `Profissao.opcoes()` e `forca_senha()` de `view/ui.py`.
+
+**`view/home.py`** — shell autenticado. Renderiza navbar (logo + avatar via `avatar_html()`), sidebar (botões de navegação + logout) e roteia para `view/pages/` via import lazy. Logout: `st.logout()` para Google; limpa session_state + `st.rerun()` para e-mail.
+
+**`view/pages/configuracoes.py`** — duas abas: **Perfil** (foto + formulário de dados) e **Segurança** (troca de senha). Aba Segurança desabilitada para contas Google. Usa `render_toast()` e `set_toast()` de `view/ui.py`.
+
+**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), seleção em massa, download (zip), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`.
+
+## view/ui.py — Utilitários compartilhados
+
+Qualquer código de UI reutilizável pertence aqui. Não duplicar em páginas individuais.
+
+| Exportação | Tipo | Descrição |
+|---|---|---|
+| `Profissao` | `str, Enum` | Profissões válidas; `.opcoes()` retorna `list[str]` para selectbox |
+| `AVATAR_NAV` | `int = 36` | Tamanho de avatar na navbar (px) |
+| `AVATAR_SM` | `int = 80` | Tamanho de avatar no cabeçalho de perfil (px) |
+| `AVATAR_LG` | `int = 120` | Tamanho de avatar na seção de foto (px) |
+| `fmt_cpf(cpf)` | `str → str` | Formata para `000.000.000-00`; aceita entrada com ou sem máscara |
+| `fmt_telefone(tel)` | `str → str` | Formata para `(00) 00000-0000` ou `(00) 0000-0000` |
+| `forca_senha(senha)` | `str → (int, str, str)` | Retorna `(score 0-4, label, emoji)` |
+| `img_b64_tag(bytes, tipo, px, caption?)` | `→ str` | HTML `<img>` circular base64 com dimensões fixas |
+| `avatar_html(nome, foto, tipo, px)` | `→ str` | Avatar circular: foto ou div com inicial; funciona inline e em bloco |
+| `set_toast(msg, icon?)` | `→ None` | Agenda toast para o próximo render (via `st.session_state`) |
+| `render_toast()` | `→ None` | Consome e exibe o toast pendente; chamar no início de cada página |
+
+**Padrão de toast cross-rerun:**
+```python
+# ao salvar:
+set_toast("Salvo com sucesso.")
+st.rerun()
+
+# no início da função de página:
+render_toast()
+```
+
+**Profissao enum** — herda de `str`, então `Profissao.MEDICO == "Médico"` é `True`. Usar `.opcoes()` em selectboxes e comparações diretas com valores do banco.
 
 ## Authentication
 
-Dois métodos coexistem; `app.py` combina os dois antes de rotear qualquer página:
+Dois métodos coexistem; `app.py` combina antes de rotear:
 
-| Método | Como detectar | Dados disponíveis |
-|--------|--------------|-------------------|
-| E-mail | `st.session_state["logado"] == True` | `st.session_state["usuario"]` (dict do banco) |
-| Google OAuth | `st.user.is_logged_in` | `st.user.name`, `st.user.email` (normalizados em `st.session_state["usuario"]` no primeiro render pós-callback) |
+| Método | Detectar | `st.session_state["usuario"]` |
+|--------|----------|-------------------------------|
+| E-mail | `st.session_state["logado"] == True` | dict completo do banco (inclui `id`, `cpf`, `foto_perfil`, etc.) |
+| Google OAuth | `st.user.is_logged_in` | `{"nome", "email", "tipo_auth": "google"}` (sem `id` se usuário não estiver no banco) |
 
-`st.session_state["usuario"]` sempre contém `{"nome", "email", "tipo_auth"}`, independente do método. Novas páginas devem ler apenas esse dict, nunca `st.user` diretamente.
+`st.session_state["usuario"]` para usuários e-mail contém todos os campos do perfil retornados por `buscar_por_email()`, incluindo `foto_perfil` (bytes ou None). Novas páginas devem ler apenas esse dict, nunca `st.user` diretamente.
 
-Credenciais OAuth ficam em `.streamlit/secrets.toml` (não commitar).
+Credenciais OAuth em `.streamlit/secrets.toml` — **não commitar**.
 
 ## Navigation
 
-Há dois níveis de roteamento:
+**Nível 1 — `app.py`**: `st.session_state["pagina"]` → `"login"` | `"cadastro"` | `"home"`.
 
-**Nível 1 — `app.py`** controla qual área o usuário acessa via `st.session_state["pagina"]` (valores: `"login"`, `"cadastro"`, `"home"`). Rotas públicas são `login` e `cadastro`; todo o resto exige autenticação.
-
-**Nível 2 — `home.py`** controla qual página autenticada é exibida via `st.session_state["pagina_atual"]` (valores: `"Análises"`, `"Conjunto de dados"`, `"Registro de pacientes"`, `"Exportar relatório"`, `"Configurações"`). A sidebar altera esse valor e chama `st.rerun()`.
+**Nível 2 — `home.py`**: `st.session_state["pagina_atual"]` → `"Análises"` | `"Conjunto de dados"` | `"Registro de pacientes"` | `"Exportar relatório"` | `"Configurações"`.
 
 Para adicionar uma nova página autenticada:
 1. Criar `view/pages/minha_pagina.py` com `minha_pagina_page()`.
-2. Adicionar um `elif` em `_conteudo()` em `home.py`.
-3. Adicionar o botão correspondente em `_sidebar()` em `home.py`.
+2. Adicionar `elif` em `_conteudo()` em `home.py`.
+3. Adicionar botão correspondente em `_sidebar()` em `home.py`.
 
 ## Database
 
-Connection hardcoded in `model/database.py` (`localhost:5432`, database `Activity`, user/password `postgres`). The `usuarios` table schema:
+Conexão hardcoded em `model/database.py` (`localhost:5432`, database `Activity`, user/password `postgres`).
 
-| Column      | Type           | Constraint         |
-|-------------|----------------|--------------------|
-| id          | SERIAL         | PRIMARY KEY        |
-| nome        | VARCHAR(255)   | NOT NULL           |
-| email       | VARCHAR(255)   | UNIQUE, NOT NULL   |
-| cpf         | VARCHAR(14)    | UNIQUE, NOT NULL   |
-| senha       | VARCHAR(255)   | NOT NULL (bcrypt)  |
-| profissao   | VARCHAR(100)   | NOT NULL           |
-| criado_em   | TIMESTAMP      | DEFAULT NOW()      |
+### Tabela `usuarios`
+
+| Coluna           | Tipo           | Constraint              |
+|------------------|----------------|-------------------------|
+| id               | SERIAL         | PRIMARY KEY             |
+| nome             | VARCHAR(255)   | NOT NULL                |
+| email            | VARCHAR(255)   | UNIQUE, NOT NULL        |
+| cpf              | VARCHAR(14)    | UNIQUE, NOT NULL        |
+| senha            | VARCHAR(255)   | NOT NULL (bcrypt)       |
+| profissao        | VARCHAR(100)   | NOT NULL                |
+| telefone         | VARCHAR(20)    | nullable                |
+| data_nascimento  | DATE           | nullable                |
+| bio              | TEXT           | nullable                |
+| foto_perfil      | BYTEA          | nullable                |
+| foto_nome        | VARCHAR(255)   | nullable                |
+| foto_tipo        | VARCHAR(50)    | nullable (MIME type)    |
+| criado_em        | TIMESTAMP      | DEFAULT CURRENT_TIMESTAMP |
+
+### Tabela `arquivos`
+
+| Coluna        | Tipo         | Constraint                                  |
+|---------------|--------------|---------------------------------------------|
+| id            | SERIAL       | PRIMARY KEY                                 |
+| usuario_id    | INTEGER      | NOT NULL, FK → usuarios(id) ON DELETE CASCADE |
+| nome          | VARCHAR(255) | NOT NULL                                    |
+| descricao     | TEXT         | DEFAULT ''                                  |
+| tamanho_bytes | INTEGER      | NOT NULL                                    |
+| num_linhas    | INTEGER      | nullable                                    |
+| encoding      | VARCHAR(50)  | nullable                                    |
+| conteudo      | BYTEA        | NOT NULL                                    |
+| criado_em     | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
+| atualizado_em | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
+
+Novas colunas são adicionadas via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` em `init_db()` — as migrações são idempotentes.
