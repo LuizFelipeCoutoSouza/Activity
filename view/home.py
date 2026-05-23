@@ -94,6 +94,13 @@ def _conteudo():
 # ── Logout ────────────────────────────────────────────────────────────────────
 
 def _logout(tipo_auth: str):
+    if tipo_auth == "email":
+        token = st.session_state.pop("_session_token", None)
+        if token:
+            from model.SessaoModel import SessaoModel
+            SessaoModel.deletar(token)
+        st.session_state["_delete_cookie"] = True
+
     for chave in ("logado", "usuario", "pagina_atual"):
         st.session_state.pop(chave, None)
     st.session_state["pagina"] = "login"

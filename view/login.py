@@ -1,5 +1,6 @@
 import streamlit as st
 from controller.UserController import UserController
+from model.SessaoModel import SessaoModel
 
 
 def login_page():
@@ -28,17 +29,23 @@ def login_page():
         st.header("Bem-vindo!")
         st.write("Acesse o portal fazendo o login abaixo.")
 
-        email           = st.text_input("E-mail", placeholder="xxxx@email.com")
-        senha           = st.text_input("Senha", placeholder="Sua senha", type="password")
+        email            = st.text_input("E-mail", placeholder="xxxx@email.com")
+        senha            = st.text_input("Senha", placeholder="Sua senha", type="password")
         manter_conectado = st.checkbox("Manter conectado por 30 dias")
 
         if st.button("Entrar", type="primary", use_container_width=True):
             sucesso, mensagem, usuario = UserController.login(email, senha)
             if sucesso:
+                # dias=0 → session cookie; dias=30 → cookie persistente de 30 dias
+                dias  = 30 if manter_conectado else 0
+                token = SessaoModel.criar(usuario["id"], dias)
+
                 st.session_state["usuario"]              = usuario
                 st.session_state["usuario"]["tipo_auth"] = "email"
                 st.session_state["logado"]               = True
                 st.session_state["pagina"]               = "home"
+                st.session_state["_session_token"]       = token
+                st.session_state["_set_cookie"]          = {"token": token, "dias": dias}
                 st.rerun()
             else:
                 st.error(mensagem)

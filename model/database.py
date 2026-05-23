@@ -57,6 +57,16 @@ def init_db():
         );
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sessoes (
+            id         SERIAL      PRIMARY KEY,
+            token      VARCHAR(36) UNIQUE NOT NULL,
+            usuario_id INTEGER     NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            criado_em  TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+            expira_em  TIMESTAMP   NOT NULL
+        );
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()
