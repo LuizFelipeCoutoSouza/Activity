@@ -17,7 +17,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` is called at startup, creates tables and runs idempotent `ALTER TABLE` migrations.
+The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` is called at startup and creates both tables with o esquema completo via `CREATE TABLE IF NOT EXISTS`.
 
 ## Dependencies
 
@@ -70,7 +70,7 @@ MVC estrito. O fluxo de dados desce em uma única direção: `view → controlle
 
 **`app.py`** — única fonte de verdade de autenticação. Executa `init_db()`, detecta `google_logado` (`st.user.is_logged_in`) e `email_logado` (`st.session_state["logado"]`), combinando em `autenticado`. No primeiro render pós-callback Google, normaliza `st.user.name/email` em `st.session_state["usuario"]`. Rotas públicas: `login`, `cadastro`; todo o resto exige `autenticado`.
 
-**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as tabelas e executa as migrações de colunas novas via `ADD COLUMN IF NOT EXISTS`.
+**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
 
 **`model/UserModel.py`** — operações de BD puras, sem validação. Usa `RealDictCursor` para SELECT. O helper `_row()` converte `RealDictRow` em `dict` e transforma colunas `BYTEA` (foto_perfil) de `memoryview` para `bytes`.
 
@@ -183,4 +183,4 @@ Conexão hardcoded em `model/database.py` (`localhost:5432`, database `Activity`
 | criado_em     | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
 | atualizado_em | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
 
-Novas colunas são adicionadas via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` em `init_db()` — as migrações são idempotentes.
+Ambas as tabelas são criadas com o esquema completo em `init_db()` via `CREATE TABLE IF NOT EXISTS`. Para adicionar colunas em bancos já existentes, executar o `ALTER TABLE` manualmente ou recriar o banco.
