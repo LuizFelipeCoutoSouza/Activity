@@ -17,7 +17,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` is called at startup and creates both tables with o esquema completo via `CREATE TABLE IF NOT EXISTS`.
+The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` is called at startup and cria as três tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
 
 ## Dependencies
 
@@ -34,16 +34,17 @@ Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
 
 ```
 Activity/
-├── app.py                          # Entry point: auth guard, DB init, page routing
+├── app.py                          # Entry point: cookie ops, session restore, auth guard, routing
 ├── requirements.txt                # Dependências diretas com versões pinadas
 ├── .streamlit/
 │   ├── config.toml                 # Streamlit theme (light)
 │   └── secrets.toml                # Google OAuth credentials — NÃO COMMITAR
 │
 ├── model/                          # Camada de dados — acesso direto ao PostgreSQL
-│   ├── database.py                 # get_connection(), init_db() — migrações idempotentes
+│   ├── database.py                 # get_connection(), init_db() — cria as 3 tabelas
 │   ├── UserModel.py                # CRUD de usuários + foto + senha
-│   └── ArquivoModel.py             # CRUD de arquivos .txt (salvar, listar, buscar, deletar)
+│   ├── ArquivoModel.py             # CRUD de arquivos .txt (salvar, listar, buscar, deletar)
+│   └── SessaoModel.py              # CRUD de sessões persistentes (criar, buscar, deletar)
 │
 ├── controller/                     # Camada de negócio — validação + orquestração
 │   ├── UserController.py           # cadastrar, login, atualizar_perfil, atualizar_foto,
@@ -68,13 +69,20 @@ Activity/
 
 MVC estrito. O fluxo de dados desce em uma única direção: `view → controller → model`.
 
-**`app.py`** — única fonte de verdade de autenticação. Executa `init_db()`, detecta `google_logado` (`st.user.is_logged_in`) e `email_logado` (`st.session_state["logado"]`), combinando em `autenticado`. No primeiro render pós-callback Google, normaliza `st.user.name/email` em `st.session_state["usuario"]`. Rotas públicas: `login`, `cadastro`; todo o resto exige `autenticado`.
+**`app.py`** — única fonte de verdade de autenticação. Ordem de execução em cada render:
+1. `init_db()` (idempotente)
+2. Processa operações pendentes de cookie (`_set_cookie` / `_delete_cookie` em session_state) via `streamlit.components.v1.html()`
+3. Detecta `google_logado` e `email_logado`
+4. Tenta restaurar sessão a partir do cookie HTTP (`st.context.cookies`) se não autenticado
+5. Roteia: públicas (`login`, `cadastro`) ou protegidas (`home`)
 
-**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
+**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as três tabelas (`usuarios`, `arquivos`, `sessoes`) via `CREATE TABLE IF NOT EXISTS`.
 
 **`model/UserModel.py`** — operações de BD puras, sem validação. Usa `RealDictCursor` para SELECT. O helper `_row()` converte `RealDictRow` em `dict` e transforma colunas `BYTEA` (foto_perfil) de `memoryview` para `bytes`.
 
 **`model/ArquivoModel.py`** — operações de BD para a tabela `arquivos`. Todos os métodos filtram por `usuario_id` para garantir isolamento entre usuários.
+
+**`model/SessaoModel.py`** — operações de BD para a tabela `sessoes`. Métodos: `criar(usuario_id, dias)` → token UUID; `buscar_usuario_id(token)` → int | None (valida expiração); `deletar(token)` → None.
 
 **`controller/UserController.py`** — toda validação de usuário fica aqui (campos obrigatórios, força de senha, CPF via `re.sub(r"\D","")`, duplicatas). Retorna `(bool, str)` ou `(bool, str, dict)`.
 
@@ -82,15 +90,15 @@ MVC estrito. O fluxo de dados desce em uma única direção: `view → controlle
 
 **`view/ui.py`** — módulo de utilitários compartilhados (ver seção dedicada abaixo).
 
-**`view/login.py`** — layout dois colunas. Coluna esquerda: descrição do app. Coluna direita: form e-mail/senha + botão Google (`st.login()`). Sucesso: seta `st.session_state["logado"]`, `["usuario"]`, `["pagina"]` e chama `st.rerun()`.
+**`view/login.py`** — layout dois colunas. Sucesso no login: chama `SessaoModel.criar()`, armazena o token em `_set_cookie` e `_session_token` no session_state, seta `logado`/`usuario`/`pagina` e chama `st.rerun()`. O cookie é gravado no browser no render seguinte por `app.py`.
 
 **`view/cadastro.py`** — formulário de cadastro. Usa `Profissao.opcoes()` e `forca_senha()` de `view/ui.py`.
 
-**`view/home.py`** — shell autenticado. Renderiza navbar (logo + avatar via `avatar_html()`), sidebar (botões de navegação + logout) e roteia para `view/pages/` via import lazy. Logout: `st.logout()` para Google; limpa session_state + `st.rerun()` para e-mail.
+**`view/home.py`** — shell autenticado. Renderiza navbar (logo + avatar via `avatar_html()`), sidebar (botões de navegação + logout) e roteia para `view/pages/` via import lazy. Logout e-mail: deleta sessão do banco via `SessaoModel.deletar()`, agenda deleção do cookie (`_delete_cookie = True`) e chama `st.rerun()`. Logout Google: `st.logout()`.
 
 **`view/pages/configuracoes.py`** — duas abas: **Perfil** (foto + formulário de dados) e **Segurança** (troca de senha). Aba Segurança desabilitada para contas Google. Usa `render_toast()` e `set_toast()` de `view/ui.py`.
 
-**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), seleção em massa, download (zip), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`.
+**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`.
 
 ## view/ui.py — Utilitários compartilhados
 
@@ -134,6 +142,31 @@ Dois métodos coexistem; `app.py` combina antes de rotear:
 `st.session_state["usuario"]` para usuários e-mail contém todos os campos do perfil retornados por `buscar_por_email()`, incluindo `foto_perfil` (bytes ou None). Novas páginas devem ler apenas esse dict, nunca `st.user` diretamente.
 
 Credenciais OAuth em `.streamlit/secrets.toml` — **não commitar**.
+
+### Persistência de sessão entre refreshes (login por e-mail)
+
+`st.session_state` é volátil — zerado em cada refresh de página. Para o login por e-mail, a sessão é persistida via cookie HTTP + tabela `sessoes` no banco:
+
+| Evento | O que acontece |
+|--------|----------------|
+| Login | `SessaoModel.criar()` grava token UUID → `_set_cookie` agendado em session_state |
+| Próximo render | `app.py` detecta `_set_cookie` → injeta JS via `components.html()` que escreve o cookie |
+| Refresh (F5) | `st.context.cookies` lê o token → `SessaoModel.buscar_usuario_id()` valida → perfil recarregado |
+| Logout | Token deletado do banco → `_delete_cookie` agendado → JS apaga o cookie no próximo render |
+
+**"Manter conectado por 30 dias"** (checkbox na tela de login):
+- Marcado (`dias=30`) → cookie com `max-age=30 dias` + sessão no banco com 30 dias
+- Desmarcado (`dias=0`) → session cookie (some ao fechar o browser) + sessão no banco com 2 horas
+
+**Chaves reservadas de session_state para o mecanismo de sessão:**
+
+| Chave | Tipo | Descrição |
+|-------|------|-----------|
+| `_session_token` | `str` | Token UUID da sessão ativa; usado pelo logout para deletar do banco |
+| `_set_cookie` | `dict` | `{"token": str, "dias": int}` — agendado por login, consumido por `app.py` |
+| `_delete_cookie` | `bool` | `True` — agendado por logout, consumido por `app.py` |
+
+O Google OAuth não usa este mecanismo — a persistência é gerenciada pelo próprio Streamlit.
 
 ## Navigation
 
@@ -183,4 +216,14 @@ Conexão hardcoded em `model/database.py` (`localhost:5432`, database `Activity`
 | criado_em     | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
 | atualizado_em | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
 
-Ambas as tabelas são criadas com o esquema completo em `init_db()` via `CREATE TABLE IF NOT EXISTS`. Para adicionar colunas em bancos já existentes, executar o `ALTER TABLE` manualmente ou recriar o banco.
+### Tabela `sessoes`
+
+| Coluna     | Tipo         | Constraint                                  |
+|------------|--------------|---------------------------------------------|
+| id         | SERIAL       | PRIMARY KEY                                 |
+| token      | VARCHAR(36)  | UNIQUE, NOT NULL (UUID v4)                  |
+| usuario_id | INTEGER      | NOT NULL, FK → usuarios(id) ON DELETE CASCADE |
+| criado_em  | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
+| expira_em  | TIMESTAMP    | NOT NULL                                    |
+
+As três tabelas são criadas com esquema completo em `init_db()` via `CREATE TABLE IF NOT EXISTS`. Para adicionar colunas em bancos já existentes, executar o `ALTER TABLE` manualmente ou recriar o banco.
