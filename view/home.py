@@ -1,4 +1,9 @@
+"""
+view/home.py — Shell autenticado: navbar, sidebar e roteamento entre páginas.
+"""
+
 import streamlit as st
+from view.ui import avatar_html, AVATAR_NAV
 
 PAGINAS = [
     ("📊", "Análises"),
@@ -6,6 +11,7 @@ PAGINAS = [
     ("👥", "Registro de pacientes"),
     ("📄", "Exportar relatório"),
 ]
+
 
 def home_page():
     usuario   = st.session_state.get("usuario", {})
@@ -18,19 +24,24 @@ def home_page():
 
 # ── Navbar ────────────────────────────────────────────────────────────────────
 
-def _navbar(usuario):
-    nome = usuario.get("nome", "Usuário")
-    inicial = nome[0].upper()
+def _navbar(usuario: dict):
+    nome      = usuario.get("nome", "Usuário")
+    foto      = usuario.get("foto_perfil")
+    foto_tipo = usuario.get("foto_tipo")
 
     col_brand, col_user = st.columns([5, 2])
     col_brand.markdown("**Activity**")
-    col_user.markdown(f"**{inicial}** · {nome}")
+    col_user.markdown(
+        f'{avatar_html(nome, foto, foto_tipo, AVATAR_NAV)} '
+        f'<strong style="vertical-align:middle;">{nome}</strong>',
+        unsafe_allow_html=True,
+    )
     st.divider()
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
-def _sidebar(tipo_auth):
+def _sidebar(tipo_auth: str):
     pagina_atual = st.session_state.get("pagina_atual", "Análises")
 
     with st.sidebar:
@@ -58,7 +69,7 @@ def _sidebar(tipo_auth):
             _logout(tipo_auth)
 
 
-# ── Conteúdo principal ────────────────────────────────────────────────────────
+# ── Roteamento de conteúdo ────────────────────────────────────────────────────
 
 def _conteudo():
     pagina = st.session_state.get("pagina_atual", "Análises")
@@ -82,7 +93,7 @@ def _conteudo():
 
 # ── Logout ────────────────────────────────────────────────────────────────────
 
-def _logout(tipo_auth):
+def _logout(tipo_auth: str):
     for chave in ("logado", "usuario", "pagina_atual"):
         st.session_state.pop(chave, None)
     st.session_state["pagina"] = "login"

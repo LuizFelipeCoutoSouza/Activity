@@ -1,3 +1,13 @@
+"""
+app.py — Ponto de entrada da aplicação Activity.
+
+Responsabilidades:
+  - Inicializar o banco de dados (init_db).
+  - Detectar autenticação por e-mail ou Google OAuth.
+  - Normalizar os dados do usuário em st.session_state["usuario"].
+  - Rotear para as áreas públicas (login, cadastro) ou protegidas (home).
+"""
+
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))

@@ -1,3 +1,9 @@
+"""
+view/pages/conjunto_de_dados.py — Gerenciamento de arquivos .txt do usuário.
+
+Funcionalidades: upload, listagem paginada, busca, edição e exclusão (individual e em massa).
+"""
+
 import io
 import zipfile
 from datetime import datetime, timedelta
@@ -5,6 +11,7 @@ from datetime import datetime, timedelta
 import streamlit as st
 from st_keyup import st_keyup
 from controller.ArquivoController import ArquivoController
+from view.ui import set_toast, render_toast
 
 POR_PAGINA = 5
 
@@ -79,7 +86,7 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
         if ok:
             st.cache_data.clear()
             st.session_state.pop("editando_id", None)
-            st.session_state["toast"] = ("Arquivo atualizado com sucesso.", "✅")
+            set_toast("Arquivo atualizado com sucesso.")
             st.rerun()
         else:
             st.error(msg)
@@ -101,10 +108,7 @@ def conjunto_de_dados_page():
         st.info("Esta funcionalidade está disponível apenas para usuários cadastrados com e-mail.")
         return
 
-    # Toast de feedback persistente entre reruns
-    if "toast" in st.session_state:
-        msg, icon = st.session_state.pop("toast")
-        st.toast(msg, icon=icon)
+    render_toast()
 
     if "editando_id" in st.session_state:
         _dialogo_editar(st.session_state["editando_id"], usuario_id)
@@ -304,7 +308,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
             st.session_state["chk_gen"] += 1
             st.cache_data.clear()
             st.session_state.pop("bulk_delete_ids", None)
-            st.session_state["toast"] = (f"{len(ids_del)} arquivo(s) excluído(s).", "✅")
+            set_toast(f"{len(ids_del)} arquivo(s) excluído(s).")
             st.rerun()
         if cd2.button("✗ Cancelar", key="canc_bulk_del", use_container_width=True):
             st.session_state.pop("bulk_delete_ids", None)
@@ -430,7 +434,7 @@ def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
             st.cache_data.clear()
             st.session_state.pop("confirm_delete", None)
             if ok:
-                st.session_state["toast"] = (msg, "✅")
+                set_toast(msg)
             else:
                 st.error(msg)
             st.rerun()
