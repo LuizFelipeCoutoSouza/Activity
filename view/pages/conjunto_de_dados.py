@@ -19,7 +19,6 @@ from view.ui import set_toast, render_toast, get_usuario_id, paginacao
 POR_PAGINA   = 5
 OPCOES_ORDEM = ["Nome", "Data de envio", "Tamanho", "Linhas", "Atualização"]
 
-# Mapeamento draft ↔ aplicado (mesma ordem)
 _CHAVES_DRAFT  = ["_d_data_ini", "_d_data_fim", "_d_ordenar_por", "_d_ordem_asc", "_d_apenas_atualizados"]
 _CHAVES_FILTRO = ["filtro_data_ini", "filtro_data_fim", "filtro_ordenar_por", "filtro_ordem_asc", "filtro_apenas_atualizados"]
 
@@ -64,9 +63,8 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
     novo_nome = st.text_input(
         "Nome do arquivo",
         value=nome_sem_ext,
-        help="A extensão .txt é adicionada automaticamente",
+        help="A extensão .txt é adicionada automaticamente ao salvar.",
     )
-    st.caption("A extensão `.txt` é adicionada automaticamente ao salvar.")
     nova_desc = st.text_area(
         "Descrição",
         value=arquivo.get("descricao") or "",
@@ -99,6 +97,47 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
         st.rerun()
 
 
+# ── Diálogos de exclusão ──────────────────────────────────────────────────────
+
+@st.dialog("Excluir arquivo")
+def _dialogo_excluir(arquivo_id: int, usuario_id: int, nome: str):
+    st.write(f"Tem certeza que deseja excluir **{nome}**?")
+    st.caption("Esta ação não pode ser desfeita.")
+    col1, col2 = st.columns(2)
+    if col1.button("Excluir", type="primary", width="stretch"):
+        ok, msg = ArquivoController.deletar(arquivo_id, usuario_id)
+        st.session_state.get("selecionados", set()).discard(arquivo_id)
+        st.cache_data.clear()
+        st.session_state.pop("confirm_delete", None)
+        set_toast(msg) if ok else st.error(msg)
+        st.rerun()
+    if col2.button("Cancelar", width="stretch"):
+        st.session_state.pop("confirm_delete", None)
+        st.rerun()
+
+
+@st.dialog("Excluir arquivos")
+def _dialogo_excluir_em_massa(ids: list, usuario_id: int, nomes: list):
+    n = len(ids)
+    st.write(f"Tem certeza que deseja excluir **{n}** arquivo(s)?")
+    preview = nomes[:5]
+    st.markdown("\n".join(f"- {nome}" for nome in preview) + (f"\n- … e mais {n - 5}" if n > 5 else ""))
+    st.caption("Esta ação não pode ser desfeita.")
+    col1, col2 = st.columns(2)
+    if col1.button(f"Excluir {n}", type="primary", width="stretch"):
+        for arq_id in ids:
+            ArquivoController.deletar(arq_id, usuario_id)
+        st.session_state["selecionados"] -= set(ids)
+        st.session_state["chk_gen"] += 1
+        st.cache_data.clear()
+        st.session_state.pop("bulk_delete_ids", None)
+        set_toast(f"{n} arquivo(s) excluído(s).")
+        st.rerun()
+    if col2.button("Cancelar", width="stretch"):
+        st.session_state.pop("bulk_delete_ids", None)
+        st.rerun()
+
+
 # ── Página principal ──────────────────────────────────────────────────────────
 
 def conjunto_de_dados_page():
@@ -110,10 +149,23 @@ def conjunto_de_dados_page():
 
     render_toast()
 
+    arquivos = ArquivoController.listar(usuario_id)
+
     if "editando_id" in st.session_state:
         _dialogo_editar(st.session_state["editando_id"], usuario_id)
 
-    arquivos = ArquivoController.listar(usuario_id)
+    if "confirm_delete" in st.session_state:
+        arq_id = st.session_state["confirm_delete"]
+        arquivo = next((a for a in arquivos if a["id"] == arq_id), None)
+        if arquivo:
+            _dialogo_excluir(arq_id, usuario_id, arquivo["nome"])
+        else:
+            st.session_state.pop("confirm_delete", None)
+
+    if "bulk_delete_ids" in st.session_state:
+        ids_del   = st.session_state["bulk_delete_ids"]
+        nomes_del = [a["nome"] for a in arquivos if a["id"] in ids_del]
+        _dialogo_excluir_em_massa(ids_del, usuario_id, nomes_del)
 
     total_bytes  = sum(a["tamanho_bytes"] for a in arquivos)
     total_linhas = sum(a.get("num_linhas") or 0 for a in arquivos)
@@ -185,9 +237,9 @@ def _secao_upload(usuario_id: int):
                 ok, msg = ArquivoController.fazer_upload(usuario_id, f, descricoes.get(f.name, ""))
                 msgs.append((ok, msg))
 
-        st.session_state["upload_msg"]    = _resumir_upload(msgs)
+        st.session_state["upload_msg"]     = _resumir_upload(msgs)
         st.session_state["upload_counter"] = counter + 1
-        st.session_state["pag_arquivos"]  = 0
+        st.session_state["pag_arquivos"]   = 0
         st.rerun()
 
 
@@ -206,7 +258,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
     sel        &= ids_atuais
     gen: int   = st.session_state.setdefault("chk_gen", 0)
 
-    # ── dispara download automático após ZIP gerado ───────────────────
+    # Dispara download automático após ZIP gerado
     if "zip_pronto" in st.session_state:
         zip_bytes, zip_nome, n_zip = st.session_state.pop("zip_pronto")
         b64 = base64.b64encode(zip_bytes).decode()
@@ -225,10 +277,8 @@ def _secao_listagem(usuario_id: int, arquivos: list):
         )
         st.toast(f"{n_zip} arquivo(s) compactado(s). Download iniciado.", icon="✅")
 
-    # Renderiza painel de filtros (draft → widgets)
     _painel_filtros()
 
-    # Lê os valores APLICADOS (não os drafts) para filtrar
     busca     = st.session_state.get("busca_arquivo", "")
     data_ini  = st.session_state.get("filtro_data_ini")
     data_fim  = st.session_state.get("filtro_data_fim")
@@ -236,9 +286,8 @@ def _secao_listagem(usuario_id: int, arquivos: list):
     ordenar   = st.session_state.get("filtro_ordenar_por", "Nome")
     asc       = st.session_state.get("filtro_ordem_asc", True)
 
-    # Busca textual é reativa: reseta paginação quando muda
     if busca != st.session_state.get("_busca_anterior", ""):
-        st.session_state["pag_arquivos"]   = 0
+        st.session_state["pag_arquivos"]    = 0
         st.session_state["_busca_anterior"] = busca
 
     arquivos_filtrados = _aplicar_filtros(arquivos, busca, data_ini, data_fim, apenas_at, ordenar, asc)
@@ -247,9 +296,10 @@ def _secao_listagem(usuario_id: int, arquivos: list):
     n_paginas = max(1, (n_filtrado + POR_PAGINA - 1) // POR_PAGINA)
     pagina    = min(max(st.session_state.get("pag_arquivos", 0), 0), n_paginas - 1)
     st.session_state["pag_arquivos"] = pagina
-    inicio = pagina * POR_PAGINA
+    inicio          = pagina * POR_PAGINA
     arquivos_pagina = arquivos_filtrados[inicio : inicio + POR_PAGINA]
 
+    # Título + controles de seleção na mesma linha
     ha_filtros = any([busca, data_ini, data_fim, apenas_at])
     if ha_filtros:
         titulo = f"Meus arquivos — {n_filtrado} de {n} resultado(s)"
@@ -257,64 +307,44 @@ def _secao_listagem(usuario_id: int, arquivos: list):
         titulo = f"Meus arquivos — página {pagina + 1} de {n_paginas} ({n} no total)"
     else:
         titulo = f"Meus arquivos ({n})"
-    st.subheader(titulo)
+
+    n_sel = len(sel)
+    col_titulo, col_sel_all, col_desel = st.columns([5, 1.5, 1.5])
+    col_titulo.subheader(titulo)
+    if col_sel_all.button("Selecionar todos", width="stretch", key="btn_sel_all"):
+        st.session_state["selecionados"] = ids_atuais.copy()
+        st.session_state["chk_gen"]      = gen + 1
+        st.rerun()
+    if col_desel.button("Limpar seleção", width="stretch", key="btn_des_all", disabled=n_sel == 0):
+        st.session_state["selecionados"] = set()
+        st.session_state["chk_gen"]      = gen + 1
+        st.rerun()
 
     if n_filtrado == 0:
         st.info("Nenhum arquivo corresponde aos filtros aplicados.")
         return
 
-    # Controles de seleção em massa
-    n_sel = len(sel)
-    c1, c2, *_ = st.columns([2.5, 2.5, 6])
-    if c1.button("Selecionar todos", width="stretch", key="btn_sel_all"):
-        st.session_state["selecionados"] = ids_atuais.copy()
-        st.session_state["chk_gen"]      = gen + 1
-        st.rerun()
-    if c2.button("Limpar seleção", width="stretch", key="btn_des_all", disabled=n_sel == 0):
-        st.session_state["selecionados"] = set()
-        st.session_state["chk_gen"]      = gen + 1
-        st.rerun()
-
+    # Barra de ações em massa — visível apenas quando há itens selecionados
     if n_sel > 0:
-        ba1, ba2 = st.columns(2)
-        if ba1.button(
-            f"⬇️  Download ({n_sel} arquivo(s))",
-            type="primary",
-            width="stretch",
-            key="btn_bulk_dl",
-        ):
-            with st.spinner("Compactando arquivos..."):
-                zip_bytes, zip_nome, n = ArquivoController.gerar_zip(list(sel), usuario_id)
-            if zip_bytes:
-                st.session_state["zip_pronto"] = (zip_bytes, zip_nome, n)
-            else:
-                st.error("Nenhum arquivo pôde ser compactado.")
-            st.rerun()
-        if ba2.button(f"🗑️  Excluir ({n_sel} arquivo(s))", width="stretch", key="btn_bulk_del"):
-            st.session_state["bulk_delete_ids"] = list(sel)
+        with st.container(border=True):
+            c_info, c_dl, c_del = st.columns([4, 2, 2])
+            c_info.markdown(f"**{n_sel}** arquivo(s) selecionado(s)")
+            if c_dl.button("⬇️  Download", type="primary", width="stretch", key="btn_bulk_dl"):
+                with st.spinner("Compactando arquivos..."):
+                    zip_bytes, zip_nome, n = ArquivoController.gerar_zip(list(sel), usuario_id)
+                if zip_bytes:
+                    st.session_state["zip_pronto"] = (zip_bytes, zip_nome, n)
+                else:
+                    st.error("Nenhum arquivo pôde ser compactado.")
+                st.rerun()
+            if c_del.button("🗑️  Excluir", width="stretch", key="btn_bulk_del"):
+                st.session_state["bulk_delete_ids"] = list(sel)
+                st.rerun()
 
-    if "bulk_delete_ids" in st.session_state:
-        ids_del   = st.session_state["bulk_delete_ids"]
-        nomes_del = [a["nome"] for a in arquivos if a["id"] in ids_del]
-        preview   = ", ".join(nomes_del[:3]) + (" ..." if len(nomes_del) > 3 else "")
-        st.warning(f"Excluir **{len(ids_del)}** arquivo(s)? ({preview})")
-        cd1, cd2 = st.columns(2)
-        if cd1.button("✓ Confirmar exclusão", type="primary", key="conf_bulk_del", width="stretch"):
-            for arq_id in ids_del:
-                ArquivoController.deletar(arq_id, usuario_id)
-            st.session_state["selecionados"] -= set(ids_del)
-            st.session_state["chk_gen"]      += 1
-            st.cache_data.clear()
-            st.session_state.pop("bulk_delete_ids", None)
-            set_toast(f"{len(ids_del)} arquivo(s) excluído(s).")
-            st.rerun()
-        if cd2.button("✗ Cancelar", key="canc_bulk_del", width="stretch"):
-            st.session_state.pop("bulk_delete_ids", None)
-            st.rerun()
-
-    cols_h = st.columns([0.5, 4, 2.5, 1.5, 3])
-    for col, h in zip(cols_h, ["", "Nome do arquivo", "Descrição", "Atualização", "Ações"]):
-        col.markdown(f"**{h}**")
+    cols_h = st.columns([0.5, 4, 2.5, 1.8, 1, 1, 1])
+    for col, h in zip(cols_h, ["", "Nome do arquivo", "Descrição", "Atualização", "", "", ""]):
+        if h:
+            col.markdown(f"**{h}**")
 
     for arq in arquivos_pagina:
         _linha_arquivo(arq, usuario_id, gen)
@@ -326,55 +356,44 @@ def _secao_listagem(usuario_id: int, arquivos: list):
 
 def _painel_filtros() -> None:
     """
-    Renderiza a barra de busca e a linha de filtros compacta.
-
-    Os widgets escrevem em chaves de rascunho (_d_*). O botão "Aplicar"
-    copia os rascunhos para as chaves efetivas (filtro_*) e reseta a paginação.
-    A busca textual é reativa e não depende do botão "Aplicar".
+    Busca textual sempre visível (reativa). Filtros de data, ordenação e
+    checkboxes ficam num expander para não poluir a listagem por padrão.
     """
     _init_draft()
 
-    # Busca textual — reativa, sem botão Aplicar
     st_keyup(
         "Buscar por nome ou descrição",
         placeholder="Nome do arquivo ou trecho da descrição...",
         key="busca_arquivo",
     )
 
-    # Linha de filtros compacta
-    c1, c2, c3, c4, c5, c6, c7 = st.columns([1.8, 1.8, 2.8, 1.3, 2.0, 1.5, 1.2])
+    tem_filtros = _tem_filtros_ativos()
+    label_exp   = "Filtros" if not tem_filtros else "Filtros (ativos)"
+    with st.expander(label_exp):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.date_input("De", key="_d_data_ini", format="DD/MM/YYYY")
+        with c2:
+            st.date_input("Até", key="_d_data_fim", format="DD/MM/YYYY")
+        with c3:
+            st.selectbox("Ordenar por", OPCOES_ORDEM, key="_d_ordenar_por")
 
-    with c1:
-        st.date_input("De", key="_d_data_ini", format="DD/MM/YYYY")
-    with c2:
-        st.date_input("Até", key="_d_data_fim", format="DD/MM/YYYY")
-    with c3:
-        st.selectbox("Ordenar por", OPCOES_ORDEM, key="_d_ordenar_por")
-    with c4:
-        st.markdown("&nbsp;", unsafe_allow_html=True)
-        st.checkbox("Crescente", key="_d_ordem_asc")
-    with c5:
-        st.markdown("&nbsp;", unsafe_allow_html=True)
-        st.checkbox("Só atualizados", key="_d_apenas_atualizados")
-    with c6:
-        st.markdown("&nbsp;", unsafe_allow_html=True)
-        if st.button("Aplicar", type="primary", width="stretch"):
+        c4, c5, c6, c7 = st.columns([2, 2, 1.5, 1.5])
+        c4.checkbox("Crescente", key="_d_ordem_asc")
+        c5.checkbox("Só atualizados", key="_d_apenas_atualizados")
+        if c6.button("Aplicar", type="primary", width="stretch"):
             _commit_draft()
             st.rerun()
-    with c7:
-        st.markdown("&nbsp;", unsafe_allow_html=True)
-        if st.button("Limpar", width="stretch", disabled=not _tem_filtros_ativos()):
+        if c7.button("Limpar", width="stretch", disabled=not tem_filtros):
             _limpar_filtros()
             st.rerun()
 
-    # Indicador sutil de filtros ativos
     _caption_filtros_ativos()
 
 
 # ── Estado dos filtros (draft / aplicado) ─────────────────────────────────────
 
 def _init_draft() -> None:
-    """Inicializa as chaves de rascunho a partir dos filtros aplicados (apenas na primeira vez)."""
     st.session_state.setdefault("_d_data_ini",           st.session_state.get("filtro_data_ini"))
     st.session_state.setdefault("_d_data_fim",           st.session_state.get("filtro_data_fim"))
     st.session_state.setdefault("_d_ordenar_por",        st.session_state.get("filtro_ordenar_por", "Nome"))
@@ -383,24 +402,21 @@ def _init_draft() -> None:
 
 
 def _commit_draft() -> None:
-    """Copia o rascunho para os filtros aplicados e reseta a paginação."""
-    st.session_state["filtro_data_ini"]            = st.session_state.get("_d_data_ini")
-    st.session_state["filtro_data_fim"]            = st.session_state.get("_d_data_fim")
-    st.session_state["filtro_ordenar_por"]         = st.session_state.get("_d_ordenar_por", "Nome")
-    st.session_state["filtro_ordem_asc"]           = st.session_state.get("_d_ordem_asc", True)
-    st.session_state["filtro_apenas_atualizados"]  = st.session_state.get("_d_apenas_atualizados", False)
+    st.session_state["filtro_data_ini"]           = st.session_state.get("_d_data_ini")
+    st.session_state["filtro_data_fim"]           = st.session_state.get("_d_data_fim")
+    st.session_state["filtro_ordenar_por"]        = st.session_state.get("_d_ordenar_por", "Nome")
+    st.session_state["filtro_ordem_asc"]          = st.session_state.get("_d_ordem_asc", True)
+    st.session_state["filtro_apenas_atualizados"] = st.session_state.get("_d_apenas_atualizados", False)
     st.session_state["pag_arquivos"] = 0
 
 
 def _limpar_filtros() -> None:
-    """Remove todos os filtros (rascunho e aplicados) e reseta a paginação."""
     for k in _CHAVES_DRAFT + _CHAVES_FILTRO + ["busca_arquivo", "_busca_anterior"]:
         st.session_state.pop(k, None)
     st.session_state["pag_arquivos"] = 0
 
 
 def _tem_filtros_ativos() -> bool:
-    """Retorna True se há algum filtro aplicado ou busca textual ativa."""
     return any([
         st.session_state.get("filtro_data_ini"),
         st.session_state.get("filtro_data_fim"),
@@ -412,7 +428,6 @@ def _tem_filtros_ativos() -> bool:
 
 
 def _caption_filtros_ativos() -> None:
-    """Exibe uma linha de caption descrevendo os filtros ativos, se houver."""
     partes = []
     busca  = st.session_state.get("busca_arquivo", "")
     ini    = st.session_state.get("filtro_data_ini")
@@ -421,10 +436,10 @@ def _caption_filtros_ativos() -> None:
     ord_p  = st.session_state.get("filtro_ordenar_por", "Nome")
     asc    = st.session_state.get("filtro_ordem_asc", True)
 
-    if busca:        partes.append(f'busca: "{busca}"')
-    if ini:          partes.append(f"de {ini.strftime('%d/%m/%Y')}")
-    if fim:          partes.append(f"até {fim.strftime('%d/%m/%Y')}")
-    if apenas:       partes.append("só atualizados")
+    if busca:  partes.append(f'busca: "{busca}"')
+    if ini:    partes.append(f"de {ini.strftime('%d/%m/%Y')}")
+    if fim:    partes.append(f"até {fim.strftime('%d/%m/%Y')}")
+    if apenas: partes.append("só atualizados")
     if ord_p != "Nome" or not asc:
         partes.append(f"ordem: {ord_p} {'↑' if asc else '↓'}")
 
@@ -476,11 +491,12 @@ def _aplicar_filtros(
     return resultado
 
 
-# ── Helpers de listagem ───────────────────────────────────────────────────────
+# ── Linha de arquivo ──────────────────────────────────────────────────────────
 
 def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
     st.divider()
-    cols = st.columns([0.5, 4, 2.5, 1.5, 3])
+    # Proporcional ao cabeçalho [0.5, 4, 2.5, 1.8, 3] — os últimos 3 botões somam 3
+    cols = st.columns([0.5, 4, 2.5, 1.8, 1, 1, 1])
 
     cols[0].checkbox(
         "Selecionar", value=arq["id"] in st.session_state.get("selecionados", set()),
@@ -489,59 +505,35 @@ def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
     )
 
     cols[1].write(f"**{arq['nome']}**")
-    linhas = arq.get("num_linhas")
     partes = []
-    if linhas:
+    if linhas := arq.get("num_linhas"):
         partes.append(f"{linhas:,} linhas")
     partes.append(_formatar_bytes(arq["tamanho_bytes"]))
-    partes.append(arq["criado_em"].strftime("%d/%m/%Y %H:%M"))
+    partes.append(arq["criado_em"].strftime("%d/%m/%Y"))
     cols[1].caption("  ·  ".join(partes))
 
     cols[2].write(arq.get("descricao") or "—")
 
     foi_atualizado = (arq["atualizado_em"] - arq["criado_em"]) > timedelta(seconds=1)
-    if foi_atualizado:
-        cols[3].write(arq["atualizado_em"].strftime("%d/%m/%Y"))
-        cols[3].caption(arq["atualizado_em"].strftime("%H:%M"))
-    else:
-        cols[3].write("—")
+    cols[3].write(arq["atualizado_em"].strftime("%d/%m/%Y %H:%M") if foi_atualizado else "—")
 
-    with cols[4]:
-        c1, c2, c3 = st.columns(3)
+    conteudo, nome_arq = _buscar_conteudo(arq["id"], usuario_id)
+    if conteudo:
+        cols[4].download_button(
+            "Baixar", data=conteudo, file_name=nome_arq, mime="text/plain",
+            key=f"dl_{arq['id']}", width="stretch",
+        )
 
-        conteudo, nome_arq = _buscar_conteudo(arq["id"], usuario_id)
-        if conteudo:
-            c1.download_button(
-                "Baixar", data=conteudo, file_name=nome_arq, mime="text/plain",
-                key=f"dl_{arq['id']}", width="stretch",
-            )
+    if cols[5].button("Editar", key=f"ed_{arq['id']}", width="stretch"):
+        st.session_state["editando_id"] = arq["id"]
+        st.rerun()
 
-        if c2.button("Editar", key=f"ed_{arq['id']}", width="stretch"):
-            st.session_state["editando_id"] = arq["id"]
-            st.rerun()
+    if cols[6].button("Excluir", key=f"del_{arq['id']}", width="stretch"):
+        st.session_state["confirm_delete"] = arq["id"]
+        st.rerun()
 
-        if st.session_state.get("confirm_delete") != arq["id"]:
-            if c3.button("Excluir", key=f"del_{arq['id']}", width="stretch"):
-                st.session_state["confirm_delete"] = arq["id"]
-                st.rerun()
 
-    if st.session_state.get("confirm_delete") == arq["id"]:
-        st.warning(f"Tem certeza que deseja excluir **{arq['nome']}**?")
-        cc1, cc2 = st.columns(2)
-        if cc1.button("✓ Confirmar", key=f"conf_{arq['id']}", type="primary"):
-            ok, msg = ArquivoController.deletar(arq["id"], usuario_id)
-            st.session_state.get("selecionados", set()).discard(arq["id"])
-            st.cache_data.clear()
-            st.session_state.pop("confirm_delete", None)
-            if ok:
-                set_toast(msg)
-            else:
-                st.error(msg)
-            st.rerun()
-        if cc2.button("✗ Cancelar", key=f"canc_{arq['id']}"):
-            st.session_state.pop("confirm_delete", None)
-            st.rerun()
-
+# ── Helper ────────────────────────────────────────────────────────────────────
 
 def _formatar_bytes(n: int) -> str:
     if n < 1_024:
