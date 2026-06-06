@@ -41,23 +41,23 @@ Activity/
 │   └── secrets.toml                # Google OAuth credentials — NÃO COMMITAR
 │
 ├── model/                          # Camada de dados — acesso a BD + lógica de domínio
-│   ├── database.py                 # get_connection(), init_db() — cria as 5 tabelas
-│   ├── UserModel.py                # CRUD de usuários + foto + senha
-│   ├── ArquivoModel.py             # CRUD de arquivos .txt (salvar, listar, buscar, deletar)
-│   ├── SessaoModel.py              # CRUD de sessões persistentes (criar, buscar, deletar)
-│   ├── PacienteModel.py            # CRUD de pacientes + vínculo com arquivos
+│   ├── database.py                 # get_connection(), db_cursor(), init_db() — cria as 5 tabelas
+│   ├── user_model.py               # CRUD de usuários + foto + senha
+│   ├── arquivo_model.py            # CRUD de arquivos .txt (salvar, listar, buscar, deletar)
+│   ├── sessao_model.py             # CRUD de sessões persistentes (criar, buscar, deletar)
+│   ├── paciente_model.py           # CRUD de pacientes + vínculo com arquivos
 │   └── condor_parser.py            # Parser de arquivos Condor (actigrafia): carregar_condor,
 │                                   #   dias_disponiveis, filtrar_dia — sem acesso a BD
 │
 ├── controller/                     # Camada de negócio — validação + orquestração
-│   ├── UserController.py           # cadastrar, login, atualizar_perfil, atualizar_foto,
+│   ├── user_controller.py          # cadastrar, login, atualizar_perfil, atualizar_foto,
 │   │                               #   atualizar_senha, listar, deletar,
 │   │                               #   buscar_perfil, buscar_perfil_por_email,
 │   │                               #   iniciar_sessao, encerrar_sessao, restaurar_sessao
-│   ├── ArquivoController.py        # fazer_upload, listar, baixar, atualizar_metadados,
+│   ├── arquivo_controller.py       # fazer_upload, listar, baixar, atualizar_metadados,
 │   │                               #   substituir_arquivo, deletar, gerar_zip,
 │   │                               #   carregar_actigrafia, dias_disponiveis, filtrar_dia
-│   └── PacienteController.py       # cadastrar, listar, buscar, atualizar, deletar,
+│   └── paciente_controller.py      # cadastrar, listar, buscar, atualizar, deletar,
 │                                   #   listar_arquivos, arquivos_disponiveis, sincronizar_arquivos
 │
 └── view/                           # Camada de apresentação — UI Streamlit
@@ -90,19 +90,19 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 4. Tenta restaurar sessão via `UserController.restaurar_sessao(token)` se não autenticado
 5. Roteia: públicas (`login`, `cadastro`) ou protegidas (`home`)
 
-**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as cinco tabelas (`usuarios`, `arquivos`, `sessoes`, `pacientes`, `paciente_arquivos`) via `CREATE TABLE IF NOT EXISTS`.
+**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. `db_cursor(write, dict_row)` é um context manager que abre cursor, commita/faz rollback automaticamente e fecha a conexão — usado por todos os models. `init_db()` cria as cinco tabelas (`usuarios`, `arquivos`, `sessoes`, `pacientes`, `paciente_arquivos`) via `CREATE TABLE IF NOT EXISTS`.
 
-**`model/UserModel.py`** — operações de BD puras, sem validação. Usa `RealDictCursor` para SELECT. O helper `_row()` converte `RealDictRow` em `dict` e transforma colunas `BYTEA` (foto_perfil) de `memoryview` para `bytes`.
+**`model/user_model.py`** — operações de BD puras, sem validação. Usa `db_cursor(dict_row=True)` para SELECT. O helper `_row()` converte `RealDictRow` em `dict` e transforma colunas `BYTEA` (foto_perfil) de `memoryview` para `bytes`.
 
-**`model/ArquivoModel.py`** — operações de BD para a tabela `arquivos`. Todos os métodos filtram por `usuario_id` para garantir isolamento entre usuários.
+**`model/arquivo_model.py`** — operações de BD para a tabela `arquivos`. Todos os métodos filtram por `usuario_id` para garantir isolamento entre usuários. `listar` retorna `list[dict]`.
 
-**`model/SessaoModel.py`** — operações de BD para a tabela `sessoes`. Métodos: `criar(usuario_id, dias)` → token UUID; `buscar_usuario_id(token)` → int | None (valida expiração); `deletar(token)` → None.
+**`model/sessao_model.py`** — operações de BD para a tabela `sessoes`. Métodos: `criar(usuario_id, dias)` → token UUID; `buscar_usuario_id(token)` → int | None (valida expiração); `deletar(token)` → None.
 
-**`model/PacienteModel.py`** — operações de BD para as tabelas `pacientes` e `paciente_arquivos`. Todos os métodos de paciente filtram por `usuario_id`. Vínculo com arquivos via `vincular_arquivo` / `desvincular_arquivo` (ON CONFLICT DO NOTHING). `listar_arquivos_ocupados(usuario_id, paciente_id_atual)` retorna arquivos vinculados a outros pacientes do mesmo usuário.
+**`model/paciente_model.py`** — operações de BD para as tabelas `pacientes` e `paciente_arquivos`. Todos os métodos de paciente filtram por `usuario_id`. Vínculo com arquivos via `vincular_arquivo` / `desvincular_arquivo` (ON CONFLICT DO NOTHING). `listar_arquivos_ocupados(usuario_id, paciente_id_atual)` retorna arquivos vinculados a outros pacientes do mesmo usuário.
 
 **`model/condor_parser.py`** — lógica de domínio para arquivos Condor (actigrafia). Não acessa BD. Funções: `carregar_condor(path_ou_bytes)` → `(metadata, DataFrame)`; `dias_disponiveis(df)` → `list[str]`; `filtrar_dia(df, data_str)` → `DataFrame`. Consumido exclusivamente por `ArquivoController`.
 
-**`controller/UserController.py`** — toda lógica de negócio de usuário e sessão:
+**`controller/user_controller.py`** — toda lógica de negócio de usuário e sessão:
 
 | Método | Descrição |
 |--------|-----------|
@@ -119,7 +119,7 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 | `encerrar_sessao(token)` | Invalida sessão no banco |
 | `restaurar_sessao(token)` | Valida token + recarrega perfil; retorna dict ou None |
 
-**`controller/ArquivoController.py`** — validação, orquestração de arquivos e análise de actigrafia:
+**`controller/arquivo_controller.py`** — validação, orquestração de arquivos e análise de actigrafia:
 
 | Método | Descrição |
 |--------|-----------|
@@ -134,7 +134,7 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 | `dias_disponiveis(df)` | Lista datas únicas do DataFrame Condor |
 | `filtrar_dia(df, data_str)` | Filtra DataFrame para um único dia |
 
-**`controller/PacienteController.py`** — validação e orquestração de pacientes e vínculos:
+**`controller/paciente_controller.py`** — validação e orquestração de pacientes e vínculos:
 
 | Método | Descrição |
 |--------|-----------|
@@ -178,6 +178,8 @@ Qualquer código de UI reutilizável pertence aqui. Não duplicar em páginas in
 | `forca_senha(senha)` | `str → (int, str, str)` | Retorna `(score 0-4, label, emoji)` |
 | `img_b64_tag(bytes, tipo, px, caption?)` | `→ str` | HTML `<img>` circular base64 com dimensões fixas |
 | `avatar_html(nome, foto, tipo, px)` | `→ str` | Avatar circular: foto ou div com inicial; funciona inline e em bloco |
+| `get_usuario_id()` | `→ int \| None` | Retorna o id do usuário e-mail ou None; exibe `st.info` automático — usar como guard no topo de cada página restrita |
+| `paginacao(pagina, n_paginas, chave)` | `→ None` | Renderiza controles Anterior/Próxima; `chave` é a chave de `session_state` que armazena a página atual |
 | `set_toast(msg, icon?)` | `→ None` | Agenda toast para o próximo render (via `st.session_state`) |
 | `render_toast()` | `→ None` | Consome e exibe o toast pendente; chamar no início de cada página |
 
