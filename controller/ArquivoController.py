@@ -1,3 +1,7 @@
+import io
+import zipfile
+from datetime import datetime
+
 from model.ArquivoModel import ArquivoModel
 
 
@@ -120,3 +124,23 @@ class ArquivoController:
             return True, "Arquivo removido com sucesso."
         except Exception as e:
             return False, f"Erro ao remover: {str(e)}"
+
+    @staticmethod
+    def gerar_zip(arquivo_ids: list, usuario_id: int) -> tuple:
+        """Compacta os arquivos indicados em um ZIP em memória.
+
+        Retorna (zip_bytes, nome_arquivo, n_incluidos).
+        Se nenhum arquivo for encontrado, retorna (None, None, 0).
+        """
+        buf = io.BytesIO()
+        n   = 0
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for arq_id in arquivo_ids:
+                raw, nome = ArquivoController.baixar(arq_id, usuario_id)
+                if raw:
+                    zf.writestr(nome, raw)
+                    n += 1
+        if n == 0:
+            return None, None, 0
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return buf.getvalue(), f"logs_{ts}.zip", n

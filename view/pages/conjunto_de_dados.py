@@ -8,11 +8,11 @@ Filtros seguem o padrão draft/aplicado:
   filtro_*    → estado efetivamente usado na listagem
 """
 
-import io
-import zipfile
-from datetime import datetime, timedelta
+import base64
+from datetime import timedelta
 
 import streamlit as st
+import streamlit.components.v1 as components
 from st_keyup import st_keyup
 from controller.ArquivoController import ArquivoController
 from view.ui import set_toast, render_toast
@@ -210,13 +210,24 @@ def _secao_listagem(usuario_id: int, arquivos: list):
     sel        &= ids_atuais
     gen: int   = st.session_state.setdefault("chk_gen", 0)
 
+    # ── dispara download automático após ZIP gerado ───────────────────
     if "zip_pronto" in st.session_state:
-        dados_zip, nome_zip, n_zip = st.session_state.pop("zip_pronto")
-        st.toast(f"{n_zip} arquivo(s) compactado(s). Clique para baixar.", icon="✅")
-        st.download_button(
-            f"⬇️  Baixar  {nome_zip}", data=dados_zip, file_name=nome_zip,
-            mime="application/zip", key="dl_zip_final", use_container_width=True,
+        zip_bytes, zip_nome, n_zip = st.session_state.pop("zip_pronto")
+        b64 = base64.b64encode(zip_bytes).decode()
+        components.html(
+            f"""<script>
+            (function() {{
+                var a = window.parent.document.createElement('a');
+                a.href = 'data:application/zip;base64,{b64}';
+                a.download = '{zip_nome}';
+                window.parent.document.body.appendChild(a);
+                a.click();
+                window.parent.document.body.removeChild(a);
+            }})();
+            </script>""",
+            height=0,
         )
+        st.toast(f"{n_zip} arquivo(s) compactado(s). Download iniciado.", icon="✅")
 
     # Renderiza painel de filtros (draft → widgets)
     _painel_filtros()
@@ -270,8 +281,19 @@ def _secao_listagem(usuario_id: int, arquivos: list):
 
     if n_sel > 0:
         ba1, ba2 = st.columns(2)
-        if ba1.button(f"⬇️  Download ({n_sel} arquivo(s))", type="primary", use_container_width=True, key="btn_bulk_dl"):
-            _preparar_zip(list(sel), usuario_id)
+        if ba1.button(
+            f"⬇️  Download ({n_sel} arquivo(s))",
+            type="primary",
+            use_container_width=True,
+            key="btn_bulk_dl",
+        ):
+            with st.spinner("Compactando arquivos..."):
+                zip_bytes, zip_nome, n = ArquivoController.gerar_zip(list(sel), usuario_id)
+            if zip_bytes:
+                st.session_state["zip_pronto"] = (zip_bytes, zip_nome, n)
+            else:
+                st.error("Nenhum arquivo pôde ser compactado.")
+            st.rerun()
         if ba2.button(f"🗑️  Excluir ({n_sel} arquivo(s))", use_container_width=True, key="btn_bulk_del"):
             st.session_state["bulk_delete_ids"] = list(sel)
 
@@ -459,25 +481,6 @@ def _aplicar_filtros(
 
 
 # ── Helpers de listagem ───────────────────────────────────────────────────────
-
-def _preparar_zip(ids: list, usuario_id: int):
-    buf = io.BytesIO()
-    n   = 0
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for arq_id in ids:
-            conteudo, nome = _buscar_conteudo(arq_id, usuario_id)
-            if conteudo:
-                zf.writestr(nome, conteudo)
-                n += 1
-
-    if n == 0:
-        st.error("Nenhum arquivo pôde ser compactado.")
-        return
-
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    st.session_state["zip_pronto"] = (buf.getvalue(), f"logs_{ts}.zip", n)
-    st.rerun()
-
 
 def _controles_paginacao(pagina: int, n_paginas: int):
     if n_paginas <= 1:

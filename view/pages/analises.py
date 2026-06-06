@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime, timedelta
+from controller.ArquivoController import ArquivoController
 from model.condor_parser import carregar_condor, dias_disponiveis, filtrar_dia
-import glob
+from view.ui import render_toast
 
 
 def analises_page():
@@ -14,33 +13,48 @@ def analises_page():
     # ─────────────────────────────────────────────
     st.title("Análises")
     st.divider()
+
+    usuario    = st.session_state.get("usuario", {})
+    usuario_id = usuario.get("id")
+
+    if not usuario_id:
+        st.info("Esta funcionalidade está disponível apenas para usuários cadastrados com e-mail.")
+        return
+
+    render_toast()
+
     # ══════════════════════════════════════════════════════════════
-    # SELEÇÃO DO ARQUIVO — na própria página
+    # SELEÇÃO DO ARQUIVO — lido do banco do usuário
     # ══════════════════════════════════════════════════════════════
 
-    # Busca todos os .txt dentro de dados/
-    arquivos = sorted(glob.glob("view/pages/dados/*.txt"))
+    arquivos = ArquivoController.listar(usuario_id)
 
     if not arquivos:
-        st.warning("Nenhum arquivo encontrado em `dados/`. Coloque os .txt nessa pasta.")
-        st.stop()
+        st.info("Nenhum arquivo enviado ainda. Acesse **Conjunto de dados** para fazer upload.")
+        return
 
-    # Monta um dicionário {nome_exibido: caminho_completo}
-    opcoes = {a.split("/")[-1].replace(".txt", ""): a for a in arquivos}
+    opcoes = {arq["nome"]: arq for arq in arquivos}
 
     col_arq, col_dia = st.columns(2)
 
     with col_arq:
         nome_escolhido = st.selectbox("Arquivo", list(opcoes.keys()))
 
-    caminho = opcoes[nome_escolhido]
+    arquivo_id = opcoes[nome_escolhido]["id"]
 
-    # ── carrega e faz cache do arquivo ──────────────────────────────
-    @st.cache_data
-    def carregar(path: str):
-        return carregar_condor(path)
+    # ── carrega e faz cache por (arquivo_id, usuario_id) ────────────
+    @st.cache_data(ttl=120)
+    def _carregar(arq_id: int, uid: int):
+        raw, _ = ArquivoController.baixar(arq_id, uid)
+        if not raw:
+            return {}, pd.DataFrame()
+        return carregar_condor(raw)
 
-    metadata, df_total = carregar(caminho)
+    metadata, df_total = _carregar(arquivo_id, usuario_id)
+
+    if df_total.empty:
+        st.warning("Não foi possível processar este arquivo.")
+        st.stop()
 
     # ── seleção do dia ───────────────────────────────────────────────
     dias = dias_disponiveis(df_total)
