@@ -12,7 +12,6 @@ import base64
 from datetime import timedelta
 
 import streamlit as st
-import streamlit.components.v1 as components
 from st_keyup import st_keyup
 from controller.ArquivoController import ArquivoController
 from view.ui import set_toast, render_toast
@@ -214,7 +213,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
     if "zip_pronto" in st.session_state:
         zip_bytes, zip_nome, n_zip = st.session_state.pop("zip_pronto")
         b64 = base64.b64encode(zip_bytes).decode()
-        components.html(
+        st.iframe(
             f"""<script>
             (function() {{
                 var a = window.parent.document.createElement('a');
