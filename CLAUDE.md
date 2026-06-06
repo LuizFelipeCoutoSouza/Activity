@@ -17,7 +17,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` is called at startup and cria as três tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
+The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` é chamado na inicialização e cria as cinco tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
 
 ## Dependencies
 
@@ -41,10 +41,11 @@ Activity/
 │   └── secrets.toml                # Google OAuth credentials — NÃO COMMITAR
 │
 ├── model/                          # Camada de dados — acesso a BD + lógica de domínio
-│   ├── database.py                 # get_connection(), init_db() — cria as 3 tabelas
+│   ├── database.py                 # get_connection(), init_db() — cria as 5 tabelas
 │   ├── UserModel.py                # CRUD de usuários + foto + senha
 │   ├── ArquivoModel.py             # CRUD de arquivos .txt (salvar, listar, buscar, deletar)
 │   ├── SessaoModel.py              # CRUD de sessões persistentes (criar, buscar, deletar)
+│   ├── PacienteModel.py            # CRUD de pacientes + vínculo com arquivos
 │   └── condor_parser.py            # Parser de arquivos Condor (actigrafia): carregar_condor,
 │                                   #   dias_disponiveis, filtrar_dia — sem acesso a BD
 │
@@ -53,9 +54,11 @@ Activity/
 │   │                               #   atualizar_senha, listar, deletar,
 │   │                               #   buscar_perfil, buscar_perfil_por_email,
 │   │                               #   iniciar_sessao, encerrar_sessao, restaurar_sessao
-│   └── ArquivoController.py        # fazer_upload, listar, baixar, atualizar_metadados,
-│                                   #   substituir_arquivo, deletar, gerar_zip,
-│                                   #   carregar_actigrafia, dias_disponiveis, filtrar_dia
+│   ├── ArquivoController.py        # fazer_upload, listar, baixar, atualizar_metadados,
+│   │                               #   substituir_arquivo, deletar, gerar_zip,
+│   │                               #   carregar_actigrafia, dias_disponiveis, filtrar_dia
+│   └── PacienteController.py       # cadastrar, listar, buscar, atualizar, deletar,
+│                                   #   listar_arquivos, arquivos_disponiveis, sincronizar_arquivos
 │
 └── view/                           # Camada de apresentação — UI Streamlit
     ├── ui.py                       # Utilitários compartilhados (ver seção "view/ui.py")
@@ -65,7 +68,7 @@ Activity/
     └── pages/                      # Uma página por arquivo; importadas lazily por home.py
         ├── analises.py             # analises_page()          [em desenvolvimento]
         ├── conjunto_de_dados.py    # conjunto_de_dados_page() [implementado]
-        ├── registro_de_pacientes.py# registro_de_pacientes_page() [em desenvolvimento]
+        ├── registro_de_pacientes.py# registro_de_pacientes_page() [implementado]
         ├── exportar_relatorio.py   # exportar_relatorio_page() [em desenvolvimento]
         └── configuracoes.py        # configuracoes_page()     [implementado]
 ```
@@ -82,18 +85,20 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`app.py`** — única fonte de verdade de autenticação. Ordem de execução em cada render:
 1. `init_db()` (idempotente)
-2. Processa operações pendentes de cookie (`_set_cookie` / `_delete_cookie` em session_state) via `streamlit.components.v1.html()`
+2. Processa operações pendentes de cookie (`_set_cookie` / `_delete_cookie` em session_state) via `st.iframe()`
 3. Detecta `google_logado` e `email_logado`
 4. Tenta restaurar sessão via `UserController.restaurar_sessao(token)` se não autenticado
 5. Roteia: públicas (`login`, `cadastro`) ou protegidas (`home`)
 
-**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as três tabelas (`usuarios`, `arquivos`, `sessoes`) via `CREATE TABLE IF NOT EXISTS`.
+**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as cinco tabelas (`usuarios`, `arquivos`, `sessoes`, `pacientes`, `paciente_arquivos`) via `CREATE TABLE IF NOT EXISTS`.
 
 **`model/UserModel.py`** — operações de BD puras, sem validação. Usa `RealDictCursor` para SELECT. O helper `_row()` converte `RealDictRow` em `dict` e transforma colunas `BYTEA` (foto_perfil) de `memoryview` para `bytes`.
 
 **`model/ArquivoModel.py`** — operações de BD para a tabela `arquivos`. Todos os métodos filtram por `usuario_id` para garantir isolamento entre usuários.
 
 **`model/SessaoModel.py`** — operações de BD para a tabela `sessoes`. Métodos: `criar(usuario_id, dias)` → token UUID; `buscar_usuario_id(token)` → int | None (valida expiração); `deletar(token)` → None.
+
+**`model/PacienteModel.py`** — operações de BD para as tabelas `pacientes` e `paciente_arquivos`. Todos os métodos de paciente filtram por `usuario_id`. Vínculo com arquivos via `vincular_arquivo` / `desvincular_arquivo` (ON CONFLICT DO NOTHING). `listar_arquivos_ocupados(usuario_id, paciente_id_atual)` retorna arquivos vinculados a outros pacientes do mesmo usuário.
 
 **`model/condor_parser.py`** — lógica de domínio para arquivos Condor (actigrafia). Não acessa BD. Funções: `carregar_condor(path_ou_bytes)` → `(metadata, DataFrame)`; `dias_disponiveis(df)` → `list[str]`; `filtrar_dia(df, data_str)` → `DataFrame`. Consumido exclusivamente por `ArquivoController`.
 
@@ -129,6 +134,19 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 | `dias_disponiveis(df)` | Lista datas únicas do DataFrame Condor |
 | `filtrar_dia(df, data_str)` | Filtra DataFrame para um único dia |
 
+**`controller/PacienteController.py`** — validação e orquestração de pacientes e vínculos:
+
+| Método | Descrição |
+|--------|-----------|
+| `cadastrar(usuario_id, nome, ...)` | Valida e cria paciente; retorna `(bool, str, int\|None)` |
+| `listar(usuario_id)` | Lista pacientes com contagem de arquivos vinculados |
+| `buscar(paciente_id, usuario_id)` | Retorna dict do paciente ou None |
+| `atualizar(paciente_id, usuario_id, ...)` | Valida e persiste alterações; retorna `(bool, str)` |
+| `deletar(paciente_id, usuario_id)` | Remove paciente (arquivos são desvinculados, não apagados) |
+| `listar_arquivos(paciente_id)` | Lista arquivos vinculados ao paciente |
+| `arquivos_disponiveis(usuario_id, paciente_id)` | Retorna `(disponíveis, ocupados_por_outros)` |
+| `sincronizar_arquivos(paciente_id, novos_ids)` | Diff-based: vincula/desvincula para atingir `novos_ids` |
+
 **`view/ui.py`** — módulo de utilitários compartilhados (ver seção dedicada abaixo).
 
 **`view/login.py`** — layout dois colunas. Sucesso no login: chama `UserController.iniciar_sessao()`, armazena o token em `_set_cookie` e `_session_token` no session_state, seta `logado`/`usuario`/`pagina` e chama `st.rerun()`. O cookie é gravado no browser no render seguinte por `app.py`.
@@ -139,9 +157,11 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`view/pages/configuracoes.py`** — duas abas: **Perfil** (foto + formulário de dados) e **Segurança** (troca de senha). Aba Segurança desabilitada para contas Google. Usa `UserController.buscar_perfil_por_email()` para carregar dados frescos do banco. Usa `render_toast()` e `set_toast()` de `view/ui.py`.
 
-**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip automático via JS), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`. Download em massa delega para `ArquivoController.gerar_zip()` e dispara o browser via JS (`window.parent.document.createElement('a')`).
+**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip automático via JS), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`. Download em massa delega para `ArquivoController.gerar_zip()` e dispara o browser via JS (`window.parent.document.createElement('a')`) injetado com `st.iframe()`.
 
 **`view/pages/analises.py`** — visualização de actigrafia. Seleciona arquivo (do banco via `ArquivoController.listar`) e dia; carrega e processa via `ArquivoController.carregar_actigrafia` (cacheado em `_carregar_actigrafia` no nível de módulo com `@st.cache_data(ttl=120)`). Exibe métricas (PIM, temperatura) e gráficos (PIM, temperatura, luz, melanopic EDI).
+
+**`view/pages/registro_de_pacientes.py`** — CRUD completo de pacientes com paginação (8/página) e busca por nome/e-mail. Cadastro e edição via `@st.dialog("Paciente", width="large")` com duas abas: **Dados** (campos do paciente) e **Arquivos vinculados** (multiselect dos arquivos disponíveis do usuário). Exclusão com confirmação inline. Regra de negócio: um arquivo só pode ser vinculado a um paciente — arquivos já ocupados ficam invisíveis no multiselect.
 
 ## view/ui.py — Utilitários compartilhados
 
@@ -193,7 +213,7 @@ Credenciais OAuth em `.streamlit/secrets.toml` — **não commitar**.
 | Evento | O que acontece |
 |--------|----------------|
 | Login | `UserController.iniciar_sessao()` grava token UUID → `_set_cookie` agendado em session_state |
-| Próximo render | `app.py` detecta `_set_cookie` → injeta JS via `components.html()` que escreve o cookie |
+| Próximo render | `app.py` detecta `_set_cookie` → injeta JS via `st.iframe()` que escreve o cookie |
 | Refresh (F5) | `st.context.cookies` lê o token → `UserController.restaurar_sessao()` valida + recarrega perfil |
 | Logout | `UserController.encerrar_sessao()` remove token do banco → `_delete_cookie` agendado → JS apaga o cookie |
 
@@ -269,4 +289,30 @@ Conexão hardcoded em `model/database.py` (`localhost:5432`, database `Activity`
 | criado_em  | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
 | expira_em  | TIMESTAMP    | NOT NULL                                    |
 
-As três tabelas são criadas com esquema completo em `init_db()` via `CREATE TABLE IF NOT EXISTS`. Para adicionar colunas em bancos já existentes, executar o `ALTER TABLE` manualmente ou recriar o banco.
+### Tabela `pacientes`
+
+| Coluna          | Tipo          | Constraint                                   |
+|-----------------|---------------|----------------------------------------------|
+| id              | SERIAL        | PRIMARY KEY                                  |
+| usuario_id      | INTEGER       | NOT NULL, FK → usuarios(id) ON DELETE CASCADE |
+| nome            | VARCHAR(255)  | NOT NULL                                     |
+| sexo            | VARCHAR(20)   | nullable                                     |
+| data_nascimento | DATE          | nullable                                     |
+| email           | VARCHAR(255)  | nullable                                     |
+| telefone        | VARCHAR(20)   | nullable                                     |
+| altura          | NUMERIC(5,2)  | nullable                                     |
+| peso            | NUMERIC(5,2)  | nullable                                     |
+| nota            | TEXT          | nullable                                     |
+| criado_em       | TIMESTAMP     | DEFAULT CURRENT_TIMESTAMP                    |
+| atualizado_em   | TIMESTAMP     | DEFAULT CURRENT_TIMESTAMP                    |
+
+### Tabela `paciente_arquivos`
+
+| Coluna      | Tipo    | Constraint                                    |
+|-------------|---------|-----------------------------------------------|
+| paciente_id | INTEGER | NOT NULL, FK → pacientes(id) ON DELETE CASCADE |
+| arquivo_id  | INTEGER | NOT NULL, FK → arquivos(id) ON DELETE CASCADE  |
+| —           | —       | PRIMARY KEY (paciente_id, arquivo_id)          |
+| —           | —       | UNIQUE (arquivo_id) — 1 arquivo → 1 paciente  |
+
+As cinco tabelas são criadas com esquema completo em `init_db()` via `CREATE TABLE IF NOT EXISTS`.
