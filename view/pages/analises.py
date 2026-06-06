@@ -1,10 +1,13 @@
 import streamlit as st
-import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from controller.ArquivoController import ArquivoController
-from model.condor_parser import carregar_condor, dias_disponiveis, filtrar_dia
 from view.ui import render_toast
+
+
+@st.cache_data(ttl=120)
+def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
+    return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
 
 
 def analises_page():
@@ -42,31 +45,19 @@ def analises_page():
 
     arquivo_id = opcoes[nome_escolhido]["id"]
 
-    # ── carrega e faz cache por (arquivo_id, usuario_id) ────────────
-    @st.cache_data(ttl=120)
-    def _carregar(arq_id: int, uid: int):
-        raw, _ = ArquivoController.baixar(arq_id, uid)
-        if not raw:
-            return {}, pd.DataFrame()
-        return carregar_condor(raw)
-
-    metadata, df_total = _carregar(arquivo_id, usuario_id)
+    metadata, df_total = _carregar_actigrafia(arquivo_id, usuario_id)
 
     if df_total.empty:
         st.warning("Não foi possível processar este arquivo.")
         st.stop()
 
     # ── seleção do dia ───────────────────────────────────────────────
-    dias = dias_disponiveis(df_total)
+    dias = ArquivoController.dias_disponiveis(df_total)
 
     with col_dia:
-        dia = st.selectbox(
-            "Dia",
-            dias,
-            format_func=lambda d: d,  # formato YYYY-MM-DD, troque se preferir
-        )
+        dia = st.selectbox("Dia", dias)
 
-    df = filtrar_dia(df_total, dia)
+    df = ArquivoController.filtrar_dia(df_total, dia)
 
     if df.empty:
         st.warning("Sem dados para esse dia.")

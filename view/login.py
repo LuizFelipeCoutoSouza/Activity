@@ -1,6 +1,5 @@
 import streamlit as st
 from controller.UserController import UserController
-from model.SessaoModel import SessaoModel
 
 
 def login_page():
@@ -38,7 +37,7 @@ def login_page():
             if sucesso:
                 # dias=0 → session cookie; dias=30 → cookie persistente de 30 dias
                 dias  = 30 if manter_conectado else 0
-                token = SessaoModel.criar(usuario["id"], dias)
+                token = UserController.iniciar_sessao(usuario["id"], dias)
 
                 st.session_state["usuario"]              = usuario
                 st.session_state["usuario"]["tipo_auth"] = "email"

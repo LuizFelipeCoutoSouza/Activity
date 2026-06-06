@@ -3,6 +3,7 @@ view/home.py — Shell autenticado: navbar, sidebar e roteamento entre páginas.
 """
 
 import streamlit as st
+from controller.UserController import UserController
 from view.ui import avatar_html, AVATAR_NAV
 
 PAGINAS = [
@@ -97,8 +98,7 @@ def _logout(tipo_auth: str):
     if tipo_auth == "email":
         token = st.session_state.pop("_session_token", None)
         if token:
-            from model.SessaoModel import SessaoModel
-            SessaoModel.deletar(token)
+            UserController.encerrar_sessao(token)
         st.session_state["_delete_cookie"] = True
 
     for chave in ("logado", "usuario", "pagina_atual"):

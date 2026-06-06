@@ -81,18 +81,14 @@ if google_logado and "usuario" not in st.session_state:
 if not email_logado and not google_logado:
     _token = st.context.cookies.get(_COOKIE)
     if _token:
-        from model.SessaoModel import SessaoModel
-        from model.UserModel import UserModel
-        _uid = SessaoModel.buscar_usuario_id(_token)
-        if _uid:
-            _dados = UserModel.buscar_por_id(_uid)
-            if _dados:
-                _dados["tipo_auth"]              = "email"
-                st.session_state["usuario"]        = _dados
-                st.session_state["logado"]         = True
-                st.session_state["_session_token"] = _token
-                st.session_state.setdefault("pagina", "home")
-                email_logado = True
+        from controller.UserController import UserController
+        _dados = UserController.restaurar_sessao(_token)
+        if _dados:
+            st.session_state["usuario"]        = _dados
+            st.session_state["logado"]         = True
+            st.session_state["_session_token"] = _token
+            st.session_state.setdefault("pagina", "home")
+            email_logado = True
 
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "login"

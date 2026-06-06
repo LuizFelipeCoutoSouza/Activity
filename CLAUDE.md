@@ -40,17 +40,22 @@ Activity/
 │   ├── config.toml                 # Streamlit theme (light)
 │   └── secrets.toml                # Google OAuth credentials — NÃO COMMITAR
 │
-├── model/                          # Camada de dados — acesso direto ao PostgreSQL
+├── model/                          # Camada de dados — acesso a BD + lógica de domínio
 │   ├── database.py                 # get_connection(), init_db() — cria as 3 tabelas
 │   ├── UserModel.py                # CRUD de usuários + foto + senha
 │   ├── ArquivoModel.py             # CRUD de arquivos .txt (salvar, listar, buscar, deletar)
-│   └── SessaoModel.py              # CRUD de sessões persistentes (criar, buscar, deletar)
+│   ├── SessaoModel.py              # CRUD de sessões persistentes (criar, buscar, deletar)
+│   └── condor_parser.py            # Parser de arquivos Condor (actigrafia): carregar_condor,
+│                                   #   dias_disponiveis, filtrar_dia — sem acesso a BD
 │
 ├── controller/                     # Camada de negócio — validação + orquestração
 │   ├── UserController.py           # cadastrar, login, atualizar_perfil, atualizar_foto,
-│   │                               #   atualizar_senha, listar, deletar
+│   │                               #   atualizar_senha, listar, deletar,
+│   │                               #   buscar_perfil, buscar_perfil_por_email,
+│   │                               #   iniciar_sessao, encerrar_sessao, restaurar_sessao
 │   └── ArquivoController.py        # fazer_upload, listar, baixar, atualizar_metadados,
-│                                   #   substituir_arquivo, deletar
+│                                   #   substituir_arquivo, deletar, gerar_zip,
+│                                   #   carregar_actigrafia, dias_disponiveis, filtrar_dia
 │
 └── view/                           # Camada de apresentação — UI Streamlit
     ├── ui.py                       # Utilitários compartilhados (ver seção "view/ui.py")
@@ -67,13 +72,19 @@ Activity/
 
 ## Architecture
 
-MVC estrito. O fluxo de dados desce em uma única direção: `view → controller → model`.
+MVC estrito. **A view nunca importa da camada model diretamente.** O fluxo de dados desce em uma única direção:
+
+```
+view → controller → model
+```
+
+Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve passar pelo controller correspondente. Violações desse padrão devem ser corrigidas imediatamente.
 
 **`app.py`** — única fonte de verdade de autenticação. Ordem de execução em cada render:
 1. `init_db()` (idempotente)
 2. Processa operações pendentes de cookie (`_set_cookie` / `_delete_cookie` em session_state) via `streamlit.components.v1.html()`
 3. Detecta `google_logado` e `email_logado`
-4. Tenta restaurar sessão a partir do cookie HTTP (`st.context.cookies`) se não autenticado
+4. Tenta restaurar sessão via `UserController.restaurar_sessao(token)` se não autenticado
 5. Roteia: públicas (`login`, `cadastro`) ou protegidas (`home`)
 
 **`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. Cada método do model abre e fecha sua própria conexão (sem pool). `init_db()` cria as três tabelas (`usuarios`, `arquivos`, `sessoes`) via `CREATE TABLE IF NOT EXISTS`.
@@ -84,21 +95,53 @@ MVC estrito. O fluxo de dados desce em uma única direção: `view → controlle
 
 **`model/SessaoModel.py`** — operações de BD para a tabela `sessoes`. Métodos: `criar(usuario_id, dias)` → token UUID; `buscar_usuario_id(token)` → int | None (valida expiração); `deletar(token)` → None.
 
-**`controller/UserController.py`** — toda validação de usuário fica aqui (campos obrigatórios, força de senha, CPF via `re.sub(r"\D","")`, duplicatas). Retorna `(bool, str)` ou `(bool, str, dict)`.
+**`model/condor_parser.py`** — lógica de domínio para arquivos Condor (actigrafia). Não acessa BD. Funções: `carregar_condor(path_ou_bytes)` → `(metadata, DataFrame)`; `dias_disponiveis(df)` → `list[str]`; `filtrar_dia(df, data_str)` → `DataFrame`. Consumido exclusivamente por `ArquivoController`.
 
-**`controller/ArquivoController.py`** — validação e orquestração de arquivos. Detecta encoding automático (`utf-8-sig`, `utf-8`, `latin-1`, `cp1252`). Retorna `(bool, str)`.
+**`controller/UserController.py`** — toda lógica de negócio de usuário e sessão:
+
+| Método | Descrição |
+|--------|-----------|
+| `cadastrar(...)` | Valida e cria usuário |
+| `login(email, senha)` | Autentica por e-mail; retorna `(bool, str, dict)` |
+| `atualizar_perfil(...)` | Valida e persiste alterações de perfil |
+| `atualizar_foto(...)` | Salva bytes de foto no banco |
+| `atualizar_senha(...)` | Valida senha atual e persiste nova hash |
+| `listar()` | Lista todos os usuários |
+| `deletar(user_id)` | Remove usuário |
+| `buscar_perfil(usuario_id)` | Retorna perfil completo pelo id |
+| `buscar_perfil_por_email(email)` | Retorna perfil pelo e-mail (contas Google) |
+| `iniciar_sessao(usuario_id, dias)` | Cria sessão persistente; retorna token UUID |
+| `encerrar_sessao(token)` | Invalida sessão no banco |
+| `restaurar_sessao(token)` | Valida token + recarrega perfil; retorna dict ou None |
+
+**`controller/ArquivoController.py`** — validação, orquestração de arquivos e análise de actigrafia:
+
+| Método | Descrição |
+|--------|-----------|
+| `fazer_upload(usuario_id, file, desc)` | Valida e salva arquivo .txt |
+| `listar(usuario_id)` | Lista metadados dos arquivos do usuário |
+| `baixar(arquivo_id, usuario_id)` | Retorna `(bytes, nome)` do arquivo |
+| `atualizar_metadados(...)` | Atualiza nome e descrição |
+| `substituir_arquivo(...)` | Substitui conteúdo mantendo metadados |
+| `deletar(arquivo_id, usuario_id)` | Remove arquivo |
+| `gerar_zip(ids, usuario_id)` | Compacta múltiplos arquivos; retorna `(bytes, nome, n)` |
+| `carregar_actigrafia(arquivo_id, usuario_id)` | Baixa e processa Condor; retorna `(metadata, DataFrame)` |
+| `dias_disponiveis(df)` | Lista datas únicas do DataFrame Condor |
+| `filtrar_dia(df, data_str)` | Filtra DataFrame para um único dia |
 
 **`view/ui.py`** — módulo de utilitários compartilhados (ver seção dedicada abaixo).
 
-**`view/login.py`** — layout dois colunas. Sucesso no login: chama `SessaoModel.criar()`, armazena o token em `_set_cookie` e `_session_token` no session_state, seta `logado`/`usuario`/`pagina` e chama `st.rerun()`. O cookie é gravado no browser no render seguinte por `app.py`.
+**`view/login.py`** — layout dois colunas. Sucesso no login: chama `UserController.iniciar_sessao()`, armazena o token em `_set_cookie` e `_session_token` no session_state, seta `logado`/`usuario`/`pagina` e chama `st.rerun()`. O cookie é gravado no browser no render seguinte por `app.py`.
 
 **`view/cadastro.py`** — formulário de cadastro. Usa `Profissao.opcoes()` e `forca_senha()` de `view/ui.py`.
 
-**`view/home.py`** — shell autenticado. Renderiza navbar (logo + avatar via `avatar_html()`), sidebar (botões de navegação + logout) e roteia para `view/pages/` via import lazy. Logout e-mail: deleta sessão do banco via `SessaoModel.deletar()`, agenda deleção do cookie (`_delete_cookie = True`) e chama `st.rerun()`. Logout Google: `st.logout()`.
+**`view/home.py`** — shell autenticado. Renderiza navbar (logo + avatar via `avatar_html()`), sidebar (botões de navegação + logout) e roteia para `view/pages/` via import lazy. Logout e-mail: chama `UserController.encerrar_sessao()`, agenda deleção do cookie (`_delete_cookie = True`) e chama `st.rerun()`. Logout Google: `st.logout()`.
 
-**`view/pages/configuracoes.py`** — duas abas: **Perfil** (foto + formulário de dados) e **Segurança** (troca de senha). Aba Segurança desabilitada para contas Google. Usa `render_toast()` e `set_toast()` de `view/ui.py`.
+**`view/pages/configuracoes.py`** — duas abas: **Perfil** (foto + formulário de dados) e **Segurança** (troca de senha). Aba Segurança desabilitada para contas Google. Usa `UserController.buscar_perfil_por_email()` para carregar dados frescos do banco. Usa `render_toast()` e `set_toast()` de `view/ui.py`.
 
-**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`.
+**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip automático via JS), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`. Download em massa delega para `ArquivoController.gerar_zip()` e dispara o browser via JS (`window.parent.document.createElement('a')`).
+
+**`view/pages/analises.py`** — visualização de actigrafia. Seleciona arquivo (do banco via `ArquivoController.listar`) e dia; carrega e processa via `ArquivoController.carregar_actigrafia` (cacheado em `_carregar_actigrafia` no nível de módulo com `@st.cache_data(ttl=120)`). Exibe métricas (PIM, temperatura) e gráficos (PIM, temperatura, luz, melanopic EDI).
 
 ## view/ui.py — Utilitários compartilhados
 
@@ -139,7 +182,7 @@ Dois métodos coexistem; `app.py` combina antes de rotear:
 | E-mail | `st.session_state["logado"] == True` | dict completo do banco (inclui `id`, `cpf`, `foto_perfil`, etc.) |
 | Google OAuth | `st.user.is_logged_in` | `{"nome", "email", "tipo_auth": "google"}` (sem `id` se usuário não estiver no banco) |
 
-`st.session_state["usuario"]` para usuários e-mail contém todos os campos do perfil retornados por `buscar_por_email()`, incluindo `foto_perfil` (bytes ou None). Novas páginas devem ler apenas esse dict, nunca `st.user` diretamente.
+`st.session_state["usuario"]` para usuários e-mail contém todos os campos do perfil retornados por `UserModel.buscar_por_id()`, incluindo `foto_perfil` (bytes ou None). Novas páginas devem ler apenas esse dict, nunca `st.user` diretamente.
 
 Credenciais OAuth em `.streamlit/secrets.toml` — **não commitar**.
 
@@ -149,10 +192,10 @@ Credenciais OAuth em `.streamlit/secrets.toml` — **não commitar**.
 
 | Evento | O que acontece |
 |--------|----------------|
-| Login | `SessaoModel.criar()` grava token UUID → `_set_cookie` agendado em session_state |
+| Login | `UserController.iniciar_sessao()` grava token UUID → `_set_cookie` agendado em session_state |
 | Próximo render | `app.py` detecta `_set_cookie` → injeta JS via `components.html()` que escreve o cookie |
-| Refresh (F5) | `st.context.cookies` lê o token → `SessaoModel.buscar_usuario_id()` valida → perfil recarregado |
-| Logout | Token deletado do banco → `_delete_cookie` agendado → JS apaga o cookie no próximo render |
+| Refresh (F5) | `st.context.cookies` lê o token → `UserController.restaurar_sessao()` valida + recarrega perfil |
+| Logout | `UserController.encerrar_sessao()` remove token do banco → `_delete_cookie` agendado → JS apaga o cookie |
 
 **"Manter conectado por 30 dias"** (checkbox na tela de login):
 - Marcado (`dias=30`) → cookie com `max-age=30 dias` + sessão no banco com 30 dias

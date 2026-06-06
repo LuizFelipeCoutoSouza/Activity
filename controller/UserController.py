@@ -8,6 +8,7 @@ de erros nas views sem expor exceções brutas.
 import re
 import bcrypt
 from model.UserModel import UserModel
+from model.SessaoModel import SessaoModel
 
 
 class UserController:
@@ -100,3 +101,41 @@ class UserController:
             return True, "Usuário removido com sucesso!"
         except Exception as e:
             return False, f"Erro ao remover: {str(e)}"
+
+    # ── Perfil ────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def buscar_perfil(usuario_id: int) -> dict | None:
+        """Retorna o perfil completo pelo id."""
+        return UserModel.buscar_por_id(usuario_id)
+
+    @staticmethod
+    def buscar_perfil_por_email(email: str) -> dict | None:
+        """Retorna o perfil completo pelo e-mail (usado por contas Google sem id na sessão)."""
+        return UserModel.buscar_por_email(email)
+
+    # ── Sessão ────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def iniciar_sessao(usuario_id: int, dias: int) -> str:
+        """Cria uma sessão persistente e retorna o token UUID."""
+        return SessaoModel.criar(usuario_id, dias)
+
+    @staticmethod
+    def encerrar_sessao(token: str) -> None:
+        """Invalida a sessão no banco (logout ou expiração forçada)."""
+        SessaoModel.deletar(token)
+
+    @staticmethod
+    def restaurar_sessao(token: str) -> dict | None:
+        """
+        Valida o token e recarrega o perfil do usuário.
+        Retorna o dict do usuário com tipo_auth='email', ou None se inválido/expirado.
+        """
+        uid = SessaoModel.buscar_usuario_id(token)
+        if not uid:
+            return None
+        dados = UserModel.buscar_por_id(uid)
+        if dados:
+            dados["tipo_auth"] = "email"
+        return dados

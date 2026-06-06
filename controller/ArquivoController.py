@@ -2,7 +2,13 @@ import io
 import zipfile
 from datetime import datetime
 
+import pandas as pd
 from model.ArquivoModel import ArquivoModel
+from model.condor_parser import (
+    carregar_condor      as _carregar_condor,
+    dias_disponiveis     as _dias_disponiveis,
+    filtrar_dia          as _filtrar_dia,
+)
 
 
 def _detectar_encoding(raw: bytes) -> str:
@@ -124,6 +130,28 @@ class ArquivoController:
             return True, "Arquivo removido com sucesso."
         except Exception as e:
             return False, f"Erro ao remover: {str(e)}"
+
+    # ── Actigrafia ────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
+        """Baixa e processa um arquivo Condor. Retorna (metadata, DataFrame) ou ({}, DataFrame vazio)."""
+        raw, _ = ArquivoController.baixar(arquivo_id, usuario_id)
+        if not raw:
+            return {}, pd.DataFrame()
+        return _carregar_condor(raw)
+
+    @staticmethod
+    def dias_disponiveis(df: pd.DataFrame) -> list:
+        """Retorna lista ordenada de datas (YYYY-MM-DD) presentes no DataFrame."""
+        return _dias_disponiveis(df)
+
+    @staticmethod
+    def filtrar_dia(df: pd.DataFrame, data_str: str) -> pd.DataFrame:
+        """Filtra o DataFrame para um único dia."""
+        return _filtrar_dia(df, data_str)
+
+    # ── ZIP ───────────────────────────────────────────────────────────────────
 
     @staticmethod
     def gerar_zip(arquivo_ids: list, usuario_id: int) -> tuple:

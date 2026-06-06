@@ -10,7 +10,6 @@ import streamlit as st
 from datetime import date
 
 from controller.UserController import UserController
-from model.UserModel import UserModel
 from view.ui import (
     Profissao,
     AVATAR_SM, AVATAR_LG,
@@ -30,7 +29,7 @@ def configuracoes_page():
     email     = usuario.get("email")
     tipo_auth = usuario.get("tipo_auth", "email")
 
-    dados = UserModel.buscar_por_email(email)
+    dados = UserController.buscar_perfil_por_email(email)
     if not dados:
         st.error("Dados do usuário não encontrados.")
         return
