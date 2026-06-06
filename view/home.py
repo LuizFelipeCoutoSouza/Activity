@@ -3,7 +3,7 @@ view/home.py — Shell autenticado: navbar, sidebar e roteamento entre páginas.
 """
 
 import streamlit as st
-from controller.UserController import UserController
+from controller.user_controller import UserController
 from view.ui import avatar_html, AVATAR_NAV
 
 PAGINAS = [

@@ -7,8 +7,8 @@ de erros nas views sem expor exceções brutas.
 
 import re
 import bcrypt
-from model.UserModel import UserModel
-from model.SessaoModel import SessaoModel
+from model.user_model import UserModel
+from model.sessao_model import SessaoModel
 
 
 def _cpf_valido(cpf: str) -> bool:

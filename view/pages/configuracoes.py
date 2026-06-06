@@ -9,7 +9,7 @@ Seções:
 import streamlit as st
 from datetime import date
 
-from controller.UserController import UserController
+from controller.user_controller import UserController
 from view.ui import (
     Profissao,
     AVATAR_SM, AVATAR_LG,

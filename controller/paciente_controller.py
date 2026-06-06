@@ -1,6 +1,6 @@
 import re
-from model.PacienteModel import PacienteModel
-from controller.ArquivoController import ArquivoController
+from model.paciente_model import PacienteModel
+from controller.arquivo_controller import ArquivoController
 
 
 def _cpf_valido(cpf: str) -> bool:

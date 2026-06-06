@@ -79,7 +79,7 @@ if google_logado and "usuario" not in st.session_state:
 if not email_logado and not google_logado:
     _token = st.context.cookies.get(_COOKIE)
     if _token:
-        from controller.UserController import UserController
+        from controller.user_controller import UserController
         _dados = UserController.restaurar_sessao(_token)
         if _dados:
             st.session_state["usuario"]        = _dados

@@ -13,7 +13,7 @@ from datetime import timedelta
 
 import streamlit as st
 from st_keyup import st_keyup
-from controller.ArquivoController import ArquivoController
+from controller.arquivo_controller import ArquivoController
 from view.ui import set_toast, render_toast, get_usuario_id, paginacao
 
 POR_PAGINA   = 5

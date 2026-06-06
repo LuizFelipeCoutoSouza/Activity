@@ -1,7 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
-from controller.ArquivoController import ArquivoController
+from controller.arquivo_controller import ArquivoController
 from view.ui import render_toast, get_usuario_id
 
 

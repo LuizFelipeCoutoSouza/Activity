@@ -3,7 +3,7 @@ view/cadastro.py — Tela de cadastro de novos usuários.
 """
 
 import streamlit as st
-from controller.UserController import UserController
+from controller.user_controller import UserController
 from view.ui import Profissao, forca_senha
 
 

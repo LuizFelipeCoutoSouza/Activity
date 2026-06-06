@@ -1,5 +1,5 @@
 import streamlit as st
-from controller.UserController import UserController
+from controller.user_controller import UserController
 
 
 def login_page():

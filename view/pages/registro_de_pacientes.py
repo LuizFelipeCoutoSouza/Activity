@@ -9,7 +9,7 @@ from datetime import date
 
 import streamlit as st
 
-from controller.PacienteController import PacienteController
+from controller.paciente_controller import PacienteController
 from view.ui import set_toast, render_toast, fmt_telefone, get_usuario_id, paginacao
 
 SEXO_OPCOES = ["Masculino", "Feminino", "Outro", "Não informado"]

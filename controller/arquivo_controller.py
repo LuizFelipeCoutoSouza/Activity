@@ -3,7 +3,7 @@ import zipfile
 from datetime import datetime
 
 import pandas as pd
-from model.ArquivoModel import ArquivoModel
+from model.arquivo_model import ArquivoModel
 from model.condor_parser import (
     carregar_condor      as _carregar_condor,
     dias_disponiveis     as _dias_disponiveis,
