@@ -67,6 +67,32 @@ def init_db():
         );
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pacientes (
+            id              SERIAL       PRIMARY KEY,
+            usuario_id      INTEGER      NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            nome            VARCHAR(255) NOT NULL,
+            sexo            VARCHAR(20),
+            data_nascimento DATE,
+            email           VARCHAR(255),
+            telefone        VARCHAR(20),
+            altura          NUMERIC(5,2),
+            peso            NUMERIC(5,2),
+            nota            TEXT,
+            criado_em       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS paciente_arquivos (
+            paciente_id INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+            arquivo_id  INTEGER NOT NULL REFERENCES arquivos(id)  ON DELETE CASCADE,
+            PRIMARY KEY (paciente_id, arquivo_id),
+            UNIQUE (arquivo_id)
+        );
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()

@@ -32,7 +32,7 @@ def login_page():
         senha            = st.text_input("Senha", placeholder="Sua senha", type="password")
         manter_conectado = st.checkbox("Manter conectado por 30 dias")
 
-        if st.button("Entrar", type="primary", use_container_width=True):
+        if st.button("Entrar", type="primary", width="stretch"):
             sucesso, mensagem, usuario = UserController.login(email, senha)
             if sucesso:
                 # dias=0 → session cookie; dias=30 → cookie persistente de 30 dias
@@ -51,12 +51,12 @@ def login_page():
 
         st.caption("— ou —")
 
-        if st.button("Entrar com Google", use_container_width=True):
+        if st.button("Entrar com Google", width="stretch"):
             st.login()
 
         st.divider()
 
         st.write("Novo na plataforma?")
-        if st.button("Criar uma conta", use_container_width=True):
+        if st.button("Criar uma conta", width="stretch"):
             st.session_state["pagina"] = "cadastro"
             st.rerun()

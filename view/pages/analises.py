@@ -99,7 +99,7 @@ def analises_page():
         yaxis_title="PIM",
         hovermode="x unified",
     )
-    st.plotly_chart(fig_pim, use_container_width=True)
+    st.plotly_chart(fig_pim, width="stretch")
 
     # ── Temperatura e Luz lado a lado ───────────────────────────────
     c1, c2 = st.columns(2)
@@ -109,7 +109,7 @@ def analises_page():
         fig_temp = px.line(df, x="timestamp", y="temperatura", color_discrete_sequence=["#c43903"])
         fig_temp.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=0),
                                xaxis=dict(tickformat="%H:%M"), xaxis_title="", yaxis_title="°C")
-        st.plotly_chart(fig_temp, use_container_width=True)
+        st.plotly_chart(fig_temp, width="stretch")
 
     with c2:
         st.subheader("Luz (Lux)")
@@ -120,7 +120,7 @@ def analises_page():
         fig_luz = px.bar(df_hora, x="hora", y="luz", color_discrete_sequence=["#ffb433"])
         fig_luz.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=0),
                               xaxis=dict(tickformat="%H:%M"), xaxis_title="", yaxis_title="Lux")
-        st.plotly_chart(fig_luz, use_container_width=True)
+        st.plotly_chart(fig_luz, width="stretch")
 
     # ── Melanopic EDI (se tiver dados) ──────────────────────────────
     if "melanopic" in df.columns and df["melanopic"].sum() > 0:
@@ -128,7 +128,7 @@ def analises_page():
         fig_mel = px.line(df, x="timestamp", y="melanopic", color_discrete_sequence=["#7c3aed"])
         fig_mel.update_layout(height=200, margin=dict(l=0, r=0, t=10, b=0),
                               xaxis=dict(tickformat="%H:%M"), xaxis_title="", yaxis_title="EDI")
-        st.plotly_chart(fig_mel, use_container_width=True)
+        st.plotly_chart(fig_mel, width="stretch")
 
     st.divider()
 

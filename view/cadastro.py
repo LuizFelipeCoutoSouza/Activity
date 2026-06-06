@@ -24,7 +24,7 @@ def cadastro_page():
         )
         st.divider()
         st.write("Já tem uma conta?")
-        if st.button("Fazer login", use_container_width=True):
+        if st.button("Fazer login", width="stretch"):
             st.session_state["pagina"] = "login"
             st.rerun()
 
@@ -47,7 +47,7 @@ def cadastro_page():
             score, label, emoji = forca_senha(senha)
             st.progress(score / 4, text=f"{emoji} Força da senha: **{label}**")
 
-        if st.button("Criar conta", type="primary", use_container_width=True):
+        if st.button("Criar conta", type="primary", width="stretch"):
             sucesso, mensagem = UserController.cadastrar(
                 nome, email, cpf, senha, confirma_senha, profissao
             )
@@ -63,7 +63,7 @@ def cadastro_page():
 def _tela_sucesso():
     st.success("Conta criada com sucesso!")
     st.info("Sua conta está pronta. Faça o login para acessar o Activity.")
-    if st.button("Ir para o login", type="primary", use_container_width=True):
+    if st.button("Ir para o login", type="primary", width="stretch"):
         st.session_state.pop("cadastro_ok", None)
         st.session_state["pagina"] = "login"
         st.rerun()

@@ -85,7 +85,7 @@ def _secao_foto(dados: dict):
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
         if dados.get("foto_perfil"):
-            if st.button("Remover foto", use_container_width=True):
+            if st.button("Remover foto", width="stretch"):
                 ok, msg = UserController.atualizar_foto(dados["id"], None, None, None)
                 if ok:
                     _sync_sessao_foto(None, None)
@@ -182,7 +182,7 @@ def _formulario_perfil(dados: dict, tipo_auth: str):
 
         st.caption("* Campos obrigatórios")
 
-        if st.form_submit_button("Salvar alterações", type="primary", use_container_width=True):
+        if st.form_submit_button("Salvar alterações", type="primary", width="stretch"):
             email_salvo = dados["email"] if tipo_auth == "google" else email
             ok, msg = UserController.atualizar_perfil(
                 dados["id"], nome, email_salvo, cpf, profissao,
@@ -220,7 +220,7 @@ def _secao_senha(dados: dict, tipo_auth: str):
             score, label, emoji = forca_senha(nova_senha)
             st.progress(score / 4, text=f"{emoji} Força: **{label}**")
 
-        if st.form_submit_button("Alterar senha", type="primary", use_container_width=True):
+        if st.form_submit_button("Alterar senha", type="primary", width="stretch"):
             ok, msg = UserController.atualizar_senha(dados["id"], senha_atual, nova_senha, confirma)
             if ok:
                 set_toast(msg)

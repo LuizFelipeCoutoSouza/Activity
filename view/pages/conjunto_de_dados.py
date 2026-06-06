@@ -81,7 +81,7 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
     novo_arq = st.file_uploader("Novo arquivo .txt", type=["txt"], key="edit_uploader")
 
     col1, col2 = st.columns(2)
-    if col1.button("Salvar", type="primary", use_container_width=True):
+    if col1.button("Salvar", type="primary", width="stretch"):
         if novo_arq:
             ok, msg = ArquivoController.substituir_arquivo(arquivo_id, usuario_id, novo_nome, nova_desc, novo_arq)
         else:
@@ -95,7 +95,7 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
         else:
             st.error(msg)
 
-    if col2.button("Cancelar", use_container_width=True):
+    if col2.button("Cancelar", width="stretch"):
         st.session_state.pop("editando_id", None)
         st.rerun()
 
@@ -270,11 +270,11 @@ def _secao_listagem(usuario_id: int, arquivos: list):
     # Controles de seleção em massa
     n_sel = len(sel)
     c1, c2, *_ = st.columns([2.5, 2.5, 6])
-    if c1.button("Selecionar todos", use_container_width=True, key="btn_sel_all"):
+    if c1.button("Selecionar todos", width="stretch", key="btn_sel_all"):
         st.session_state["selecionados"] = ids_atuais.copy()
         st.session_state["chk_gen"]      = gen + 1
         st.rerun()
-    if c2.button("Limpar seleção", use_container_width=True, key="btn_des_all", disabled=n_sel == 0):
+    if c2.button("Limpar seleção", width="stretch", key="btn_des_all", disabled=n_sel == 0):
         st.session_state["selecionados"] = set()
         st.session_state["chk_gen"]      = gen + 1
         st.rerun()
@@ -284,7 +284,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
         if ba1.button(
             f"⬇️  Download ({n_sel} arquivo(s))",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="btn_bulk_dl",
         ):
             with st.spinner("Compactando arquivos..."):
@@ -294,7 +294,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
             else:
                 st.error("Nenhum arquivo pôde ser compactado.")
             st.rerun()
-        if ba2.button(f"🗑️  Excluir ({n_sel} arquivo(s))", use_container_width=True, key="btn_bulk_del"):
+        if ba2.button(f"🗑️  Excluir ({n_sel} arquivo(s))", width="stretch", key="btn_bulk_del"):
             st.session_state["bulk_delete_ids"] = list(sel)
 
     if "bulk_delete_ids" in st.session_state:
@@ -303,7 +303,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
         preview   = ", ".join(nomes_del[:3]) + (" ..." if len(nomes_del) > 3 else "")
         st.warning(f"Excluir **{len(ids_del)}** arquivo(s)? ({preview})")
         cd1, cd2 = st.columns(2)
-        if cd1.button("✓ Confirmar exclusão", type="primary", key="conf_bulk_del", use_container_width=True):
+        if cd1.button("✓ Confirmar exclusão", type="primary", key="conf_bulk_del", width="stretch"):
             for arq_id in ids_del:
                 ArquivoController.deletar(arq_id, usuario_id)
             st.session_state["selecionados"] -= set(ids_del)
@@ -312,7 +312,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
             st.session_state.pop("bulk_delete_ids", None)
             set_toast(f"{len(ids_del)} arquivo(s) excluído(s).")
             st.rerun()
-        if cd2.button("✗ Cancelar", key="canc_bulk_del", use_container_width=True):
+        if cd2.button("✗ Cancelar", key="canc_bulk_del", width="stretch"):
             st.session_state.pop("bulk_delete_ids", None)
             st.rerun()
 
@@ -362,12 +362,12 @@ def _painel_filtros() -> None:
         st.checkbox("Só atualizados", key="_d_apenas_atualizados")
     with c6:
         st.markdown("&nbsp;", unsafe_allow_html=True)
-        if st.button("Aplicar", type="primary", use_container_width=True):
+        if st.button("Aplicar", type="primary", width="stretch"):
             _commit_draft()
             st.rerun()
     with c7:
         st.markdown("&nbsp;", unsafe_allow_html=True)
-        if st.button("Limpar", use_container_width=True, disabled=not _tem_filtros_ativos()):
+        if st.button("Limpar", width="stretch", disabled=not _tem_filtros_ativos()):
             _limpar_filtros()
             st.rerun()
 
@@ -488,14 +488,14 @@ def _controles_paginacao(pagina: int, n_paginas: int):
 
     st.divider()
     col_prev, col_info, col_next = st.columns([2, 3, 2])
-    if col_prev.button("◀  Anterior", disabled=pagina == 0, use_container_width=True, key="pag_prev"):
+    if col_prev.button("◀  Anterior", disabled=pagina == 0, width="stretch", key="pag_prev"):
         st.session_state["pag_arquivos"] = pagina - 1
         st.rerun()
     col_info.button(
         f"Página {pagina + 1} de {n_paginas}",
-        disabled=True, use_container_width=True, key="pag_info",
+        disabled=True, width="stretch", key="pag_info",
     )
-    if col_next.button("Próxima  ▶", disabled=pagina >= n_paginas - 1, use_container_width=True, key="pag_next"):
+    if col_next.button("Próxima  ▶", disabled=pagina >= n_paginas - 1, width="stretch", key="pag_next"):
         st.session_state["pag_arquivos"] = pagina + 1
         st.rerun()
 
@@ -535,15 +535,15 @@ def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
         if conteudo:
             c1.download_button(
                 "Baixar", data=conteudo, file_name=nome_arq, mime="text/plain",
-                key=f"dl_{arq['id']}", use_container_width=True,
+                key=f"dl_{arq['id']}", width="stretch",
             )
 
-        if c2.button("Editar", key=f"ed_{arq['id']}", use_container_width=True):
+        if c2.button("Editar", key=f"ed_{arq['id']}", width="stretch"):
             st.session_state["editando_id"] = arq["id"]
             st.rerun()
 
         if st.session_state.get("confirm_delete") != arq["id"]:
-            if c3.button("Excluir", key=f"del_{arq['id']}", use_container_width=True):
+            if c3.button("Excluir", key=f"del_{arq['id']}", width="stretch"):
                 st.session_state["confirm_delete"] = arq["id"]
                 st.rerun()
 

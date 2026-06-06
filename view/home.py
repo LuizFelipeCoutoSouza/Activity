@@ -53,7 +53,7 @@ def _sidebar(tipo_auth: str):
             ativo = pagina_atual == nome
             if st.button(
                 f"{icone}  {nome}",
-                use_container_width=True,
+                width="stretch",
                 type="primary" if ativo else "secondary",
                 key=f"nav_{nome}",
             ):
@@ -62,11 +62,11 @@ def _sidebar(tipo_auth: str):
 
         st.divider()
 
-        if st.button("⚙️  Configurações", use_container_width=True, key="nav_config"):
+        if st.button("⚙️  Configurações", width="stretch", key="nav_config"):
             st.session_state["pagina_atual"] = "Configurações"
             st.rerun()
 
-        if st.button("🚪  Sair", use_container_width=True, key="nav_logout"):
+        if st.button("🚪  Sair", width="stretch", key="nav_logout"):
             _logout(tipo_auth)
 
 
