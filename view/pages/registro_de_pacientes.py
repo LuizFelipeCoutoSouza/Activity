@@ -179,11 +179,11 @@ def _dialogo_paciente(paciente_id: int | None, usuario_id: int):
         if is_novo:
             st.info("Salve os dados do paciente primeiro para vincular arquivos.")
         else:
-            disponiveis, ocupados = PacienteController.arquivos_disponiveis(usuario_id, paciente_id)
+            disponiveis, _ = PacienteController.arquivos_disponiveis(usuario_id, paciente_id)
             vinculados = PacienteController.listar_arquivos(paciente_id)
             ids_vin    = {a["arquivo_id"] for a in vinculados}
 
-            if not disponiveis and not ocupados:
+            if not disponiveis:
                 st.info("Nenhum arquivo disponível. Faça upload em **Conjunto de dados**.")
             else:
                 mapa    = {a["nome"]: a["id"] for a in disponiveis}
@@ -193,7 +193,6 @@ def _dialogo_paciente(paciente_id: int | None, usuario_id: int):
                     "Arquivos deste paciente",
                     options=list(mapa.keys()),
                     default=default,
-                    help="Apenas arquivos sem paciente vinculado estão disponíveis para seleção.",
                 )
 
                 if st.button(
@@ -207,12 +206,6 @@ def _dialogo_paciente(paciente_id: int | None, usuario_id: int):
                         st.rerun()
                     else:
                         st.error(msg)
-
-                if ocupados:
-                    st.divider()
-                    st.caption("**Arquivos vinculados a outros pacientes** (indisponíveis)")
-                    for o in ocupados:
-                        st.caption(f"📎 {o['arquivo_nome']}  →  paciente: *{o['paciente_nome']}*")
 
 
 # ── Linha de paciente ─────────────────────────────────────────────────────────
