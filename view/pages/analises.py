@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 from controller.ArquivoController import ArquivoController
-from view.ui import render_toast
+from view.ui import render_toast, get_usuario_id
 
 
 @st.cache_data(ttl=120)
@@ -17,11 +17,8 @@ def analises_page():
     st.title("Análises")
     st.divider()
 
-    usuario    = st.session_state.get("usuario", {})
-    usuario_id = usuario.get("id")
-
+    usuario_id = get_usuario_id()
     if not usuario_id:
-        st.info("Esta funcionalidade está disponível apenas para usuários cadastrados com e-mail.")
         return
 
     render_toast()

@@ -11,6 +11,10 @@ from model.UserModel import UserModel
 from model.SessaoModel import SessaoModel
 
 
+def _cpf_valido(cpf: str) -> bool:
+    return len(re.sub(r"\D", "", cpf)) == 11
+
+
 class UserController:
 
     @staticmethod
@@ -21,7 +25,7 @@ class UserController:
             return False, "As senhas não coincidem."
         if len(senha) < 6:
             return False, "A senha deve ter no mínimo 6 caracteres."
-        if len(re.sub(r"\D", "", cpf)) != 11:
+        if not _cpf_valido(cpf):
             return False, "CPF inválido."
         try:
             UserModel.criar_usuario(nome, email, cpf, senha, profissao)
@@ -51,12 +55,12 @@ class UserController:
                          telefone, data_nascimento, bio):
         if not all([nome, email, cpf, profissao]):
             return False, "Nome, e-mail, CPF e profissão são obrigatórios."
-        if len(re.sub(r"\D", "", cpf)) != 11:
+        if not _cpf_valido(cpf):
             return False, "CPF inválido."
         try:
             UserModel.atualizar_perfil(
                 user_id, nome, email, cpf, profissao,
-                telefone, data_nascimento, bio
+                telefone, data_nascimento, bio,
             )
             return True, "Perfil atualizado com sucesso!"
         except Exception as e:
@@ -106,24 +110,20 @@ class UserController:
 
     @staticmethod
     def buscar_perfil(usuario_id: int) -> dict | None:
-        """Retorna o perfil completo pelo id."""
         return UserModel.buscar_por_id(usuario_id)
 
     @staticmethod
     def buscar_perfil_por_email(email: str) -> dict | None:
-        """Retorna o perfil completo pelo e-mail (usado por contas Google sem id na sessão)."""
         return UserModel.buscar_por_email(email)
 
     # ── Sessão ────────────────────────────────────────────────────────────────
 
     @staticmethod
     def iniciar_sessao(usuario_id: int, dias: int) -> str:
-        """Cria uma sessão persistente e retorna o token UUID."""
         return SessaoModel.criar(usuario_id, dias)
 
     @staticmethod
     def encerrar_sessao(token: str) -> None:
-        """Invalida a sessão no banco (logout ou expiração forçada)."""
         SessaoModel.deletar(token)
 
     @staticmethod

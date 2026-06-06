@@ -1,4 +1,6 @@
 
+
+
 """
 view/ui.py — Utilitários de UI compartilhados entre as views.
 
@@ -7,6 +9,8 @@ Exporta:
   Tamanhos: AVATAR_NAV, AVATAR_SM, AVATAR_LG
   Helpers : fmt_cpf, fmt_telefone, forca_senha
   Avatar  : img_b64_tag, avatar_html
+  Auth    : get_usuario_id
+  Navegação: paginacao
   Toast   : set_toast, render_toast
 """
 
@@ -125,6 +129,49 @@ def avatar_html(nome: str, foto: bytes | None, foto_tipo: str | None, tamanho: i
         f'justify-content:center;font-size:{font}px;color:white;font-weight:bold;">'
         f'{inicial}</div>'
     )
+
+
+# ── Auth guard ───────────────────────────────────────────────────────────────
+
+def get_usuario_id() -> int | None:
+    """
+    Retorna o id do usuário logado por e-mail, ou None para contas Google.
+    Exibe aviso automático quando não há id — use o retorno como guard:
+
+        usuario_id = get_usuario_id()
+        if not usuario_id:
+            return
+    """
+    uid = st.session_state.get("usuario", {}).get("id")
+    if not uid:
+        st.info("Esta funcionalidade está disponível apenas para usuários cadastrados com e-mail.")
+    return uid
+
+
+# ── Paginação ─────────────────────────────────────────────────────────────────
+
+def paginacao(pagina: int, n_paginas: int, chave: str) -> None:
+    """
+    Renderiza controles de paginação (Anterior / info / Próxima).
+
+    chave — chave de session_state que armazena o índice da página atual.
+    Usa chave como prefixo de key dos botões para evitar conflitos entre
+    múltiplas paginações na mesma página.
+    """
+    if n_paginas <= 1:
+        return
+    st.divider()
+    col_prev, col_info, col_next = st.columns([2, 3, 2])
+    if col_prev.button("◀  Anterior", disabled=pagina == 0, width="stretch", key=f"{chave}_prev"):
+        st.session_state[chave] = pagina - 1
+        st.rerun()
+    col_info.button(
+        f"Página {pagina + 1} de {n_paginas}",
+        disabled=True, width="stretch", key=f"{chave}_info",
+    )
+    if col_next.button("Próxima  ▶", disabled=pagina >= n_paginas - 1, width="stretch", key=f"{chave}_next"):
+        st.session_state[chave] = pagina + 1
+        st.rerun()
 
 
 # ── Toast ─────────────────────────────────────────────────────────────────────

@@ -3,8 +3,12 @@ model/database.py — Conexão com o banco de dados e inicialização do esquema
 
 Expõe:
   get_connection() — abre e retorna uma conexão psycopg2 com o PostgreSQL.
+  db_cursor(write, dict_row) — context manager que abre cursor, commita/rollback
+                               automaticamente e fecha conexão ao sair.
   init_db()        — cria as tabelas com o esquema completo (idempotente via IF NOT EXISTS).
 """
+
+from contextlib import contextmanager
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -18,6 +22,30 @@ def get_connection():
         password="postgres",
         port=5432,
     )
+
+
+@contextmanager
+def db_cursor(write: bool = False, dict_row: bool = False):
+    """
+    Context manager de cursor psycopg2.
+
+    write=True  → commita no sucesso, rollback na exceção.
+    dict_row=True → cursor com RealDictCursor (retorna dicts).
+    """
+    conn = get_connection()
+    kw = {"cursor_factory": RealDictCursor} if dict_row else {}
+    cursor = conn.cursor(**kw)
+    try:
+        yield cursor
+        if write:
+            conn.commit()
+    except Exception:
+        if write:
+            conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def init_db():

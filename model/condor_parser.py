@@ -7,7 +7,7 @@ def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
     Recebe caminho (str) ou bytes do arquivo Condor.
     Retorna (metadata dict, DataFrame com os dados).
     """
-    if isinstance(path_ou_bytes, (str,)):
+    if isinstance(path_ou_bytes, str):
         with open(path_ou_bytes, encoding="utf-8", errors="replace") as f:
             raw = f.read()
     elif isinstance(path_ou_bytes, bytes):

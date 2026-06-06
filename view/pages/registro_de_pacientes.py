@@ -10,7 +10,7 @@ from datetime import date
 import streamlit as st
 
 from controller.PacienteController import PacienteController
-from view.ui import set_toast, render_toast, fmt_telefone
+from view.ui import set_toast, render_toast, fmt_telefone, get_usuario_id, paginacao
 
 SEXO_OPCOES = ["Masculino", "Feminino", "Outro", "Não informado"]
 POR_PAGINA  = 8
@@ -21,9 +21,8 @@ POR_PAGINA  = 8
 def registro_de_pacientes_page():
     st.title("👥 Registro de pacientes")
 
-    usuario_id = st.session_state.get("usuario", {}).get("id")
+    usuario_id = get_usuario_id()
     if not usuario_id:
-        st.info("Esta funcionalidade está disponível apenas para usuários cadastrados com e-mail.")
         return
 
     render_toast()
@@ -81,7 +80,7 @@ def registro_de_pacientes_page():
     for p in pag_atual:
         _linha_paciente(p, usuario_id)
 
-    _controles_paginacao(pagina, n_paginas)
+    paginacao(pagina, n_paginas, "pag_pacientes")
 
 
 # ── Dialog de cadastro / edição ───────────────────────────────────────────────
@@ -257,18 +256,3 @@ def _idade(data_nascimento) -> int | None:
     return anos
 
 
-def _controles_paginacao(pagina: int, n_paginas: int):
-    if n_paginas <= 1:
-        return
-    st.divider()
-    col_prev, col_info, col_next = st.columns([2, 3, 2])
-    if col_prev.button("◀  Anterior", disabled=pagina == 0, width="stretch", key="pac_prev"):
-        st.session_state["pag_pacientes"] = pagina - 1
-        st.rerun()
-    col_info.button(
-        f"Página {pagina + 1} de {n_paginas}",
-        disabled=True, width="stretch", key="pac_info",
-    )
-    if col_next.button("Próxima  ▶", disabled=pagina >= n_paginas - 1, width="stretch", key="pac_next"):
-        st.session_state["pag_pacientes"] = pagina + 1
-        st.rerun()

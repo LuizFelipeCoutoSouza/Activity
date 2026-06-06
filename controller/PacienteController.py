@@ -3,28 +3,46 @@ from model.PacienteModel import PacienteModel
 from controller.ArquivoController import ArquivoController
 
 
+def _cpf_valido(cpf: str) -> bool:
+    return len(re.sub(r"\D", "", cpf)) == 11
+
+
 class PacienteController:
+
+    @staticmethod
+    def _validar_campos(nome: str, email: str) -> tuple[str | None, str | None]:
+        """Retorna (nome_limpo, mensagem_de_erro). Erro é None se válido."""
+        nome = (nome or "").strip()
+        if not nome:
+            return None, "O nome é obrigatório."
+        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            return None, "E-mail inválido."
+        return nome, None
+
+    @staticmethod
+    def _normalizar(sexo, data_nascimento, email, telefone, altura, peso, nota) -> tuple:
+        return (
+            sexo or None,
+            data_nascimento or None,
+            email.strip() if email else None,
+            telefone.strip() if telefone else None,
+            float(altura) if (altura and float(altura) > 0) else None,
+            float(peso)   if (peso   and float(peso)   > 0) else None,
+            nota.strip() if nota else None,
+        )
 
     @staticmethod
     def cadastrar(usuario_id, nome, sexo, data_nascimento,
                   email, telefone, altura, peso, nota) -> tuple:
-        """Valida e persiste um novo paciente. Retorna (bool, str, id | None)."""
-        nome = (nome or "").strip()
-        if not nome:
-            return False, "O nome é obrigatório.", None
-        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            return False, "E-mail inválido.", None
+        nome_limpo, erro = PacienteController._validar_campos(nome, email)
+        if erro:
+            return False, erro, None
         try:
             pid = PacienteModel.criar(
-                usuario_id,
-                nome,
-                sexo or None,
-                data_nascimento or None,
-                email.strip() if email else None,
-                telefone.strip() if telefone else None,
-                float(altura) if (altura and float(altura) > 0) else None,
-                float(peso)   if (peso   and float(peso)   > 0) else None,
-                nota.strip() if nota else None,
+                usuario_id, nome_limpo,
+                *PacienteController._normalizar(
+                    sexo, data_nascimento, email, telefone, altura, peso, nota
+                ),
             )
             return True, "Paciente cadastrado com sucesso.", pid
         except Exception as e:
@@ -41,23 +59,15 @@ class PacienteController:
     @staticmethod
     def atualizar(paciente_id, usuario_id, nome, sexo, data_nascimento,
                   email, telefone, altura, peso, nota) -> tuple:
-        """Valida e atualiza os dados de um paciente existente. Retorna (bool, str)."""
-        nome = (nome or "").strip()
-        if not nome:
-            return False, "O nome é obrigatório."
-        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            return False, "E-mail inválido."
+        nome_limpo, erro = PacienteController._validar_campos(nome, email)
+        if erro:
+            return False, erro
         try:
             PacienteModel.atualizar(
-                paciente_id, usuario_id,
-                nome,
-                sexo or None,
-                data_nascimento or None,
-                email.strip() if email else None,
-                telefone.strip() if telefone else None,
-                float(altura) if (altura and float(altura) > 0) else None,
-                float(peso)   if (peso   and float(peso)   > 0) else None,
-                nota.strip() if nota else None,
+                paciente_id, usuario_id, nome_limpo,
+                *PacienteController._normalizar(
+                    sexo, data_nascimento, email, telefone, altura, peso, nota
+                ),
             )
             return True, "Paciente atualizado com sucesso."
         except Exception as e:
@@ -82,13 +92,12 @@ class PacienteController:
         """
         Separa os arquivos do usuário em dois grupos:
         - disponíveis: sem vínculo ou já vinculados a este paciente
-        - ocupados: vinculados a outro paciente (contém arquivo_nome e paciente_nome)
+        - ocupados: vinculados a outro paciente
         """
         todos    = ArquivoController.listar(usuario_id)
         ocupados = PacienteModel.listar_arquivos_ocupados(usuario_id, paciente_id)
         ids_occ  = {o["arquivo_id"] for o in ocupados}
-        disponiveis = [a for a in todos if a["id"] not in ids_occ]
-        return disponiveis, ocupados
+        return [a for a in todos if a["id"] not in ids_occ], ocupados
 
     @staticmethod
     def sincronizar_arquivos(paciente_id: int, novos_ids: list) -> tuple:

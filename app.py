@@ -37,14 +37,14 @@ def _gravar_cookie(token: str, dias: int) -> None:
               f'{_COOKIE}={token};max-age={dias * 86400};path=/;SameSite=Strict";')
     else:
         js = f'window.parent.document.cookie="{_COOKIE}={token};path=/;SameSite=Strict";'
-    st.iframe(f"<script>{js}</script>", height=0)
+    st.iframe(f"<script>{js}</script>", height=1)
 
 
 def _apagar_cookie() -> None:
     """Remove o cookie de sessão via JS (expiração no passado)."""
     js = (f'window.parent.document.cookie="'
           f'{_COOKIE}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;";')
-    st.iframe(f"<script>{js}</script>", height=0)
+    st.iframe(f"<script>{js}</script>", height=1)
 
 
 # ── Operações pendentes de cookie (agendadas por login / logout) ───────────────

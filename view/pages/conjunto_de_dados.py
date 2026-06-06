@@ -14,7 +14,7 @@ from datetime import timedelta
 import streamlit as st
 from st_keyup import st_keyup
 from controller.ArquivoController import ArquivoController
-from view.ui import set_toast, render_toast
+from view.ui import set_toast, render_toast, get_usuario_id, paginacao
 
 POR_PAGINA   = 5
 OPCOES_ORDEM = ["Nome", "Data de envio", "Tamanho", "Linhas", "Atualização"]
@@ -104,11 +104,8 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
 def conjunto_de_dados_page():
     st.title("🗃️ Conjunto de dados")
 
-    usuario    = st.session_state.get("usuario", {})
-    usuario_id = usuario.get("id")
-
+    usuario_id = get_usuario_id()
     if not usuario_id:
-        st.info("Esta funcionalidade está disponível apenas para usuários cadastrados com e-mail.")
         return
 
     render_toast()
@@ -224,7 +221,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
                 window.parent.document.body.removeChild(a);
             }})();
             </script>""",
-            height=0,
+            height=1,
         )
         st.toast(f"{n_zip} arquivo(s) compactado(s). Download iniciado.", icon="✅")
 
@@ -322,7 +319,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
     for arq in arquivos_pagina:
         _linha_arquivo(arq, usuario_id, gen)
 
-    _controles_paginacao(pagina, n_paginas)
+    paginacao(pagina, n_paginas, "pag_arquivos")
 
 
 # ── Painel de filtros ─────────────────────────────────────────────────────────
@@ -480,24 +477,6 @@ def _aplicar_filtros(
 
 
 # ── Helpers de listagem ───────────────────────────────────────────────────────
-
-def _controles_paginacao(pagina: int, n_paginas: int):
-    if n_paginas <= 1:
-        return
-
-    st.divider()
-    col_prev, col_info, col_next = st.columns([2, 3, 2])
-    if col_prev.button("◀  Anterior", disabled=pagina == 0, width="stretch", key="pag_prev"):
-        st.session_state["pag_arquivos"] = pagina - 1
-        st.rerun()
-    col_info.button(
-        f"Página {pagina + 1} de {n_paginas}",
-        disabled=True, width="stretch", key="pag_info",
-    )
-    if col_next.button("Próxima  ▶", disabled=pagina >= n_paginas - 1, width="stretch", key="pag_next"):
-        st.session_state["pag_arquivos"] = pagina + 1
-        st.rerun()
-
 
 def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
     st.divider()
