@@ -11,14 +11,16 @@ from view.ui import render_toast, get_usuario_id
 COR_LINHA = "#234cbe"
 COR_LEGENDA = "black"
 
+MODOS_ATIVIDADE = {"PIM": "pim", "TAT": "TAT", "ZCM": "ZCM"}
+
 
 @st.cache_data(ttl=120)
 def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
     return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
 
 
-def _construir_raw(nome: str, df: pd.DataFrame) -> BaseRaw:
-    serie = pd.Series(df["pim"].to_numpy(), index=pd.DatetimeIndex(df["timestamp"]), name="Activity")
+def _construir_raw(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
+    serie = pd.Series(df[coluna].to_numpy(), index=pd.DatetimeIndex(df["timestamp"]), name="Activity")
     frequencia = pd.Timedelta(serie.index.to_series().diff().median())
 
     return BaseRaw(
@@ -47,7 +49,7 @@ def _rotulo_dia(numero_dia: int, dia: str) -> str:
     return f"Dia {numero_dia} — {pd.Timestamp(dia).strftime('%d/%m/%Y')}"
 
 
-def _grafico_dia(serie: pd.Series, dia: str, numero_dia: int, escala_y: tuple[float, float]) -> go.Figure:
+def _grafico_dia(serie: pd.Series, dia: str, numero_dia: int, escala_y: tuple[float, float], modo_atividade: str) -> go.Figure:
     inicio = pd.Timestamp(dia)
     fim = inicio + pd.Timedelta(hours=23, minutes=59, seconds=59)
 
@@ -56,7 +58,7 @@ def _grafico_dia(serie: pd.Series, dia: str, numero_dia: int, escala_y: tuple[fl
         layout=go.Layout(
             title=_rotulo_dia(numero_dia, dia),
             xaxis=dict(title="Hora", range=[inicio, fim], tickformat="%H:%M"),
-            yaxis=dict(title="Atividade (PIM)", range=escala_y),
+            yaxis=dict(title=f"Atividade ({modo_atividade})", range=escala_y),
             height=300,
             margin=dict(l=0, r=0, t=40, b=0),
         ),
@@ -65,7 +67,7 @@ def _grafico_dia(serie: pd.Series, dia: str, numero_dia: int, escala_y: tuple[fl
     return fig
 
 
-def _grafico_todos_os_dias(raw: BaseRaw, dias: list[str], escala_y: tuple[float, float]) -> go.Figure:
+def _grafico_todos_os_dias(raw: BaseRaw, dias: list[str], escala_y: tuple[float, float], modo_atividade: str) -> go.Figure:
     n = len(dias)
     altura_por_dia = 250
     espaco_vertical = min(0.015, 1 / (n - 1)) if n > 1 else 0
@@ -87,9 +89,9 @@ def _grafico_todos_os_dias(raw: BaseRaw, dias: list[str], escala_y: tuple[float,
 
         eixo_y = "y domain" if i == 1 else f"y{i} domain"
 
-        # "PIM" — dentro da área do gráfico, canto superior esquerdo (não disputa espaço com a margem)
+        # nome do modo — dentro da área do gráfico, canto superior esquerdo (não disputa espaço com a margem)
         fig.add_annotation(
-            text="PIM",
+            text=modo_atividade,
             xref="x domain", yref=eixo_y,
             x=0.01, y=0.95,
             xanchor="left", yanchor="top",
@@ -136,7 +138,11 @@ def analises2_page():
         st.warning("Não foi possível processar este arquivo.")
         return
 
-    raw = _construir_raw(nome_escolhido, df)
+    with st.expander("Modo de atividade"):
+        modo_atividade = st.radio("Selecione o modo", list(MODOS_ATIVIDADE.keys()), horizontal=True)
+    coluna_atividade = MODOS_ATIVIDADE[modo_atividade]
+
+    raw = _construir_raw(nome_escolhido, df, coluna_atividade)
     dias = ArquivoController.dias_disponiveis(df)
     escala_y = (0, float(raw.data.max()))
 
@@ -145,6 +151,6 @@ def analises2_page():
     if modo == "Um dia específico":
         rotulos = {_rotulo_dia(i, dia): (i, dia) for i, dia in enumerate(dias, start=1)}
         numero_dia, dia = rotulos[st.selectbox("Dia", list(rotulos.keys()))]
-        st.plotly_chart(_grafico_dia(raw.data.loc[dia], dia, numero_dia, escala_y), width="stretch")
+        st.plotly_chart(_grafico_dia(raw.data.loc[dia], dia, numero_dia, escala_y, modo_atividade), width="stretch")
     else:
-        st.plotly_chart(_grafico_todos_os_dias(raw, dias, escala_y), width="stretch")
+        st.plotly_chart(_grafico_todos_os_dias(raw, dias, escala_y, modo_atividade), width="stretch")
