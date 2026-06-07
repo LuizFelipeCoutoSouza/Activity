@@ -8,6 +8,7 @@ from view.ui import avatar_html, AVATAR_NAV
 
 PAGINAS = [
     ("📊", "Análises"),
+    ("🧪", "Análise 2"),
     ("🗃️", "Conjunto de dados"),
     ("👥", "Registro de pacientes"),
     ("📄", "Exportar relatório"),
@@ -78,6 +79,9 @@ def _conteudo():
     if pagina == "Análises":
         from view.pages.analises import analises_page
         analises_page()
+    elif pagina == "Análise 2":
+        from view.pages.analises2 import analises2_page
+        analises2_page()
     elif pagina == "Conjunto de dados":
         from view.pages.conjunto_de_dados import conjunto_de_dados_page
         conjunto_de_dados_page()
