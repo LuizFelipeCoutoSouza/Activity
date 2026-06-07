@@ -1,7 +1,6 @@
 
 import pandas as pd
 import plotly.graph_objs as go
-from plotly.subplots import make_subplots
 from pyActigraphy.io import BaseRaw
 import streamlit as st
 from controller.arquivo_controller import ArquivoController
@@ -9,6 +8,8 @@ from view.ui import render_toast, get_usuario_id
 
 
 COR_LINHA = "#234cbe"
+COR_LUZ = "#ffb433"
+COR_TEMPERATURA = "#c43903"
 COR_LEGENDA = "black"
 COR_SOMBRA_NOITE = "rgba(25, 35, 90, 0.12)"
 COR_SOMBRA_EVENTO = "rgba(34, 139, 34, 0.18)"
@@ -81,72 +82,97 @@ def _rotulo_dia(numero_dia: int, dia: str) -> str:
     return f"Dia {numero_dia} — {pd.Timestamp(dia).strftime('%d/%m/%Y')}"
 
 
-def _grafico_dia(serie: pd.Series, dia: str, numero_dia: int, escala_y: tuple[float, float], modo_atividade: str, serie_evento: pd.Series | None = None) -> go.Figure:
+_LARGURA_EIXO_EXTRA = 0.08
+
+
+def _grafico_combinado_dia(
+    dia: str,
+    numero_dia: int,
+    serie_atividade: pd.Series,
+    escala_atividade: tuple[float, float],
+    rotulo_atividade: str,
+    cor_atividade: str = COR_LINHA,
+    mostrar_atividade: bool = True,
+    serie_luz: pd.Series | None = None,
+    serie_temp: pd.Series | None = None,
+    serie_evento: pd.Series | None = None,
+) -> go.Figure:
     inicio = pd.Timestamp(dia)
     fim = inicio + pd.Timedelta(hours=23, minutes=59, seconds=59)
 
-    fig = go.Figure(
-        data=[go.Scatter(x=serie.index, y=serie.values, mode="lines", name="Atividade", line=dict(color=COR_LINHA))],
-        layout=go.Layout(
-            title=_rotulo_dia(numero_dia, dia),
-            xaxis=dict(title="Hora", range=[inicio, fim], tickformat="%H:%M"),
-            yaxis=dict(title=f"Atividade ({modo_atividade})", range=escala_y),
-            height=300,
-            margin=dict(l=0, r=0, t=40, b=0),
+    # luz e temperatura entram como eixos Y extras à direita — cada um com sua
+    # própria escala — em vez de subplots separados, para permitir comparar os
+    # três sinais lado a lado no tempo
+    extras = [
+        (rotulo, cor, serie, faixa)
+        for rotulo, cor, serie, faixa in (
+            ("Luz (Lux)", COR_LUZ, serie_luz, (0, float(serie_luz.max())) if serie_luz is not None else None),
+            ("Temperatura (°C)", COR_TEMPERATURA, serie_temp, (float(serie_temp.min()), float(serie_temp.max())) if serie_temp is not None else None),
+        )
+        if serie is not None
+    ]
+
+    fim_dominio_x = 1 - _LARGURA_EIXO_EXTRA * len(extras)
+
+    fig = go.Figure()
+    if mostrar_atividade:
+        fig.add_trace(go.Scatter(
+            x=serie_atividade.index, y=serie_atividade.values, mode="lines",
+            name=rotulo_atividade, line=dict(color=cor_atividade),
+        ))
+
+    layout = dict(
+        title=dict(text=_rotulo_dia(numero_dia, dia), x=0.01, xanchor="left", font=dict(size=14, color=COR_LEGENDA)),
+        xaxis=dict(title="Hora", domain=[0, fim_dominio_x], range=[inicio, fim], tickformat="%H:%M"),
+        yaxis=dict(
+            title=dict(text=rotulo_atividade, font=dict(color=cor_atividade)),
+            tickfont=dict(color=cor_atividade),
+            range=escala_atividade,
+        ),
+        height=340,
+        margin=dict(l=0, r=0, t=60, b=0),
+        hovermode="x unified",
+        # legenda no canto superior direito, fora da área sombreada do gráfico,
+        # com fundo e borda para permanecer legível sobre as curvas e sombreados
+        legend=dict(
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="right", x=1,
+            bgcolor="rgba(255, 255, 255, 0.75)",
+            bordercolor="rgba(0, 0, 0, 0.15)",
+            borderwidth=1,
+            font=dict(size=11, color=COR_LEGENDA),
         ),
     )
+
+    for i, (rotulo, cor, serie, faixa) in enumerate(extras):
+        indice_eixo = i + 2  # eixo da atividade é "y" (1); extras começam em "y2"
+        eixo_id = f"y{indice_eixo}"
+        fatia = serie.loc[dia]
+
+        fig.add_trace(go.Scatter(
+            x=fatia.index, y=fatia.values, mode="lines",
+            name=rotulo, line=dict(color=cor, dash="dot"), yaxis=eixo_id,
+        ))
+
+        eixo = dict(
+            title=dict(text=rotulo, font=dict(color=cor)),
+            tickfont=dict(color=cor),
+            range=faixa,
+            overlaying="y",
+            side="right",
+        )
+        if i > 0:
+            # primeiro extra fica na borda direita da área do gráfico;
+            # os seguintes precisam de eixo "livre" e posição explícita
+            eixo["anchor"] = "free"
+            eixo["position"] = fim_dominio_x + _LARGURA_EIXO_EXTRA * i
+        layout[f"yaxis{indice_eixo}"] = eixo
+
+    fig.update_layout(**layout)
     _sombrear_periodo_noturno(fig, inicio)
     if serie_evento is not None:
         _sombrear_eventos(fig, serie_evento, dia)
-    return fig
-
-
-def _grafico_todos_os_dias(raw: BaseRaw, dias: list[str], escala_y: tuple[float, float], modo_atividade: str, serie_evento: pd.Series | None = None) -> go.Figure:
-    n = len(dias)
-    altura_por_dia = 250
-    espaco_vertical = min(0.015, 1 / (n - 1)) if n > 1 else 0
-
-    fig = make_subplots(rows=n, cols=1, vertical_spacing=espaco_vertical)
-
-    for i, dia in enumerate(dias, start=1):
-        serie = raw.data.loc[dia]
-        inicio = pd.Timestamp(dia)
-        fim = inicio + pd.Timedelta(hours=23, minutes=59, seconds=59)
-
-        fig.add_trace(
-            go.Scatter(x=serie.index, y=serie.values, mode="lines", name="Atividade", line=dict(color=COR_LINHA), showlegend=False),
-            row=i, col=1,
-        )
-        fig.update_xaxes(range=[inicio, fim], tickformat="%H:%M", row=i, col=1)
-        fig.update_yaxes(range=escala_y, row=i, col=1)
-        _sombrear_periodo_noturno(fig, inicio, row=i, col=1)
-        if serie_evento is not None:
-            _sombrear_eventos(fig, serie_evento, dia, row=i, col=1)
-
-        eixo_y = "y domain" if i == 1 else f"y{i} domain"
-
-        # nome do modo — dentro da área do gráfico, canto superior esquerdo (não disputa espaço com a margem)
-        fig.add_annotation(
-            text=modo_atividade,
-            xref="x domain", yref=eixo_y,
-            x=0.01, y=0.95,
-            xanchor="left", yanchor="top",
-            showarrow=False,
-            font=dict(size=11, color=COR_LEGENDA),
-        )
-        # rótulo do dia — na margem esquerda, na vertical, fora da área do gráfico
-        fig.add_annotation(
-            text=_rotulo_dia(i, dia),
-            xref="paper", yref=eixo_y,
-            x=0, xshift=-55,
-            y=0.5,
-            xanchor="center", yanchor="middle",
-            showarrow=False,
-            textangle=-90,
-            font=dict(size=12, color=COR_LEGENDA),
-        )
-
-    fig.update_layout(height=altura_por_dia * n, margin=dict(l=90, r=0, t=10, b=0), showlegend=False)
     return fig
 
 
@@ -250,8 +276,36 @@ def analises2_page():
 
     tem_evento = "EVENT" in df.columns
 
+    # luz e temperatura são opcionais — nem todo dispositivo Condor as registra,
+    # e quando a coluna existe mas vem vazia, max()/min() retornam NaN, o que
+    # quebraria a faixa do eixo y do gráfico — por isso a checagem de "tem
+    # dados utilizáveis" precisa rodar antes de montar as opções de exibição
+    def _coluna_numerica_utilizavel(nome_coluna: str) -> pd.Series | None:
+        if nome_coluna not in df.columns:
+            return None
+        valores = pd.to_numeric(df[nome_coluna], errors="coerce")
+        return valores if valores.notna().any() else None
+
+    luz_bruta = _coluna_numerica_utilizavel("LIGHT")
+    temp_bruta = _coluna_numerica_utilizavel("TEMPERATURE")
+    tem_luz = luz_bruta is not None
+    tem_temperatura = temp_bruta is not None
+
     with st.expander("Opções de exibição"):
         modo_atividade = st.radio("Modo de atividade", MODOS_ATIVIDADE, horizontal=True)
+
+        st.caption("Sinais exibidos no gráfico")
+        col_a, col_l, col_t = st.columns(3)
+        mostrar_atividade = col_a.checkbox(f"Atividade ({modo_atividade})", value=True)
+        mostrar_luz = col_l.checkbox(
+            "Luz", value=tem_luz, disabled=not tem_luz,
+            help=None if tem_luz else "Este arquivo não possui registros de luz utilizáveis (coluna LIGHT).",
+        )
+        mostrar_temperatura = col_t.checkbox(
+            "Temperatura", value=tem_temperatura, disabled=not tem_temperatura,
+            help=None if tem_temperatura else "Este arquivo não possui registros de temperatura utilizáveis (coluna TEMPERATURE).",
+        )
+
         mostrar_eventos = st.checkbox(
             "Destacar marcações de evento (botão)",
             disabled=not tem_evento,
@@ -267,12 +321,30 @@ def analises2_page():
         eventos = pd.to_numeric(df["EVENT"], errors="coerce")
         serie_evento = pd.Series(eventos.to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="evento")
 
+    serie_luz = None
+    if mostrar_luz and luz_bruta is not None:
+        serie_luz = pd.Series(luz_bruta.to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="luz")
+
+    serie_temp = None
+    if mostrar_temperatura and temp_bruta is not None:
+        serie_temp = pd.Series(temp_bruta.to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="temperatura")
+
+    if not (mostrar_atividade or serie_luz is not None or serie_temp is not None):
+        st.info("Selecione ao menos um sinal em **Opções de exibição** para gerar o gráfico.")
+        return
+
     modo = st.radio("Exibir", ["Um dia específico", "Todos os dias"], horizontal=True)
 
     if modo == "Um dia específico":
         rotulos = {_rotulo_dia(i, dia): (i, dia) for i, dia in enumerate(dias, start=1)}
         numero_dia, dia = rotulos[st.selectbox("Dia", list(rotulos.keys()))]
-        st.plotly_chart(_grafico_dia(raw.data.loc[dia], dia, numero_dia, escala_y, modo_atividade, serie_evento), width="stretch")
+        st.plotly_chart(
+            _grafico_combinado_dia(
+                dia, numero_dia, raw.data.loc[dia], escala_y, modo_atividade, cor_atividade=COR_LINHA,
+                mostrar_atividade=mostrar_atividade, serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
+            ),
+            width="stretch",
+        )
 
         st.divider()
         # recalcula IS/IV/L5/M10 a partir de um BaseRaw construído só com os
@@ -287,7 +359,16 @@ def analises2_page():
             mostrar_periodos=False,
         )
     else:
-        st.plotly_chart(_grafico_todos_os_dias(raw, dias, escala_y, modo_atividade, serie_evento), width="stretch")
+        # um gráfico combinado por dia — cada um com seus próprios eixos —
+        # em vez de um único grid, que ficaria ilegível com 3 sinais sobrepostos
+        for i, dia in enumerate(dias, start=1):
+            st.plotly_chart(
+                _grafico_combinado_dia(
+                    dia, i, raw.data.loc[dia], escala_y, modo_atividade, cor_atividade=COR_LINHA,
+                    mostrar_atividade=mostrar_atividade, serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
+                ),
+                width="stretch",
+            )
 
         st.divider()
         _metricas_ritmo(raw, titulo="Ritmo de repouso-atividade — registro completo")
