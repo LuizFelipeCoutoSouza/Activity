@@ -157,26 +157,38 @@ _AVISO_DADOS_INSUFICIENTES = (
 )
 
 
-def _metricas_ritmo(raw: BaseRaw) -> None:
-    st.subheader("Ritmo de repouso-atividade")
+def _metricas_ritmo(raw: BaseRaw, titulo: str = "Ritmo de repouso-atividade", rotulo_escopo: str = "geral", mostrar_is: bool = True, mostrar_periodos: bool = True) -> None:
+    st.subheader(titulo)
 
     # IS/IV/L5/M10 dependem de uma janela de atividade média ao longo do
     # dia; com registros curtos ou cheios de lacunas, o pyActigraphy chega
     # a uma janela vazia/toda NaN e KeyError: NaT ao buscar seu mínimo/máximo.
     try:
-        valor_is, valor_iv, valor_l5, valor_m10 = raw.IS(), raw.IV(), raw.L5(), raw.M10()
+        valor_iv, valor_l5, valor_m10 = raw.IV(), raw.L5(), raw.M10()
+        valor_is = raw.IS() if mostrar_is else None
     except _ERROS_METRICA_RITMO:
         st.info(_AVISO_DADOS_INSUFICIENTES)
     else:
         col_is, col_iv, col_l5, col_m10 = st.columns(4)
-        col_is.metric("IS — geral", f"{valor_is:.3f}",
-                      help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
-        col_iv.metric("IV — geral", f"{valor_iv:.3f}",
+        if mostrar_is:
+            col_is.metric(f"IS — {rotulo_escopo}", f"{valor_is:.3f}",
+                          help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
+        else:
+            # IS compara o padrão de repouso-atividade ENTRE dias — em um
+            # único dia, a "média diária" é o próprio dia e a métrica sempre
+            # daria 1.000 (variância sobre ela mesma), um valor sem sentido.
+            col_is.metric("IS", "—",
+                          help="Estabilidade interdiária compara o padrão de repouso-atividade entre vários dias; "
+                               "não é uma métrica definida para um único dia.")
+        col_iv.metric(f"IV — {rotulo_escopo}", f"{valor_iv:.3f}",
                       help="Variabilidade intradiária: o quanto a atividade se fragmenta ao longo do dia.")
-        col_l5.metric("L5 — geral", f"{valor_l5:.3f}",
+        col_l5.metric(f"L5 — {rotulo_escopo}", f"{valor_l5:.3f}",
                       help="Atividade média durante as 5 horas menos ativas do dia (média entre todos os dias do registro).")
-        col_m10.metric("M10 — geral", f"{valor_m10:.3f}",
+        col_m10.metric(f"M10 — {rotulo_escopo}", f"{valor_m10:.3f}",
                        help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
+
+    if not mostrar_periodos:
+        return
 
     with st.expander("Valores por período de 24h"):
         try:
@@ -261,8 +273,21 @@ def analises2_page():
         rotulos = {_rotulo_dia(i, dia): (i, dia) for i, dia in enumerate(dias, start=1)}
         numero_dia, dia = rotulos[st.selectbox("Dia", list(rotulos.keys()))]
         st.plotly_chart(_grafico_dia(raw.data.loc[dia], dia, numero_dia, escala_y, modo_atividade, serie_evento), width="stretch")
+
+        st.divider()
+        # recalcula IS/IV/L5/M10 a partir de um BaseRaw construído só com os
+        # dados do dia selecionado, em vez de reaproveitar as métricas gerais
+        df_dia = ArquivoController.filtrar_dia(df, dia)
+        raw_dia = _construir_raw(f"{nome_escolhido} — {dia}", df_dia, modo_atividade)
+        _metricas_ritmo(
+            raw_dia,
+            titulo=f"Ritmo de repouso-atividade — {_rotulo_dia(numero_dia, dia)}",
+            rotulo_escopo="no dia",
+            mostrar_is=False,
+            mostrar_periodos=False,
+        )
     else:
         st.plotly_chart(_grafico_todos_os_dias(raw, dias, escala_y, modo_atividade, serie_evento), width="stretch")
 
-    st.divider()
-    _metricas_ritmo(raw)
+        st.divider()
+        _metricas_ritmo(raw, titulo="Ritmo de repouso-atividade — registro completo")
