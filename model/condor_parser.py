@@ -54,6 +54,10 @@ def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
     # lançar KeyError: NaT).
     df["DATE/TIME"] = pd.to_datetime(df["DATE/TIME"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
     df.dropna(subset=["DATE/TIME"], inplace=True)
+    # timestamps duplicados (falha de gravação do dispositivo) fazem o
+    # asfreq() usado para montar o BaseRaw falhar com "cannot reindex on an
+    # axis with duplicate labels", interrompendo o cálculo de IS/IV/L5/M10.
+    df.drop_duplicates(subset=["DATE/TIME"], keep="first", inplace=True)
     df.sort_values("DATE/TIME", inplace=True)
     df.reset_index(drop=True, inplace=True)
 

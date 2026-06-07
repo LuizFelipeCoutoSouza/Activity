@@ -276,6 +276,14 @@ def analises2_page():
 
     tem_evento = "EVENT" in df.columns
 
+    # nem todo arquivo Condor registra os três modos de atividade — oferecer
+    # um modo cuja coluna não existe faz _construir_raw (df[coluna]) lançar
+    # KeyError e quebrar a página inteira, inclusive o cálculo de IS/IV/L5/M10
+    modos_disponiveis = [modo for modo in MODOS_ATIVIDADE if modo in df.columns]
+    if not modos_disponiveis:
+        st.warning("Este arquivo não possui nenhuma coluna de atividade reconhecida (PIM, TAT ou ZCM).")
+        return
+
     # luz e temperatura são opcionais — nem todo dispositivo Condor as registra,
     # e quando a coluna existe mas vem vazia, max()/min() retornam NaN, o que
     # quebraria a faixa do eixo y do gráfico — por isso a checagem de "tem
@@ -292,7 +300,7 @@ def analises2_page():
     tem_temperatura = temp_bruta is not None
 
     with st.expander("Opções de exibição"):
-        modo_atividade = st.radio("Modo de atividade", MODOS_ATIVIDADE, horizontal=True)
+        modo_atividade = st.radio("Modo de atividade", modos_disponiveis, horizontal=True)
 
         st.caption("Sinais exibidos no gráfico")
         col_a, col_l, col_t = st.columns(3)
@@ -333,42 +341,16 @@ def analises2_page():
         st.info("Selecione ao menos um sinal em **Opções de exibição** para gerar o gráfico.")
         return
 
-    modo = st.radio("Exibir", ["Um dia específico", "Todos os dias"], horizontal=True)
-
-    if modo == "Um dia específico":
-        rotulos = {_rotulo_dia(i, dia): (i, dia) for i, dia in enumerate(dias, start=1)}
-        numero_dia, dia = rotulos[st.selectbox("Dia", list(rotulos.keys()))]
+    # um gráfico combinado por dia — cada um com seus próprios eixos —
+    # em vez de um único grid, que ficaria ilegível com 3 sinais sobrepostos
+    for i, dia in enumerate(dias, start=1):
         st.plotly_chart(
             _grafico_combinado_dia(
-                dia, numero_dia, raw.data.loc[dia], escala_y, modo_atividade, cor_atividade=COR_LINHA,
+                dia, i, raw.data.loc[dia], escala_y, modo_atividade, cor_atividade=COR_LINHA,
                 mostrar_atividade=mostrar_atividade, serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
             ),
             width="stretch",
         )
 
-        st.divider()
-        # recalcula IS/IV/L5/M10 a partir de um BaseRaw construído só com os
-        # dados do dia selecionado, em vez de reaproveitar as métricas gerais
-        df_dia = ArquivoController.filtrar_dia(df, dia)
-        raw_dia = _construir_raw(f"{nome_escolhido} — {dia}", df_dia, modo_atividade)
-        _metricas_ritmo(
-            raw_dia,
-            titulo=f"Ritmo de repouso-atividade — {_rotulo_dia(numero_dia, dia)}",
-            rotulo_escopo="no dia",
-            mostrar_is=False,
-            mostrar_periodos=False,
-        )
-    else:
-        # um gráfico combinado por dia — cada um com seus próprios eixos —
-        # em vez de um único grid, que ficaria ilegível com 3 sinais sobrepostos
-        for i, dia in enumerate(dias, start=1):
-            st.plotly_chart(
-                _grafico_combinado_dia(
-                    dia, i, raw.data.loc[dia], escala_y, modo_atividade, cor_atividade=COR_LINHA,
-                    mostrar_atividade=mostrar_atividade, serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
-                ),
-                width="stretch",
-            )
-
-        st.divider()
-        _metricas_ritmo(raw, titulo="Ritmo de repouso-atividade — registro completo")
+    st.divider()
+    _metricas_ritmo(raw, titulo="Ritmo de repouso-atividade — registro completo")
