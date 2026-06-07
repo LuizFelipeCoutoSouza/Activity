@@ -65,8 +65,15 @@ def _intervalos_marcados(mascara: pd.Series) -> list[tuple[pd.Timestamp, pd.Time
     return intervalos
 
 
-def _sombrear_eventos(fig: go.Figure, serie_evento: pd.Series, row: int | str = "all", col: int | str = "all") -> None:
-    for ini, fim in _intervalos_marcados(serie_evento == 1):
+def _sombrear_eventos(fig: go.Figure, serie_evento: pd.Series, dia: str, row: int | str = "all", col: int | str = "all") -> None:
+    try:
+        fatia = serie_evento.loc[dia]
+    except KeyError:
+        return
+    # EVENT registra a marcação do botão como contagem (não necessariamente 1);
+    # qualquer valor diferente de zero indica que houve marcação no intervalo.
+    marcado = fatia.fillna(0) != 0
+    for ini, fim in _intervalos_marcados(marcado):
         fig.add_vrect(x0=ini, x1=fim, fillcolor=COR_SOMBRA_EVENTO, line_width=0, layer="below", row=row, col=col)
 
 
@@ -90,7 +97,7 @@ def _grafico_dia(serie: pd.Series, dia: str, numero_dia: int, escala_y: tuple[fl
     )
     _sombrear_periodo_noturno(fig, inicio)
     if serie_evento is not None:
-        _sombrear_eventos(fig, serie_evento.loc[dia])
+        _sombrear_eventos(fig, serie_evento, dia)
     return fig
 
 
@@ -114,7 +121,7 @@ def _grafico_todos_os_dias(raw: BaseRaw, dias: list[str], escala_y: tuple[float,
         fig.update_yaxes(range=escala_y, row=i, col=1)
         _sombrear_periodo_noturno(fig, inicio, row=i, col=1)
         if serie_evento is not None:
-            _sombrear_eventos(fig, serie_evento.loc[dia], row=i, col=1)
+            _sombrear_eventos(fig, serie_evento, dia, row=i, col=1)
 
         eixo_y = "y domain" if i == 1 else f"y{i} domain"
 
@@ -143,24 +150,44 @@ def _grafico_todos_os_dias(raw: BaseRaw, dias: list[str], escala_y: tuple[float,
     return fig
 
 
+_ERROS_METRICA_RITMO = (KeyError, ValueError, ZeroDivisionError)
+_AVISO_DADOS_INSUFICIENTES = (
+    "Não foi possível calcular esta métrica para o registro selecionado — "
+    "o pyActigraphy exige pelo menos 24h de dados contínuos para estimar o ritmo de repouso-atividade."
+)
+
+
 def _metricas_ritmo(raw: BaseRaw) -> None:
     st.subheader("Ritmo de repouso-atividade")
 
-    col_is, col_iv, col_l5, col_m10 = st.columns(4)
-    col_is.metric("IS — geral", f"{raw.IS():.3f}",
-                  help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
-    col_iv.metric("IV — geral", f"{raw.IV():.3f}",
-                  help="Variabilidade intradiária: o quanto a atividade se fragmenta ao longo do dia.")
-    col_l5.metric("L5 — geral", f"{raw.L5():.3f}",
-                  help="Atividade média durante as 5 horas menos ativas do dia (média entre todos os dias do registro).")
-    col_m10.metric("M10 — geral", f"{raw.M10():.3f}",
-                   help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
+    # IS/IV/L5/M10 dependem de uma janela de atividade média ao longo do
+    # dia; com registros curtos ou cheios de lacunas, o pyActigraphy chega
+    # a uma janela vazia/toda NaN e KeyError: NaT ao buscar seu mínimo/máximo.
+    try:
+        valor_is, valor_iv, valor_l5, valor_m10 = raw.IS(), raw.IV(), raw.L5(), raw.M10()
+    except _ERROS_METRICA_RITMO:
+        st.info(_AVISO_DADOS_INSUFICIENTES)
+    else:
+        col_is, col_iv, col_l5, col_m10 = st.columns(4)
+        col_is.metric("IS — geral", f"{valor_is:.3f}",
+                      help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
+        col_iv.metric("IV — geral", f"{valor_iv:.3f}",
+                      help="Variabilidade intradiária: o quanto a atividade se fragmenta ao longo do dia.")
+        col_l5.metric("L5 — geral", f"{valor_l5:.3f}",
+                      help="Atividade média durante as 5 horas menos ativas do dia (média entre todos os dias do registro).")
+        col_m10.metric("M10 — geral", f"{valor_m10:.3f}",
+                       help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
 
     with st.expander("Valores por período de 24h"):
-        is_p = raw.ISp(period="1D")
-        iv_p = raw.IVp(period="1D")
-        l5_p = raw.L5p(period="1D")
-        m10_p = raw.M10p(period="1D")
+        try:
+            is_p = raw.ISp(period="1D")
+            iv_p = raw.IVp(period="1D")
+            l5_p = raw.L5p(period="1D")
+            m10_p = raw.M10p(period="1D")
+        except _ERROS_METRICA_RITMO:
+            st.info(_AVISO_DADOS_INSUFICIENTES)
+            return
+
         inicio = raw.data.index[0]
 
         tabela = pd.DataFrame({
@@ -209,17 +236,24 @@ def analises2_page():
         st.warning("Não foi possível processar este arquivo.")
         return
 
+    tem_evento = "EVENT" in df.columns
+
     with st.expander("Opções de exibição"):
         modo_atividade = st.radio("Modo de atividade", MODOS_ATIVIDADE, horizontal=True)
-        mostrar_eventos = st.checkbox("Destacar marcações de evento (botão)")
+        mostrar_eventos = st.checkbox(
+            "Destacar marcações de evento (botão)",
+            disabled=not tem_evento,
+            help=None if tem_evento else "Este arquivo não possui registros de marcação de evento (coluna EVENT).",
+        )
 
     raw = _construir_raw(nome_escolhido, df, modo_atividade)
     dias = ArquivoController.dias_disponiveis(df)
     escala_y = (0, float(raw.data.max()))
 
     serie_evento = None
-    if mostrar_eventos:
-        serie_evento = pd.Series(df["EVENT"].to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="evento")
+    if mostrar_eventos and tem_evento:
+        eventos = pd.to_numeric(df["EVENT"], errors="coerce")
+        serie_evento = pd.Series(eventos.to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="evento")
 
     modo = st.radio("Exibir", ["Um dia específico", "Todos os dias"], horizontal=True)
 

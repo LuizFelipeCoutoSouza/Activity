@@ -48,7 +48,12 @@ def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
     df = pd.read_csv(io.StringIO(corpo), sep=";", decimal=".")
 
     # --- converte timestamp ---
+    # linhas com data/hora ilegível viram NaT e são descartadas: um único
+    # NaT no índice corrompe o cálculo de período/frequência do registro
+    # (e, com isso, as métricas de ritmo do pyActigraphy, que passam a
+    # lançar KeyError: NaT).
     df["DATE/TIME"] = pd.to_datetime(df["DATE/TIME"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+    df.dropna(subset=["DATE/TIME"], inplace=True)
     df.sort_values("DATE/TIME", inplace=True)
     df.reset_index(drop=True, inplace=True)
 
