@@ -66,9 +66,9 @@ def analises_page():
     # MÉTRICAS RÁPIDAS
     # ══════════════════════════════════════════════════════════════
     m1, m2, m3 = st.columns(3)
-    m1.metric("PIM total", f"{df['pim'].sum():,.0f}")
-    m2.metric("Pico PIM", f"{df['pim'].max():,.0f}")
-    m3.metric("Temp. média", f"{df['temperatura'].mean():.1f} °C")
+    m1.metric("PIM total", f"{df['PIM'].sum():,.0f}")
+    m2.metric("Pico PIM", f"{df['PIM'].max():,.0f}")
+    m3.metric("Temp. média", f"{df['TEMPERATURE'].mean():.1f} °C")
 
     st.divider()
 
@@ -81,8 +81,8 @@ def analises_page():
 
     fig_pim = go.Figure()
     fig_pim.add_trace(go.Scatter(
-        x=df["timestamp"],
-        y=df["pim"],
+        x=df["DATE/TIME"],
+        y=df["PIM"],
         mode="lines",
         name="PIM",
         line=dict(color="#234cbe", width=1.5),
@@ -103,7 +103,7 @@ def analises_page():
 
     with c1:
         st.subheader("Temperatura (°C)")
-        fig_temp = px.line(df, x="timestamp", y="temperatura", color_discrete_sequence=["#c43903"])
+        fig_temp = px.line(df, x="DATE/TIME", y="TEMPERATURE", color_discrete_sequence=["#c43903"])
         fig_temp.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=0),
                                xaxis=dict(tickformat="%H:%M"), xaxis_title="", yaxis_title="°C")
         st.plotly_chart(fig_temp, width="stretch")
@@ -111,18 +111,18 @@ def analises_page():
     with c2:
         st.subheader("Luz (Lux)")
         # agrega por hora para o gráfico ficar legível
-        df_hora = (df.set_index("timestamp")["luz"]
+        df_hora = (df.set_index("DATE/TIME")["LIGHT"]
                    .resample("1h").mean()
-                   .reset_index().rename(columns={"timestamp": "hora"}))
-        fig_luz = px.bar(df_hora, x="hora", y="luz", color_discrete_sequence=["#ffb433"])
+                   .reset_index().rename(columns={"DATE/TIME": "hora"}))
+        fig_luz = px.bar(df_hora, x="hora", y="LIGHT", color_discrete_sequence=["#ffb433"])
         fig_luz.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=0),
                               xaxis=dict(tickformat="%H:%M"), xaxis_title="", yaxis_title="Lux")
         st.plotly_chart(fig_luz, width="stretch")
 
     # ── Melanopic EDI (se tiver dados) ──────────────────────────────
-    if "melanopic" in df.columns and df["melanopic"].sum() > 0:
+    if "MELANOPIC EDI" in df.columns and df["MELANOPIC EDI"].sum() > 0:
         st.subheader("Melanopic EDI")
-        fig_mel = px.line(df, x="timestamp", y="melanopic", color_discrete_sequence=["#7c3aed"])
+        fig_mel = px.line(df, x="DATE/TIME", y="MELANOPIC EDI", color_discrete_sequence=["#7c3aed"])
         fig_mel.update_layout(height=200, margin=dict(l=0, r=0, t=10, b=0),
                               xaxis=dict(tickformat="%H:%M"), xaxis_title="", yaxis_title="EDI")
         st.plotly_chart(fig_mel, width="stretch")

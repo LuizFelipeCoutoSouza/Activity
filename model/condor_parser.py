@@ -1,5 +1,9 @@
 import io
+import re
+
 import pandas as pd
+
+_LINHA_DE_DADOS = re.compile(r"^\d{2}/\d{2}/\d{4}")
 
 
 def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
@@ -18,41 +22,42 @@ def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
     linhas = raw.splitlines()
 
     # --- separa cabeçalho dos dados ---
+    # O arquivo pode trazer mais de uma linha "DATE/TIME;...": uma legenda
+    # genérica do formato seguida do cabeçalho real, com número de colunas
+    # diferente. A que vale é a última antes da primeira linha de dados —
+    # é ela que casa com as colunas efetivamente presentes nos registros.
     metadata = {}
-    inicio_dados = 0
+    cabecalho = None
+    inicio_dados = None
     for i, linha in enumerate(linhas):
         if linha.startswith("DATE/TIME"):
+            cabecalho = linha
+            continue
+        if _LINHA_DE_DADOS.match(linha):
             inicio_dados = i
             break
         if " : " in linha and not linha.startswith("+") and not linha.startswith("#"):
             chave, valor = linha.split(" : ", 1)
             metadata[chave.strip()] = valor.strip()
 
+    if cabecalho is None or inicio_dados is None:
+        return metadata, pd.DataFrame()
+
     # --- parse da tabela ---
-    corpo = "\n".join(linhas[inicio_dados:])
-    df = pd.read_csv(io.StringIO(corpo), sep=";", decimal=".", dayfirst=True)
-
-
-    df.rename(columns={
-        "DATE/TIME":     "timestamp",
-        "TEMPERATURE":   "temperatura",
-        "PIM":           "pim",
-        "LIGHT":         "luz",
-        "MELANOPIC EDI": "melanopic",
-        "STATE":         "estado",
-    }, inplace=True)
+    corpo = "\n".join([cabecalho] + linhas[inicio_dados:])
+    df = pd.read_csv(io.StringIO(corpo), sep=";", decimal=".")
 
     # --- converte timestamp ---
-    df["timestamp"] = pd.to_datetime(df["timestamp"], dayfirst=True, errors="coerce")
-    df.sort_values("timestamp", inplace=True)
+    df["DATE/TIME"] = pd.to_datetime(df["DATE/TIME"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+    df.sort_values("DATE/TIME", inplace=True)
     df.reset_index(drop=True, inplace=True)
 
     return metadata, df
 
 
 def dias_disponiveis(df: pd.DataFrame) -> list[str]:
-    return sorted(df["timestamp"].dt.date.astype(str).unique().tolist())
+    return sorted(df["DATE/TIME"].dt.date.astype(str).unique().tolist())
 
 
 def filtrar_dia(df: pd.DataFrame, data_str: str) -> pd.DataFrame:
-    return df[df["timestamp"].dt.date.astype(str) == data_str].copy()
+    return df[df["DATE/TIME"].dt.date.astype(str) == data_str].copy()

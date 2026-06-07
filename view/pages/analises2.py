@@ -13,8 +13,7 @@ COR_LEGENDA = "black"
 COR_SOMBRA_NOITE = "rgba(25, 35, 90, 0.12)"
 COR_SOMBRA_EVENTO = "rgba(34, 139, 34, 0.18)"
 
-MODOS_ATIVIDADE = {"PIM": "pim", "TAT": "TAT", "ZCM": "ZCM"}
-
+MODOS_ATIVIDADE = ["PIM", "TAT", "ZCM"]
 
 @st.cache_data(ttl=120)
 def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
@@ -22,7 +21,7 @@ def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
 
 
 def _construir_raw(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
-    serie = pd.Series(df[coluna].to_numpy(), index=pd.DatetimeIndex(df["timestamp"]), name="Activity")
+    serie = pd.Series(df[coluna].to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="Activity")
     frequencia = pd.Timedelta(serie.index.to_series().diff().median())
     serie = serie.asfreq(frequencia)
 
@@ -211,17 +210,16 @@ def analises2_page():
         return
 
     with st.expander("Opções de exibição"):
-        modo_atividade = st.radio("Modo de atividade", list(MODOS_ATIVIDADE.keys()), horizontal=True)
+        modo_atividade = st.radio("Modo de atividade", MODOS_ATIVIDADE, horizontal=True)
         mostrar_eventos = st.checkbox("Destacar marcações de evento (botão)")
-    coluna_atividade = MODOS_ATIVIDADE[modo_atividade]
 
-    raw = _construir_raw(nome_escolhido, df, coluna_atividade)
+    raw = _construir_raw(nome_escolhido, df, modo_atividade)
     dias = ArquivoController.dias_disponiveis(df)
     escala_y = (0, float(raw.data.max()))
 
     serie_evento = None
     if mostrar_eventos:
-        serie_evento = pd.Series(df["EVENT"].to_numpy(), index=pd.DatetimeIndex(df["timestamp"]), name="evento")
+        serie_evento = pd.Series(df["EVENT"].to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="evento")
 
     modo = st.radio("Exibir", ["Um dia específico", "Todos os dias"], horizontal=True)
 
