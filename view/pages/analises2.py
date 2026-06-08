@@ -27,6 +27,9 @@ _PERIODOS_DIA = {
     "Noite (18h–24h)": (18, 24),
 }
 
+# opções (em horas) do seletor de duração mínima da máscara de inatividade
+_DURACOES_MASCARA_H = list(range(0, 13, 2))
+
 @st.cache_data(ttl=120)
 def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
     return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
@@ -307,6 +310,26 @@ def analises2_page():
         # calculada aqui dentro — ao contrário de luz/temperatura, que não mudam
         faixa_total_atividade = (0.0, float(df[modo_atividade].max()))
 
+        mascarar_inatividade = st.checkbox(
+            "Mascarar períodos de inatividade prolongada",
+            help=(
+                "Usa o pyActigraphy para identificar sequências de valor zero mais longas "
+                "que a duração escolhida — provavelmente o sensor foi removido — e tratá-las "
+                "como dados ausentes, tanto no gráfico quanto nas métricas de ritmo."
+            ),
+        )
+        duracao_mascara_h = None
+        if mascarar_inatividade:
+            duracao_mascara_h = st.pills(
+                "Duração mínima considerada inatividade",
+                _DURACOES_MASCARA_H, default=2, required=True, format_func=lambda h: f"{h}h",
+                help=(
+                    "Sequências de zeros mais curtas que esse intervalo são preservadas — "
+                    "provavelmente são períodos normais de repouso, não remoção do sensor. "
+                    "O pyActigraphy recomenda ao menos 2h para não mascarar o sono."
+                ),
+            )
+
         st.divider()
         st.caption("Sinais exibidos no gráfico")
         col_a, col_l, col_t = st.columns(3, gap="medium")
@@ -352,6 +375,9 @@ def analises2_page():
         )
 
     raw = _construir_raw(nome_escolhido, df, modo_atividade)
+    if mascarar_inatividade and duracao_mascara_h is not None:
+        raw.create_inactivity_mask(f"{duracao_mascara_h}h")
+        raw.mask_inactivity = True
     dias = ArquivoController.dias_disponiveis(df)
 
     # numeração original ("Dia N") preservada mesmo com filtro aplicado —
