@@ -16,6 +16,17 @@ COR_SOMBRA_EVENTO = "rgba(34, 139, 34, 0.18)"
 
 MODOS_ATIVIDADE = ["PIM", "TAT", "ZCM"]
 
+_DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+
+# faixas de hora (início, fim) usadas tanto para recortar a janela exibida
+# quanto para definir o intervalo do controle "Personalizado"
+_PERIODOS_DIA = {
+    "Dia inteiro": (0, 24),
+    "Manhã (06h–12h)": (6, 12),
+    "Tarde (12h–18h)": (12, 18),
+    "Noite (18h–24h)": (18, 24),
+}
+
 @st.cache_data(ttl=120)
 def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
     return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
@@ -109,9 +120,18 @@ def _grafico_combinado_dia(
     serie_luz: pd.Series | None = None,
     serie_temp: pd.Series | None = None,
     serie_evento: pd.Series | None = None,
+    escala_luz: tuple[float, float] | None = None,
+    escala_temperatura: tuple[float, float] | None = None,
+    hora_inicio: int = 0,
+    hora_fim: int = 24,
 ) -> go.Figure:
-    inicio = pd.Timestamp(dia)
-    fim = inicio + pd.Timedelta(hours=23, minutes=59, seconds=59)
+    inicio_dia = pd.Timestamp(dia)
+    # janela exibida — pode ser um recorte do dia (ex.: só a manhã); o
+    # sombreamento noturno continua relativo ao dia inteiro (inicio_dia)
+    inicio = inicio_dia + pd.Timedelta(hours=hora_inicio)
+    fim = inicio_dia + pd.Timedelta(hours=hora_fim) - pd.Timedelta(seconds=1)
+
+    serie_atividade = serie_atividade.loc[inicio:fim]
 
     # luz e temperatura entram como eixos Y extras à direita — cada um com sua
     # própria escala — em vez de subplots separados, para permitir comparar os
@@ -119,8 +139,8 @@ def _grafico_combinado_dia(
     extras = [
         (rotulo, cor, serie, faixa)
         for rotulo, cor, serie, faixa in (
-            ("Luz (Lux)", COR_LUZ, serie_luz, (0, float(serie_luz.max())) if serie_luz is not None else None),
-            ("Temperatura (°C)", COR_TEMPERATURA, serie_temp, (float(serie_temp.min()), float(serie_temp.max())) if serie_temp is not None else None),
+            ("Luz (Lux)", COR_LUZ, serie_luz, escala_luz),
+            ("Temperatura (°C)", COR_TEMPERATURA, serie_temp, escala_temperatura),
         )
         if serie is not None
     ]
@@ -161,7 +181,7 @@ def _grafico_combinado_dia(
     for i, (rotulo, cor, serie, faixa) in enumerate(extras):
         indice_eixo = i + 2  # eixo da atividade é "y" (1); extras começam em "y2"
         eixo_id = f"y{indice_eixo}"
-        fatia = serie.loc[dia]
+        fatia = serie.loc[inicio:fim]
 
         fig.add_trace(go.Scatter(
             x=fatia.index, y=fatia.values, mode="lines",
@@ -183,7 +203,7 @@ def _grafico_combinado_dia(
         layout[f"yaxis{indice_eixo}"] = eixo
 
     fig.update_layout(**layout)
-    _sombrear_periodo_noturno(fig, inicio)
+    _sombrear_periodo_noturno(fig, inicio_dia)
     if serie_evento is not None:
         _sombrear_eventos(fig, serie_evento, dia)
     return fig
@@ -275,21 +295,56 @@ def analises2_page():
     tem_luz = luz_bruta is not None
     tem_temperatura = temp_bruta is not None
 
-    with st.expander("Opções de exibição"):
-        modo_atividade = st.radio("Modo de atividade", modos_disponiveis, horizontal=True)
+    faixa_total_luz = (0.0, float(luz_bruta.max())) if luz_bruta is not None else None
+    faixa_total_temp = (float(temp_bruta.min()), float(temp_bruta.max())) if temp_bruta is not None else None
 
+    with st.expander("Opções de exibição"):
+        modo_atividade = st.radio(
+            "Modo de atividade", modos_disponiveis, horizontal=True,
+            help="Medida de atividade motora usada no gráfico e no cálculo do ritmo de repouso-atividade.",
+        )
+        # a faixa total depende do modo escolhido acima, então só pode ser
+        # calculada aqui dentro — ao contrário de luz/temperatura, que não mudam
+        faixa_total_atividade = (0.0, float(df[modo_atividade].max()))
+
+        st.divider()
         st.caption("Sinais exibidos no gráfico")
-        col_a, col_l, col_t = st.columns(3)
+        col_a, col_l, col_t = st.columns(3, gap="medium")
         mostrar_atividade = col_a.checkbox(f"Atividade ({modo_atividade})", value=True)
+        escala_atividade = faixa_total_atividade
+        if mostrar_atividade and faixa_total_atividade[0] < faixa_total_atividade[1]:
+            escala_atividade = col_a.slider(
+                f"Faixa exibida ({modo_atividade})",
+                min_value=faixa_total_atividade[0], max_value=faixa_total_atividade[1], value=faixa_total_atividade,
+                help="Recorta o eixo da atividade para a faixa de valores selecionada, sem alterar os dados originais.",
+            )
+
         mostrar_luz = col_l.checkbox(
             "Luz", value=tem_luz, disabled=not tem_luz,
             help=None if tem_luz else "Este arquivo não possui registros de luz utilizáveis (coluna LIGHT).",
         )
+        # cada faixa de valores fica logo abaixo do checkbox do seu sinal —
+        # agrupamento por proximidade — e só aparece quando há variação a recortar
+        escala_luz = faixa_total_luz
+        if mostrar_luz and faixa_total_luz is not None and faixa_total_luz[0] < faixa_total_luz[1]:
+            escala_luz = col_l.slider(
+                "Faixa exibida (Lux)", min_value=faixa_total_luz[0], max_value=faixa_total_luz[1], value=faixa_total_luz,
+                help="Recorta o eixo da luz para a faixa de valores selecionada, sem alterar os dados originais.",
+            )
+
         mostrar_temperatura = col_t.checkbox(
             "Temperatura", value=tem_temperatura, disabled=not tem_temperatura,
             help=None if tem_temperatura else "Este arquivo não possui registros de temperatura utilizáveis (coluna TEMPERATURE).",
         )
+        escala_temperatura = faixa_total_temp
+        if mostrar_temperatura and faixa_total_temp is not None and faixa_total_temp[0] < faixa_total_temp[1]:
+            escala_temperatura = col_t.slider(
+                "Faixa exibida (°C)", min_value=faixa_total_temp[0], max_value=faixa_total_temp[1], value=faixa_total_temp,
+                help="Recorta o eixo da temperatura para a faixa de valores selecionada, sem alterar os dados originais.",
+            )
 
+
+        st.divider()
         mostrar_eventos = st.checkbox(
             "Destacar marcações de evento (botão)",
             disabled=not tem_evento,
@@ -298,7 +353,45 @@ def analises2_page():
 
     raw = _construir_raw(nome_escolhido, df, modo_atividade)
     dias = ArquivoController.dias_disponiveis(df)
-    escala_y = (0, float(raw.data.max()))
+
+    # numeração original ("Dia N") preservada mesmo com filtro aplicado —
+    # senão "Dia 1" mudaria de data conforme a seleção de dias da semana
+    numero_por_dia = {dia: numero for numero, dia in enumerate(dias, start=1)}
+
+    with st.expander("Filtrar dias exibidos"):
+        st.caption("Filtros apenas de exibição — recortam os gráficos abaixo sem alterar os dados nem as métricas do registro completo.")
+
+        col_semana, col_periodo = st.columns(2, gap="large")
+
+        with col_semana:
+            st.caption("Dia da semana")
+            # pills em vez de multiselect: com só 7 opções fixas, selecionar
+            # clicando é mais rápido do que abrir um dropdown e marcar uma a uma
+            dias_semana_escolhidos = st.pills(
+                "Dia da semana", _DIAS_SEMANA, selection_mode="multi", default=_DIAS_SEMANA,
+                label_visibility="collapsed",
+                help="Mostra apenas os gráficos dos dias que caem nos dias da semana selecionados.",
+            ) or []
+
+        with col_periodo:
+            st.caption("Período do dia")
+            rotulo_periodo = st.segmented_control(
+                "Período do dia", [*_PERIODOS_DIA.keys(), "Personalizado"],
+                default="Dia inteiro", required=True, label_visibility="collapsed",
+                help="Recorta a janela de horário exibida em cada gráfico diário.",
+            )
+            if rotulo_periodo == "Personalizado":
+                hora_inicio, hora_fim = st.slider(
+                    "Intervalo de horário personalizado", min_value=0, max_value=24, value=(0, 24),
+                    step=1, format="%dh", label_visibility="collapsed",
+                )
+            else:
+                hora_inicio, hora_fim = _PERIODOS_DIA[rotulo_periodo]
+
+    dias_exibidos = [
+        dia for dia in dias
+        if _DIAS_SEMANA[pd.Timestamp(dia).weekday()] in dias_semana_escolhidos
+    ]
 
     serie_evento = None
     if mostrar_eventos and tem_evento:
@@ -320,13 +413,19 @@ def analises2_page():
     _metricas_ritmo(raw, titulo="Ritmo de repouso-atividade — registro completo")
     st.divider()
 
+    if not dias_exibidos:
+        st.info("Nenhum dia do registro corresponde aos filtros selecionados em **Filtrar dias exibidos**.")
+        return
+
     # um gráfico combinado por dia — cada um com seus próprios eixos —
     # em vez de um único grid, que ficaria ilegível com 3 sinais sobrepostos
-    for i, dia in enumerate(dias, start=1):
+    for dia in dias_exibidos:
         st.plotly_chart(
             _grafico_combinado_dia(
-                dia, i, raw.data.loc[dia], escala_y, modo_atividade, cor_atividade=COR_LINHA,
+                dia, numero_por_dia[dia], raw.data.loc[dia], escala_atividade, modo_atividade, cor_atividade=COR_LINHA,
                 mostrar_atividade=mostrar_atividade, serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
+                escala_luz=escala_luz, escala_temperatura=escala_temperatura,
+                hora_inicio=hora_inicio, hora_fim=hora_fim,
             ),
             width="stretch",
         )
