@@ -222,14 +222,17 @@ _AVISO_DADOS_INSUFICIENTES = (
 )
 
 
-def _metricas_ritmo(raw: BaseRaw, titulo: str = "Ritmo de repouso-atividade") -> None:
+def _metricas_ritmo(raw: BaseRaw, titulo: str = "Ritmo de repouso-atividade", freq: str = "1H", limiar: int = 4) -> None:
     st.subheader(titulo)
 
     # IS/IV/L5/M10 dependem de uma janela de atividade média ao longo do
     # dia; com registros curtos ou cheios de lacunas, o pyActigraphy chega
     # a uma janela vazia/toda NaN e KeyError: NaT ao buscar seu mínimo/máximo.
     try:
-        valor_is, valor_iv, valor_l5, valor_m10 = raw.IS(), raw.IV(), raw.L5(), raw.M10()
+        valor_is = raw.IS(freq=freq, threshold=limiar)
+        valor_iv = raw.IV(freq=freq, threshold=limiar)
+        valor_l5 = raw.L5(threshold=limiar)
+        valor_m10 = raw.M10(threshold=limiar)
     except _ERROS_METRICA_RITMO:
         st.info(_AVISO_DADOS_INSUFICIENTES)
         return
@@ -463,7 +466,27 @@ def analises2_page():
         st.info("Selecione ao menos um sinal em **Opções de exibição** para gerar o gráfico.")
         return
 
-    _metricas_ritmo(raw, titulo="Ritmo de repouso-atividade — registro completo")
+    with st.expander("Parâmetros das métricas não paramétricas"):
+        st.caption("Ajustam o cálculo de IS, IV, L5 e M10 abaixo — não alteram os dados nem os gráficos.")
+        col_freq, col_limiar = st.columns(2, gap="medium")
+        frequencia_metricas = col_freq.selectbox(
+            "Frequência de reamostragem (IS e IV)",
+            ["10min", "15min", "30min", "1H", "2H"], index=3,
+            help=(
+                "Janela de tempo usada para agregar os dados antes de calcular IS e IV — "
+                "janelas menores aumentam a sensibilidade à fragmentação intradiária."
+            ),
+        )
+        limiar_atividade = col_limiar.number_input(
+            "Limiar de binarização (IS, IV, L5 e M10)",
+            min_value=0, value=4, step=1,
+            help="Valores de atividade a partir deste limiar contam como 'ativo' (1); abaixo dele, como 'inativo' (0).",
+        )
+
+    _metricas_ritmo(
+        raw, titulo="Ritmo de repouso-atividade — registro completo",
+        freq=frequencia_metricas, limiar=int(limiar_atividade),
+    )
     st.divider()
 
     if not dias_exibidos:
