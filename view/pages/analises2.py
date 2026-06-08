@@ -82,6 +82,19 @@ def _rotulo_dia(numero_dia: int, dia: str) -> str:
     return f"Dia {numero_dia} — {pd.Timestamp(dia).strftime('%d/%m/%Y')}"
 
 
+def _rotulo_genero(valor: str | None) -> str:
+    if not valor:
+        return "—"
+    # o Condor grava o gênero como sigla ou palavra, em português ou inglês
+    # (ex.: "M", "Male", "Masculino") — a inicial basta para normalizar
+    inicial = valor.strip().upper()[:1]
+    if inicial == "M":
+        return "MASCULINO"
+    if inicial == "F":
+        return "FEMININO"
+    return valor.strip().upper()
+
+
 _LARGURA_EIXO_EXTRA = 0.08
 
 
@@ -183,71 +196,27 @@ _AVISO_DADOS_INSUFICIENTES = (
 )
 
 
-def _metricas_ritmo(raw: BaseRaw, titulo: str = "Ritmo de repouso-atividade", rotulo_escopo: str = "geral", mostrar_is: bool = True, mostrar_periodos: bool = True) -> None:
+def _metricas_ritmo(raw: BaseRaw, titulo: str = "Ritmo de repouso-atividade") -> None:
     st.subheader(titulo)
 
     # IS/IV/L5/M10 dependem de uma janela de atividade média ao longo do
     # dia; com registros curtos ou cheios de lacunas, o pyActigraphy chega
     # a uma janela vazia/toda NaN e KeyError: NaT ao buscar seu mínimo/máximo.
     try:
-        valor_iv, valor_l5, valor_m10 = raw.IV(), raw.L5(), raw.M10()
-        valor_is = raw.IS() if mostrar_is else None
+        valor_is, valor_iv, valor_l5, valor_m10 = raw.IS(), raw.IV(), raw.L5(), raw.M10()
     except _ERROS_METRICA_RITMO:
         st.info(_AVISO_DADOS_INSUFICIENTES)
-    else:
-        col_is, col_iv, col_l5, col_m10 = st.columns(4)
-        if mostrar_is:
-            col_is.metric(f"IS — {rotulo_escopo}", f"{valor_is:.3f}",
-                          help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
-        else:
-            # IS compara o padrão de repouso-atividade ENTRE dias — em um
-            # único dia, a "média diária" é o próprio dia e a métrica sempre
-            # daria 1.000 (variância sobre ela mesma), um valor sem sentido.
-            col_is.metric("IS", "—",
-                          help="Estabilidade interdiária compara o padrão de repouso-atividade entre vários dias; "
-                               "não é uma métrica definida para um único dia.")
-        col_iv.metric(f"IV — {rotulo_escopo}", f"{valor_iv:.3f}",
-                      help="Variabilidade intradiária: o quanto a atividade se fragmenta ao longo do dia.")
-        col_l5.metric(f"L5 — {rotulo_escopo}", f"{valor_l5:.3f}",
-                      help="Atividade média durante as 5 horas menos ativas do dia (média entre todos os dias do registro).")
-        col_m10.metric(f"M10 — {rotulo_escopo}", f"{valor_m10:.3f}",
-                       help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
-
-    if not mostrar_periodos:
         return
 
-    with st.expander("Valores por período de 24h"):
-        try:
-            is_p = raw.ISp(period="1D")
-            iv_p = raw.IVp(period="1D")
-            l5_p = raw.L5p(period="1D")
-            m10_p = raw.M10p(period="1D")
-        except _ERROS_METRICA_RITMO:
-            st.info(_AVISO_DADOS_INSUFICIENTES)
-            return
-
-        inicio = raw.data.index[0]
-
-        tabela = pd.DataFrame({
-            "Período": [
-                f"{(inicio + i * pd.Timedelta(days=1)).strftime('%d/%m/%Y %Hh%M')} "
-                f"– {(inicio + (i + 1) * pd.Timedelta(days=1)).strftime('%d/%m/%Y %Hh%M')}"
-                for i in range(len(is_p))
-            ],
-            "IS": is_p,
-            "IV": iv_p,
-            "L5": l5_p,
-            "M10": m10_p,
-        })
-        st.dataframe(
-            tabela,
-            hide_index=True,
-            width="stretch",
-            column_config={
-                coluna: st.column_config.NumberColumn(format="%.3f")
-                for coluna in ("IS", "IV", "L5", "M10")
-            },
-        )
+    col_is, col_iv, col_l5, col_m10 = st.columns(4)
+    col_is.metric("IS — geral", f"{valor_is:.3f}",
+                  help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
+    col_iv.metric("IV — geral", f"{valor_iv:.3f}",
+                  help="Variabilidade intradiária: o quanto a atividade se fragmenta ao longo do dia.")
+    col_l5.metric("L5 — geral", f"{valor_l5:.3f}",
+                  help="Atividade média durante as 5 horas menos ativas do dia (média entre todos os dias do registro).")
+    col_m10.metric("M10 — geral", f"{valor_m10:.3f}",
+                   help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
 
 
 def analises2_page():
@@ -269,10 +238,17 @@ def analises2_page():
     nome_escolhido = st.selectbox("Arquivo", list(opcoes.keys()))
     arquivo_id = opcoes[nome_escolhido]["id"]
 
-    _, df = _carregar_actigrafia(arquivo_id, usuario_id)
+    metadata, df = _carregar_actigrafia(arquivo_id, usuario_id)
     if df.empty:
         st.warning("Não foi possível processar este arquivo.")
         return
+
+    nome_sujeito = metadata.get("SUBJECT_NAME")
+
+    col_nome, col_sexo, col_nascimento = st.columns(3)
+    col_nome.caption(f"**Paciente:** {nome_sujeito.strip().upper() if nome_sujeito else '—'}")
+    col_sexo.caption(f"**Sexo:** {_rotulo_genero(metadata.get('SUBJECT_GENDER'))}")
+    col_nascimento.caption(f"**Data de nascimento:** {metadata.get('SUBJECT_DATE_OF_BIRTH', '—')}")
 
     tem_evento = "EVENT" in df.columns
 
@@ -341,6 +317,9 @@ def analises2_page():
         st.info("Selecione ao menos um sinal em **Opções de exibição** para gerar o gráfico.")
         return
 
+    _metricas_ritmo(raw, titulo="Ritmo de repouso-atividade — registro completo")
+    st.divider()
+
     # um gráfico combinado por dia — cada um com seus próprios eixos —
     # em vez de um único grid, que ficaria ilegível com 3 sinais sobrepostos
     for i, dia in enumerate(dias, start=1):
@@ -351,6 +330,3 @@ def analises2_page():
             ),
             width="stretch",
         )
-
-    st.divider()
-    _metricas_ritmo(raw, titulo="Ritmo de repouso-atividade — registro completo")
