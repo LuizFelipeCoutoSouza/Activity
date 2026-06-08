@@ -29,6 +29,9 @@ Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
 | `psycopg2-binary` | 2.9.12 | Driver PostgreSQL; `RealDictCursor` para SELECT como dict |
 | `bcrypt` | 5.0.0 | Hash de senhas em `UserModel.criar_usuario` e verificação no login |
 | `streamlit-keyup` | 0.3.0 | `st_keyup` — dispara rerun a cada tecla (busca em tempo real em `conjunto_de_dados.py`) |
+| `pyActigraphy` | 1.2.2 | Parsing/análise de actigrafia: `BaseRaw`, métricas IS/IV/L5/M10, máscara de inatividade — usado em `view/pages/analises2.py` |
+| `pandas` | 2.1.4 | DataFrames/séries temporais — usado por `model/condor_parser.py` e nas páginas de análise |
+| `plotly` | 6.7.0 | Gráficos interativos (`graph_objects`/`express`) nas páginas `analises.py`/`analises2.py` |
 
 ## File Structure
 
@@ -67,6 +70,7 @@ Activity/
     ├── home.py                     # home_page(): navbar, sidebar, roteamento lazy
     └── pages/                      # Uma página por arquivo; importadas lazily por home.py
         ├── analises.py             # analises_page()          [em desenvolvimento]
+        ├── analises2.py            # analises2_page()         [em desenvolvimento]
         ├── conjunto_de_dados.py    # conjunto_de_dados_page() [implementado]
         ├── registro_de_pacientes.py# registro_de_pacientes_page() [implementado]
         ├── exportar_relatorio.py   # exportar_relatorio_page() [em desenvolvimento]
@@ -161,6 +165,14 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`view/pages/analises.py`** — visualização de actigrafia. Seleciona arquivo (do banco via `ArquivoController.listar`) e dia; carrega e processa via `ArquivoController.carregar_actigrafia` (cacheado em `_carregar_actigrafia` no nível de módulo com `@st.cache_data(ttl=120)`). Exibe métricas (PIM, temperatura) e gráficos (PIM, temperatura, luz, melanopic EDI).
 
+**`view/pages/analises2.py`** — segunda versão (mais completa) da análise de actigrafia, construída em torno do objeto `BaseRaw` do pyActigraphy (`_construir_raw`, módulo `pyActigraphy.io`). Estrutura:
+- Carrega o arquivo escolhido (cacheado via `_carregar_actigrafia`/`@st.cache_data(ttl=120)`) e exibe nome, sexo e data de nascimento do sujeito a partir de `metadata` (`SUBJECT_NAME`, `SUBJECT_GENDER`, `SUBJECT_DATE_OF_BIRTH`, normalizados por `_rotulo_genero`).
+- **Descartar início do registro**: checkbox + `st.pills` (0h–12h, passo 2h) que recorta `df` a partir de `primeiro_registro + duração`, antes de qualquer outro cálculo — afeta métricas, faixas e dias disponíveis, não só a exibição.
+- **Opções de exibição** (`st.expander`): escolha do modo de atividade (PIM/TAT/ZCM via `st.radio`, com `MODOS_ATIVIDADE` filtrado pelas colunas existentes); **mascaramento de inatividade** via `raw.create_inactivity_mask(f"{duração}h")` + `raw.mask_inactivity = True` (checkbox + `st.pills` 0h–12h, passo 2h) — propaga automaticamente para `raw.data`, afetando gráficos e métricas sem alterar `df`; checkboxes e sliders de faixa de valores (escala) para atividade, luz e temperatura.
+- **Parâmetros das métricas não paramétricas** (`st.expander`): `selectbox` de frequência de reamostragem (`10min`–`2H`, padrão `1H`) e `number_input` de limiar de binarização (padrão `4`), repassados a `raw.IS()`/`raw.IV()`/`raw.L5()`/`raw.M10()` via `_metricas_ritmo(raw, freq=..., limiar=...)`.
+- **Filtrar dias exibidos** (`st.expander`): filtros somente de exibição — dia da semana (`st.pills`, multi) e período do dia (`st.segmented_control`: Manhã/Tarde/Noite/Personalizado, este último com `st.slider` de intervalo de horas) — recortam os gráficos por dia (`_grafico_combinado_dia`) sem alterar dados nem métricas. A numeração "Dia N" é preservada via `numero_por_dia`, calculado antes da filtragem.
+- Gráficos combinados por dia (`_grafico_combinado_dia`, Plotly `go.Figure`): atividade + eixos extras de luz/temperatura sobrepostos, sombreamento do período noturno (`_sombrear_periodo_noturno`) e de marcações de evento (`_sombrear_eventos`/`_intervalos_marcados`).
+
 **`view/pages/registro_de_pacientes.py`** — CRUD completo de pacientes com paginação (8/página) e busca por nome/e-mail. Cadastro e edição via `@st.dialog("Paciente", width="large")` com duas abas: **Dados** (campos do paciente) e **Arquivos vinculados** (multiselect dos arquivos disponíveis do usuário). Exclusão com confirmação inline. Regra de negócio: um arquivo só pode ser vinculado a um paciente — arquivos já ocupados ficam invisíveis no multiselect.
 
 ## view/ui.py — Utilitários compartilhados
@@ -237,7 +249,7 @@ O Google OAuth não usa este mecanismo — a persistência é gerenciada pelo pr
 
 **Nível 1 — `app.py`**: `st.session_state["pagina"]` → `"login"` | `"cadastro"` | `"home"`.
 
-**Nível 2 — `home.py`**: `st.session_state["pagina_atual"]` → `"Análises"` | `"Conjunto de dados"` | `"Registro de pacientes"` | `"Exportar relatório"` | `"Configurações"`.
+**Nível 2 — `home.py`**: `st.session_state["pagina_atual"]` → `"Análises"` | `"Análise 2"` | `"Conjunto de dados"` | `"Registro de pacientes"` | `"Exportar relatório"` | `"Configurações"`.
 
 Para adicionar uma nova página autenticada:
 1. Criar `view/pages/minha_pagina.py` com `minha_pagina_page()`.
