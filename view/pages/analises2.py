@@ -30,6 +30,9 @@ _PERIODOS_DIA = {
 # opções (em horas) do seletor de duração mínima da máscara de inatividade
 _DURACOES_MASCARA_H = list(range(0, 13, 2))
 
+# opções (em horas) do seletor de quanto descartar do início do registro
+_DURACOES_DESCARTE_H = list(range(0, 13, 2))
+
 @st.cache_data(ttl=120)
 def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
     return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
@@ -272,6 +275,30 @@ def analises2_page():
     col_nome.caption(f"**Paciente:** {nome_sujeito.strip().upper() if nome_sujeito else '—'}")
     col_sexo.caption(f"**Sexo:** {_rotulo_genero(metadata.get('SUBJECT_GENDER'))}")
     col_nascimento.caption(f"**Data de nascimento:** {metadata.get('SUBJECT_DATE_OF_BIRTH', '—')}")
+
+    # recorte aplicado ao registro inteiro, antes de qualquer outro cálculo —
+    # diferente dos filtros de exibição abaixo, este afeta os dados analisados
+    # (métricas, faixas e dias disponíveis), não só o que é desenhado na tela
+    descartar_inicio = st.checkbox(
+        "Descartar as primeiras horas do registro",
+        help=(
+            "Remove o início do registro — por exemplo, o período de adaptação ao "
+            "dispositivo, antes que o paciente retome a rotina normal. Afeta as "
+            "métricas e os gráficos a seguir, mas não altera o arquivo salvo."
+        ),
+    )
+    if descartar_inicio:
+        duracao_descarte_h = st.pills(
+            "Duração a descartar do início do registro",
+            _DURACOES_DESCARTE_H, default=2, required=True, format_func=lambda h: f"{h}h",
+            help="Remove os dados anteriores a esse intervalo, contado a partir do primeiro registro do arquivo.",
+        )
+        if duracao_descarte_h:
+            limite = pd.Timestamp(df["DATE/TIME"].iloc[0]) + pd.Timedelta(hours=duracao_descarte_h)
+            df = df[df["DATE/TIME"] >= limite].copy()
+            if df.empty:
+                st.warning("O intervalo selecionado descarta o registro inteiro — escolha uma duração menor.")
+                return
 
     tem_evento = "EVENT" in df.columns
 
