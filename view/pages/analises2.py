@@ -96,7 +96,10 @@ def _sombrear_eventos(fig: go.Figure, serie_evento: pd.Series, dia: str, row: in
 
 
 def _rotulo_dia(numero_dia: int, dia: str) -> str:
-    return f"Dia {numero_dia} — {pd.Timestamp(dia).strftime('%d/%m/%Y')}"
+    ts = pd.Timestamp(dia)
+    idx = int(ts.weekday())
+    dia_semana = _DIAS_SEMANA[idx] + ("-feira" if idx < 5 else "")
+    return f"Dia {numero_dia} — {ts.strftime('%d/%m/%Y')} · {dia_semana}"
 
 
 def _rotulo_genero(valor: str | None) -> str:
@@ -466,7 +469,7 @@ def analises2_page():
         st.info("Selecione ao menos um sinal em **Opções de exibição** para gerar o gráfico.")
         return
 
-    with st.expander("Parâmetros das métricas não paramétricas"):
+    with st.expander("Configurações das medidas não paramétricas"):
         st.caption("Ajustam o cálculo de IS, IV, L5 e M10 abaixo — não alteram os dados nem os gráficos.")
         col_freq, col_limiar = st.columns(2, gap="medium")
         frequencia_metricas = col_freq.selectbox(
