@@ -2,13 +2,15 @@
 view/home.py — Shell autenticado: navbar, sidebar e roteamento entre páginas.
 """
 
+import base64
+
 import streamlit as st
 from controller.user_controller import UserController
 from view.ui import avatar_html, AVATAR_NAV
 
 PAGINAS = [
     ("📊", "Análises"),
-    ("🧪", "Análise 2"),
+    ("📊", "Análise 2"),
     ("🗃️", "Conjunto de dados"),
     ("👥", "Registro de pacientes"),
     ("📄", "Exportar relatório"),
@@ -32,13 +34,11 @@ def _navbar(usuario: dict):
     foto_tipo = usuario.get("foto_tipo")
 
     col_brand, col_user = st.columns([5, 2])
-    col_brand.markdown("**Activity**")
     col_user.markdown(
         f'{avatar_html(nome, foto, foto_tipo, AVATAR_NAV)} '
         f'<strong style="vertical-align:middle;">{nome}</strong>',
         unsafe_allow_html=True,
     )
-    st.divider()
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -47,8 +47,52 @@ def _sidebar(tipo_auth: str):
     pagina_atual = st.session_state.get("pagina_atual", "Análises")
 
     with st.sidebar:
-        st.markdown("## Activity")
-        st.divider()
+        st.markdown("""
+        <style>
+        section[data-testid="stSidebar"] > div:first-child {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        [data-testid="stSidebarContent"] {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        [data-testid="stSidebarUserContent"] {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        [data-testid="stSidebarUserContent"] > div:first-child {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        [data-testid="stSidebarUserContent"] [data-testid="stVerticalBlock"] {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        [data-testid="stSidebarUserContent"] [data-testid="stVerticalBlock"] > div:nth-last-child(3) {
+            margin-top: auto;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        col_logo, col_titulo = st.columns([1, 10], vertical_alignment="center")
+        col_logo.image("imagens/spring.png", width=900)
+        col_titulo.markdown(
+            "<div style='padding-left:0.1rem; display:flex; flex-direction:column; justify-content:center; height:100%; margin-top:-1.3rem'>"
+            "<h1 style='margin:0; font-size:2.8rem; font-weight:700'>Activity</h1>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("<div style='margin-top:6rem'></div>", unsafe_allow_html=True)
 
         for icone, nome in PAGINAS:
             ativo = pagina_atual == nome
