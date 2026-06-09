@@ -6,6 +6,30 @@ def login_page():
     col_esq, col_dir = st.columns(2, border=True)
 
     with col_esq:
+        st.markdown("""
+        <style>
+        [data-testid="stColumn"]:first-of-type > [data-testid="stVerticalBlockBorderWrapper"] > div,
+        [data-testid="stColumn"]:last-of-type  > [data-testid="stVerticalBlockBorderWrapper"] > div {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        [data-testid="stColumn"]:first-of-type [data-testid="stVerticalBlock"]:first-of-type,
+        [data-testid="stColumn"]:last-of-type  [data-testid="stVerticalBlock"]:first-of-type {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        [data-testid="stColumn"]:first-of-type [data-testid="stVerticalBlock"]:first-of-type > div:last-child {
+            margin-top: auto;
+        }
+        [data-testid="stColumn"]:last-of-type [data-testid="stVerticalBlock"]:first-of-type > div:last-child {
+            margin-top: auto;
+            margin-bottom: auto;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         st.header("Activity")
         st.subheader("Faça suas análises sobre os dados de actigrafia.")
         st.write(
@@ -13,16 +37,18 @@ def login_page():
             "e acessível. Ajudamos pesquisadores e profissionais de saúde a entregar "
             "relatórios claros, precisos e fundamentados."
         )
+
         container = st.container(border=True)
         with container:
-            st.write("Pensado e desenvolvido pela EACH-USP")
-            st.write("Ana Amélia, Laila e Luiz :)")
-
-        st.divider()
-        col1, col2, col3 = st.columns(3)
-        col1.markdown("[Privacidade](https://www.google.com)")
-        col2.markdown("[Segurança](https://www.google.com)")
-        col3.markdown("[Ajuda](https://www.google.com)")
+            col_img, col_txt = st.columns([1, 5], vertical_alignment="center")
+            col_img.image("imagens/Logo_EACH-USP.png", width=100)
+            col_txt.markdown(
+                "<div style='padding-left:0.1rem; display:flex; flex-direction:column; justify-content:center; height:100%; margin-top:-0.9rem'>"
+                "<strong>Pensado e desenvolvido pela EACH-USP</strong>"
+                "<br><span style='font-size:0.8rem; color:gray'>Projeto Supervisionado de Graduação I</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
 
     with col_dir:
         st.header("Bem-vindo!")
@@ -49,14 +75,20 @@ def login_page():
             else:
                 st.error(mensagem)
 
-        st.caption("— ou —")
-
-        if st.button("Entrar com Google", width="stretch"):
-            st.login()
-
         st.divider()
 
-        st.write("Novo na plataforma?")
+        st.markdown("<div style='text-align:center; margin-bottom:0.6rem'>Novo na plataforma?</div>", unsafe_allow_html=True)
         if st.button("Criar uma conta", width="stretch"):
             st.session_state["pagina"] = "cadastro"
             st.rerun()
+
+        st.markdown(
+            "<div style='text-align:center'>"
+            "<a href='https://www.google.com'>Privacidade</a>"
+            " &nbsp;·&nbsp; "
+            "<a href='https://www.google.com'>Segurança</a>"
+            " &nbsp;·&nbsp; "
+            "<a href='https://www.google.com'>Ajuda</a>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
