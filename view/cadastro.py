@@ -40,6 +40,14 @@ def cadastro_page():
         [data-testid="stColumn"]:first-of-type [data-testid="stVerticalBlock"]:first-of-type > div:last-child {
             margin-top: auto;
         }
+        [data-testid="stBaseButton-primary"] {
+            background-color: #1a3a5c;
+            border-color: #1a3a5c;
+        }
+        [data-testid="stBaseButton-primary"]:hover {
+            background-color: #142d4a;
+            border-color: #142d4a;
+        }
         </style>
         """, unsafe_allow_html=True)
 

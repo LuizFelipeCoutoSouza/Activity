@@ -27,6 +27,14 @@ def login_page():
             margin-top: auto;
             margin-bottom: auto;
         }
+        [data-testid="stBaseButton-primary"] {
+            background-color: #1a3a5c;
+            border-color: #1a3a5c;
+        }
+        [data-testid="stBaseButton-primary"]:hover {
+            background-color: #142d4a;
+            border-color: #142d4a;
+        }
         </style>
         """, unsafe_allow_html=True)
 

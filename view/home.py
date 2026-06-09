@@ -80,6 +80,14 @@ def _sidebar(tipo_auth: str):
         [data-testid="stSidebarUserContent"] [data-testid="stVerticalBlock"] > div:nth-last-child(3) {
             margin-top: auto;
         }
+        [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
+            background-color: #1a3a5c;
+            border-color: #1a3a5c;
+        }
+        [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover {
+            background-color: #142d4a;
+            border-color: #142d4a;
+        }
         </style>
         """, unsafe_allow_html=True)
 
@@ -107,7 +115,10 @@ def _sidebar(tipo_auth: str):
 
         st.divider()
 
-        if st.button("⚙️  Configurações", width="stretch", key="nav_config"):
+        if st.button(
+            "⚙️  Configurações", width="stretch", key="nav_config",
+            type="primary" if pagina_atual == "Configurações" else "secondary",
+        ):
             st.session_state["pagina_atual"] = "Configurações"
             st.rerun()
 
