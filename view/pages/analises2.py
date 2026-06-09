@@ -225,30 +225,48 @@ _AVISO_DADOS_INSUFICIENTES = (
 )
 
 
-def _metricas_ritmo(raw: BaseRaw, titulo: str = "Ritmo de repouso-atividade", freq: str = "1H", limiar: int = 4) -> None:
+def _metricas_ritmo(
+    raw: BaseRaw,
+    titulo: str = "Ritmo de repouso-atividade",
+    freq: str = "1H",
+    limiar: int = 4,
+    usar_periodo: bool = False,
+    periodo: str = "7D",
+) -> None:
     st.subheader(titulo)
 
     # IS/IV/L5/M10 dependem de uma janela de atividade média ao longo do
     # dia; com registros curtos ou cheios de lacunas, o pyActigraphy chega
     # a uma janela vazia/toda NaN e KeyError: NaT ao buscar seu mínimo/máximo.
     try:
-        valor_is = raw.IS(freq=freq, threshold=limiar)
-        valor_iv = raw.IV(freq=freq, threshold=limiar)
-        valor_l5 = raw.L5(threshold=limiar)
-        valor_m10 = raw.M10(threshold=limiar)
+        if usar_periodo:
+            vals_is  = raw.ISp(period=periodo, freq=freq, threshold=limiar)
+            vals_iv  = raw.IVp(period=periodo, freq=freq, threshold=limiar)
+            vals_l5  = raw.L5p(period=periodo, threshold=limiar)
+            vals_m10 = raw.M10p(period=periodo, threshold=limiar)
+            n = max(len(vals_is), len(vals_iv), len(vals_l5), len(vals_m10))
+            rotulos = [f"Período {i + 1}" for i in range(n)]
+            df_metricas = pd.DataFrame(
+                {"IS": vals_is, "IV": vals_iv, "L5": vals_l5, "M10": vals_m10},
+                index=rotulos,
+            )
+            st.dataframe(df_metricas.style.format("{:.3f}"), use_container_width=True)
+        else:
+            valor_is  = raw.IS(freq=freq, threshold=limiar)
+            valor_iv  = raw.IV(freq=freq, threshold=limiar)
+            valor_l5  = raw.L5(threshold=limiar)
+            valor_m10 = raw.M10(threshold=limiar)
+            col_is, col_iv, col_l5, col_m10 = st.columns(4)
+            col_is.metric("IS — geral", f"{valor_is:.3f}",
+                          help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
+            col_iv.metric("IV — geral", f"{valor_iv:.3f}",
+                          help="Variabilidade intradiária: o quanto a atividade se fragmenta ao longo do dia.")
+            col_l5.metric("L5 — geral", f"{valor_l5:.3f}",
+                          help="Atividade média durante as 5 horas menos ativas do dia (média entre todos os dias do registro).")
+            col_m10.metric("M10 — geral", f"{valor_m10:.3f}",
+                           help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
     except _ERROS_METRICA_RITMO:
         st.info(_AVISO_DADOS_INSUFICIENTES)
-        return
-
-    col_is, col_iv, col_l5, col_m10 = st.columns(4)
-    col_is.metric("IS — geral", f"{valor_is:.3f}",
-                  help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
-    col_iv.metric("IV — geral", f"{valor_iv:.3f}",
-                  help="Variabilidade intradiária: o quanto a atividade se fragmenta ao longo do dia.")
-    col_l5.metric("L5 — geral", f"{valor_l5:.3f}",
-                  help="Atividade média durante as 5 horas menos ativas do dia (média entre todos os dias do registro).")
-    col_m10.metric("M10 — geral", f"{valor_m10:.3f}",
-                   help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
 
 
 def analises2_page():
@@ -294,17 +312,81 @@ def analises2_page():
         ),
     )
     if descartar_inicio:
-        duracao_descarte_h = st.pills(
-            "Duração a descartar do início do registro",
-            _DURACOES_DESCARTE_H, default=2, required=True, format_func=lambda h: f"{h}h",
-            help="Remove os dados anteriores a esse intervalo, contado a partir do primeiro registro do arquivo.",
+        import datetime as _dt
+        from typing import cast
+
+        inicio_dt = cast(_dt.datetime, pd.Timestamp(df["DATE/TIME"].iloc[0]))
+        fim_dt    = cast(_dt.datetime, pd.Timestamp(df["DATE/TIME"].iloc[-1]))
+
+        modo_descarte = st.segmented_control(
+            "Modo de corte",
+            ["Por duração", "Por data e hora"],
+            default="Por duração",
+            label_visibility="collapsed",
         )
-        if duracao_descarte_h:
-            limite = pd.Timestamp(df["DATE/TIME"].iloc[0]) + pd.Timedelta(hours=duracao_descarte_h)
-            df = df[df["DATE/TIME"] >= limite].copy()
-            if df.empty:
-                st.warning("O intervalo selecionado descarta o registro inteiro — escolha uma duração menor.")
-                return
+        limite_dt: _dt.datetime | None = None
+        limite_fim_dt: _dt.datetime | None = None
+
+        if modo_descarte == "Por duração":
+            col_dur_ini, col_dur_fim = st.columns(2)
+            duracao_descarte_h = col_dur_ini.pills(
+                "Duração a descartar do início do registro",
+                _DURACOES_DESCARTE_H, default=2, required=True, format_func=lambda h: f"{h}h",
+                help="Remove os dados anteriores a esse intervalo, contado a partir do primeiro registro do arquivo.",
+            )
+            if duracao_descarte_h:
+                limite_dt = inicio_dt + _dt.timedelta(hours=int(duracao_descarte_h))
+
+            duracao_fim_h = col_dur_fim.pills(
+                "Duração a descartar do fim do registro",
+                _DURACOES_DESCARTE_H, default=None, format_func=lambda h: f"{h}h",
+                help="Remove os dados posteriores a esse intervalo, contado a partir do último registro do arquivo.",
+            )
+            if duracao_fim_h is not None:
+                limite_fim_dt = fim_dt - _dt.timedelta(hours=int(duracao_fim_h))
+
+        else:
+            col_label_ini, _, col_label_fim = st.columns([2, 0.5, 2])
+            col_label_ini.markdown("**Início**")
+            col_label_fim.markdown("**Fim**")
+            col_data_ini, col_hora_ini, col_sep, col_data_fim, col_hora_fim = st.columns([2, 2, 0.5, 2, 2])
+            data_ini = col_data_ini.date_input(
+                "Data de início da análise",
+                value=inicio_dt.date(),
+                min_value=inicio_dt.date(),
+                max_value=fim_dt.date(),
+                format="DD/MM/YYYY",
+            )
+            hora_ini = col_hora_ini.time_input(
+                "Hora de início da análise",
+                value=inicio_dt.time(),
+                step=300,
+            )
+            if isinstance(data_ini, _dt.date) and hora_ini:
+                limite_dt = _dt.datetime.combine(data_ini, hora_ini)
+
+            data_fim = col_data_fim.date_input(
+                "Data de fim da análise",
+                value=fim_dt.date(),
+                min_value=inicio_dt.date(),
+                max_value=fim_dt.date(),
+                format="DD/MM/YYYY",
+            )
+            hora_fim = col_hora_fim.time_input(
+                "Hora de fim da análise",
+                value=fim_dt.time(),
+                step=300,
+            )
+            if isinstance(data_fim, _dt.date) and hora_fim:
+                limite_fim_dt = _dt.datetime.combine(data_fim, hora_fim)
+
+        if limite_dt is not None and limite_dt > inicio_dt:
+            df = df[df["DATE/TIME"] >= limite_dt].copy()
+        if limite_fim_dt is not None and limite_fim_dt < fim_dt:
+            df = df[df["DATE/TIME"] <= limite_fim_dt].copy()
+        if df.empty:
+            st.warning("O intervalo selecionado não contém dados — ajuste os valores.")
+            return
 
     tem_evento = "EVENT" in df.columns
 
@@ -486,9 +568,38 @@ def analises2_page():
             help="Valores de atividade a partir deste limiar contam como 'ativo' (1); abaixo dele, como 'inativo' (0).",
         )
 
+        st.divider()
+        usar_periodo = st.checkbox(
+            "Calcular por período",
+            help="Usa ISp, IVp, L5p e M10p — calcula as medidas separadamente para cada janela de tempo do registro.",
+        )
+        if usar_periodo:
+            _PERIODOS_FIXOS = [
+                (1, "1 dia",    "1D"),
+                (3, "3 dias",   "3D"),
+                (7, "7 dias",   "7D"),
+                (14, "14 dias", "14D"),
+                (30, "30 dias", "30D"),
+            ]
+            dias_registro = len(dias)
+            opcoes = [(label, val) for d, label, val in _PERIODOS_FIXOS if d <= dias_registro // 2]
+            if not opcoes:
+                opcoes = [("1 dia", "1D")]
+            labels   = [l for l, _ in opcoes]
+            vals_map = {l: v for l, v in opcoes}
+            escolha  = st.selectbox(
+                "Período de análise",
+                labels,
+                help=f"Registro com {dias_registro} dia(s). Apenas períodos que permitem ao menos 2 janelas são exibidos.",
+            )
+            periodo_metricas = vals_map[escolha] if escolha else "1D"
+        else:
+            periodo_metricas = "7D"
+
     _metricas_ritmo(
         raw, titulo="Ritmo de repouso-atividade — registro completo",
         freq=frequencia_metricas, limiar=int(limiar_atividade),
+        usar_periodo=usar_periodo, periodo=periodo_metricas,
     )
     st.divider()
 
