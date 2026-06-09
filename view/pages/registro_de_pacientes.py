@@ -9,6 +9,7 @@ from datetime import date
 
 import streamlit as st
 
+from controller.arquivo_controller import ArquivoController
 from controller.paciente_controller import PacienteController
 from view.ui import set_toast, render_toast, fmt_telefone, get_usuario_id, paginacao
 
@@ -33,10 +34,19 @@ def registro_de_pacientes_page():
         _dialogo_paciente(st.session_state["editando_paciente_id"], usuario_id)
 
     pacientes = PacienteController.listar(usuario_id)
+    arquivos  = ArquivoController.listar(usuario_id)
+
+    arquivos_atribuidos     = sum(int(p.get("num_arquivos", 0)) for p in pacientes)
+    arquivos_nao_atribuidos = len(arquivos) - arquivos_atribuidos
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Pacientes", len(pacientes))
+    col2.metric("Arquivos atribuídos", arquivos_atribuidos)
+    col3.metric("Arquivos sem paciente", arquivos_nao_atribuidos)
 
     # ── Cabeçalho + botão novo ────────────────────────────────────────────────
     col_titulo, col_btn = st.columns([5, 1])
-    col_titulo.subheader(f"Pacientes ({len(pacientes)})")
+    col_titulo.subheader("Pacientes")
     if col_btn.button("➕ Novo", type="primary", width="stretch", key="btn_novo_pac"):
         st.session_state["novo_paciente"] = True
         st.rerun()
