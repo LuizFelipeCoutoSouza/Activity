@@ -30,15 +30,28 @@ def login_page():
         </style>
         """, unsafe_allow_html=True)
 
-        st.header("Activity")
-        st.subheader("Faça suas análises sobre os dados de actigrafia.")
-        st.write(
+        col_logo, col_titulo = st.columns([1, 14], vertical_alignment="center")
+        col_logo.image("imagens/spring.png", width=50)
+        col_titulo.markdown(
+            "<div style='padding-left:0.1rem; display:flex; flex-direction:column; justify-content:center; height:100%; margin-top:-1.3rem'>"
+            "<h1 style='margin:0'>Activity</h1>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<p style='font-size:1.9rem; font-weight:700; margin:1.7rem 0 1rem 0'>"
+            "Faça suas análises "
+            "<span style='color:#1a3a5c'>sobre os dados de actigrafia</span>."
+            "</p>"
+            "<p style='font-size:1.15rem; line-height:2.0; margin:0'>"
             "Organize, filtre e visualize dados de actigrafia de forma interativa "
             "e acessível. Ajudamos pesquisadores e profissionais de saúde a entregar "
             "relatórios claros, precisos e fundamentados."
+            "</p>",
+            unsafe_allow_html=True,
         )
 
-        container = st.container(border=True)
+        container = st.container(border=False)
         with container:
             col_img, col_txt = st.columns([1, 5], vertical_alignment="center")
             col_img.image("imagens/Logo_EACH-USP.png", width=100)
