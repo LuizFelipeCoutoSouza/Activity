@@ -1,4 +1,7 @@
 
+import datetime as _dt
+from typing import cast
+
 import pandas as pd
 import plotly.graph_objs as go
 from pyActigraphy.io import BaseRaw
@@ -18,58 +21,120 @@ MODOS_ATIVIDADE = ["PIM", "TAT", "ZCM"]
 
 _DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
 
-# faixas de hora (início, fim) usadas tanto para recortar a janela exibida
-# quanto para definir o intervalo do controle "Personalizado"
 _PERIODOS_DIA = {
-    "Dia inteiro": (0, 24),
-    "Manhã (06h–12h)": (6, 12),
-    "Tarde (12h–18h)": (12, 18),
-    "Noite (18h–24h)": (18, 24),
+    "Dia inteiro":      (0, 24),
+    "Manhã (06h–12h)":  (6, 12),
+    "Tarde (12h–18h)":  (12, 18),
+    "Noite (18h–24h)":  (18, 24),
 }
 
-# opções (em horas) do seletor de duração mínima da máscara de inatividade
-_DURACOES_MASCARA_H = list(range(0, 13, 2))
-
-# opções (em horas) do seletor de quanto descartar do início do registro
+_DURACOES_MASCARA_H  = list(range(0, 13, 2))
 _DURACOES_DESCARTE_H = list(range(0, 13, 2))
+
+_PERIODOS_FIXOS = [
+    (1,  "1 dia",   "1D"),
+    (3,  "3 dias",  "3D"),
+    (7,  "7 dias",  "7D"),
+    (14, "14 dias", "14D"),
+    (30, "30 dias", "30D"),
+]
+
+_LARGURA_EIXO_EXTRA = 0.08
+
+_ERROS_METRICA_RITMO = (KeyError, ValueError, ZeroDivisionError)
+_AVISO_DADOS_INSUFICIENTES = (
+    "Não foi possível calcular esta métrica para o registro selecionado — "
+    "o pyActigraphy exige pelo menos 24h de dados contínuos para estimar o ritmo de repouso-atividade."
+)
+
+
+# ── Cache de I/O ──────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=120)
 def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
     return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
 
 
+# ── Construção do objeto BaseRaw ──────────────────────────────────────────────
+
 def _construir_raw(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
     serie = pd.Series(df[coluna].to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="Activity")
     frequencia = pd.Timedelta(serie.index.to_series().diff().median())
     serie = serie.asfreq(frequencia)
-
     return BaseRaw(
-        name=nome,
-        uuid=nome,
-        format="CONDOR",
-        axial_mode=None,
-        start_time=serie.index[0],
-        period=serie.index[-1] - serie.index[0],
-        frequency=frequencia,
-        data=serie,
-        light=None,
+        name=nome, uuid=nome, format="CONDOR", axial_mode=None,
+        start_time=serie.index[0], period=serie.index[-1] - serie.index[0],
+        frequency=frequencia, data=serie, light=None,
     )
 
 
-def _sombrear_periodo_noturno(fig: go.Figure, inicio: pd.Timestamp, row: int | str = "all", col: int | str = "all") -> None:
-    # noite cruza a meia-noite: sombreia 00h-06h (madrugada) e 18h-24h (entrada da noite)
+@st.cache_data(ttl=120, show_spinner=False)
+def _construir_raw_cached(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
+    return _construir_raw(nome, df, coluna)
+
+
+# ── Cálculo cacheado de métricas (pesado) ─────────────────────────────────────
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _computar_metricas_globais(
+    df: pd.DataFrame, nome: str, coluna: str,
+    freq: str, limiar: int, mask_h: int | None,
+) -> dict | None:
+    raw = _construir_raw_cached(nome, df, coluna)
+    if mask_h is not None:
+        raw.create_inactivity_mask(f"{mask_h}h")
+        raw.mask_inactivity = True
+    try:
+        return {
+            "is":  float(raw.IS(freq=freq, threshold=limiar)),
+            "iv":  float(raw.IV(freq=freq, threshold=limiar)),
+            "l5":  float(raw.L5(threshold=limiar)),
+            "m10": float(raw.M10(threshold=limiar)),
+        }
+    except _ERROS_METRICA_RITMO:
+        return None
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _computar_metricas_periodo(
+    df: pd.DataFrame, nome: str, coluna: str,
+    freq: str, limiar: int, mask_h: int | None, periodo: str,
+) -> pd.DataFrame | None:
+    raw = _construir_raw_cached(nome, df, coluna)
+    if mask_h is not None:
+        raw.create_inactivity_mask(f"{mask_h}h")
+        raw.mask_inactivity = True
+    try:
+        vals_is  = raw.ISp(period=periodo, freq=freq, threshold=limiar)
+        vals_iv  = raw.IVp(period=periodo, freq=freq, threshold=limiar)
+        vals_l5  = raw.L5p(period=periodo, threshold=limiar)
+        vals_m10 = raw.M10p(period=periodo, threshold=limiar)
+        n = max(len(vals_is), len(vals_iv), len(vals_l5), len(vals_m10))
+        return pd.DataFrame(
+            {"IS": vals_is, "IV": vals_iv, "L5": vals_l5, "M10": vals_m10},
+            index=[f"Período {i + 1}" for i in range(n)],
+        )
+    except _ERROS_METRICA_RITMO:
+        return None
+
+
+# ── Helpers de sombreamento ───────────────────────────────────────────────────
+
+def _sombrear_periodo_noturno(
+    fig: go.Figure, inicio: pd.Timestamp,
+    row: int | str = "all", col: int | str = "all",
+) -> None:
     for ini, fim in (
-        (inicio, inicio + pd.Timedelta(hours=6)),
-        (inicio + pd.Timedelta(hours=18), inicio + pd.Timedelta(days=1)),
+        (inicio,                              inicio + pd.Timedelta(hours=6)),
+        (inicio + pd.Timedelta(hours=18),     inicio + pd.Timedelta(days=1)),
     ):
         fig.add_vrect(x0=ini, x1=fim, fillcolor=COR_SOMBRA_NOITE, line_width=0, layer="below", row=row, col=col)
 
 
-def _intervalos_marcados(mascara: pd.Series) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
-    intervalos = []
+def _intervalos_marcados(mascara: pd.Series) -> list[tuple]:
+    intervalos: list[tuple] = []
     em_intervalo = False
     inicio = anterior = None
-
     for ts, valor in mascara.items():
         if valor and not em_intervalo:
             inicio, em_intervalo = ts, True
@@ -77,23 +142,25 @@ def _intervalos_marcados(mascara: pd.Series) -> list[tuple[pd.Timestamp, pd.Time
             intervalos.append((inicio, anterior))
             em_intervalo = False
         anterior = ts
-
     if em_intervalo:
         intervalos.append((inicio, anterior))
     return intervalos
 
 
-def _sombrear_eventos(fig: go.Figure, serie_evento: pd.Series, dia: str, row: int | str = "all", col: int | str = "all") -> None:
+def _sombrear_eventos(
+    fig: go.Figure, serie_evento: pd.Series, dia: str,
+    row: int | str = "all", col: int | str = "all",
+) -> None:
     try:
         fatia = serie_evento.loc[dia]
     except KeyError:
         return
-    # EVENT registra a marcação do botão como contagem (não necessariamente 1);
-    # qualquer valor diferente de zero indica que houve marcação no intervalo.
     marcado = fatia.fillna(0) != 0
     for ini, fim in _intervalos_marcados(marcado):
         fig.add_vrect(x0=ini, x1=fim, fillcolor=COR_SOMBRA_EVENTO, line_width=0, layer="below", row=row, col=col)
 
+
+# ── Helpers de rótulo ─────────────────────────────────────────────────────────
 
 def _rotulo_dia(numero_dia: int, dia: str) -> str:
     ts = pd.Timestamp(dia)
@@ -105,8 +172,6 @@ def _rotulo_dia(numero_dia: int, dia: str) -> str:
 def _rotulo_genero(valor: str | None) -> str:
     if not valor:
         return "—"
-    # o Condor grava o gênero como sigla ou palavra, em português ou inglês
-    # (ex.: "M", "Male", "Masculino") — a inicial basta para normalizar
     inicial = valor.strip().upper()[:1]
     if inicial == "M":
         return "MASCULINO"
@@ -115,9 +180,16 @@ def _rotulo_genero(valor: str | None) -> str:
     return valor.strip().upper()
 
 
-_LARGURA_EIXO_EXTRA = 0.08
+def _coluna_numerica_utilizavel(df: pd.DataFrame, nome_coluna: str) -> pd.Series | None:
+    if nome_coluna not in df.columns:
+        return None
+    valores = pd.to_numeric(df[nome_coluna], errors="coerce")
+    return valores if valores.notna().any() else None
 
 
+# ── Gráfico diário cacheado ───────────────────────────────────────────────────
+
+@st.cache_data(ttl=120, show_spinner=False)
 def _grafico_combinado_dia(
     dia: str,
     numero_dia: int,
@@ -135,20 +207,15 @@ def _grafico_combinado_dia(
     hora_fim: int = 24,
 ) -> go.Figure:
     inicio_dia = pd.Timestamp(dia)
-    # janela exibida — pode ser um recorte do dia (ex.: só a manhã); o
-    # sombreamento noturno continua relativo ao dia inteiro (inicio_dia)
     inicio = inicio_dia + pd.Timedelta(hours=hora_inicio)
-    fim = inicio_dia + pd.Timedelta(hours=hora_fim) - pd.Timedelta(seconds=1)
+    fim    = inicio_dia + pd.Timedelta(hours=hora_fim) - pd.Timedelta(seconds=1)
 
     serie_atividade = serie_atividade.loc[inicio:fim]
 
-    # luz e temperatura entram como eixos Y extras à direita — cada um com sua
-    # própria escala — em vez de subplots separados, para permitir comparar os
-    # três sinais lado a lado no tempo
     extras = [
         (rotulo, cor, serie, faixa)
         for rotulo, cor, serie, faixa in (
-            ("Luz (Lux)", COR_LUZ, serie_luz, escala_luz),
+            ("Luz (Lux)",        COR_LUZ,         serie_luz,  escala_luz),
             ("Temperatura (°C)", COR_TEMPERATURA, serie_temp, escala_temperatura),
         )
         if serie is not None
@@ -174,40 +241,29 @@ def _grafico_combinado_dia(
         height=340,
         margin=dict(l=0, r=0, t=60, b=0),
         hovermode="x unified",
-        # legenda no canto superior direito, fora da área sombreada do gráfico,
-        # com fundo e borda para permanecer legível sobre as curvas e sombreados
         legend=dict(
-            orientation="h",
-            yanchor="bottom", y=1.02,
-            xanchor="right", x=1,
+            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
             bgcolor="rgba(255, 255, 255, 0.75)",
-            bordercolor="rgba(0, 0, 0, 0.15)",
-            borderwidth=1,
+            bordercolor="rgba(0, 0, 0, 0.15)", borderwidth=1,
             font=dict(size=11, color=COR_LEGENDA),
         ),
     )
 
     for i, (rotulo, cor, serie, faixa) in enumerate(extras):
-        indice_eixo = i + 2  # eixo da atividade é "y" (1); extras começam em "y2"
+        indice_eixo = i + 2
         eixo_id = f"y{indice_eixo}"
         fatia = serie.loc[inicio:fim]
-
         fig.add_trace(go.Scatter(
             x=fatia.index, y=fatia.values, mode="lines",
             name=rotulo, line=dict(color=cor, dash="dot"), yaxis=eixo_id,
         ))
-
-        eixo = dict(
+        eixo: dict = dict(
             title=dict(text=rotulo, font=dict(color=cor)),
             tickfont=dict(color=cor),
-            range=faixa,
-            overlaying="y",
-            side="right",
+            range=faixa, overlaying="y", side="right",
         )
         if i > 0:
-            # primeiro extra fica na borda direita da área do gráfico;
-            # os seguintes precisam de eixo "livre" e posição explícita
-            eixo["anchor"] = "free"
+            eixo["anchor"]   = "free"
             eixo["position"] = fim_dominio_x + _LARGURA_EIXO_EXTRA * i
         layout[f"yaxis{indice_eixo}"] = eixo
 
@@ -218,56 +274,43 @@ def _grafico_combinado_dia(
     return fig
 
 
-_ERROS_METRICA_RITMO = (KeyError, ValueError, ZeroDivisionError)
-_AVISO_DADOS_INSUFICIENTES = (
-    "Não foi possível calcular esta métrica para o registro selecionado — "
-    "o pyActigraphy exige pelo menos 24h de dados contínuos para estimar o ritmo de repouso-atividade."
-)
-
+# ── Exibição de métricas ──────────────────────────────────────────────────────
 
 def _metricas_ritmo(
-    raw: BaseRaw,
+    df: pd.DataFrame,
+    nome: str,
+    coluna: str,
     titulo: str = "Ritmo de repouso-atividade",
     freq: str = "1H",
     limiar: int = 4,
     usar_periodo: bool = False,
     periodo: str = "7D",
+    mask_h: int | None = None,
 ) -> None:
     st.subheader(titulo)
-
-    # IS/IV/L5/M10 dependem de uma janela de atividade média ao longo do
-    # dia; com registros curtos ou cheios de lacunas, o pyActigraphy chega
-    # a uma janela vazia/toda NaN e KeyError: NaT ao buscar seu mínimo/máximo.
-    try:
-        if usar_periodo:
-            vals_is  = raw.ISp(period=periodo, freq=freq, threshold=limiar)
-            vals_iv  = raw.IVp(period=periodo, freq=freq, threshold=limiar)
-            vals_l5  = raw.L5p(period=periodo, threshold=limiar)
-            vals_m10 = raw.M10p(period=periodo, threshold=limiar)
-            n = max(len(vals_is), len(vals_iv), len(vals_l5), len(vals_m10))
-            rotulos = [f"Período {i + 1}" for i in range(n)]
-            df_metricas = pd.DataFrame(
-                {"IS": vals_is, "IV": vals_iv, "L5": vals_l5, "M10": vals_m10},
-                index=rotulos,
-            )
-            st.dataframe(df_metricas.style.format("{:.3f}"), use_container_width=True)
+    if usar_periodo:
+        resultado = _computar_metricas_periodo(df, nome, coluna, freq, limiar, mask_h, periodo)
+        if resultado is None:
+            st.info(_AVISO_DADOS_INSUFICIENTES)
         else:
-            valor_is  = raw.IS(freq=freq, threshold=limiar)
-            valor_iv  = raw.IV(freq=freq, threshold=limiar)
-            valor_l5  = raw.L5(threshold=limiar)
-            valor_m10 = raw.M10(threshold=limiar)
+            st.dataframe(resultado.style.format("{:.3f}"), use_container_width=True)
+    else:
+        resultado = _computar_metricas_globais(df, nome, coluna, freq, limiar, mask_h)
+        if resultado is None:
+            st.info(_AVISO_DADOS_INSUFICIENTES)
+        else:
             col_is, col_iv, col_l5, col_m10 = st.columns(4)
-            col_is.metric("IS — geral", f"{valor_is:.3f}",
+            col_is.metric("IS — geral",  f"{resultado['is']:.3f}",
                           help="Estabilidade interdiária: o quanto o padrão de repouso-atividade se repete de um dia para o outro.")
-            col_iv.metric("IV — geral", f"{valor_iv:.3f}",
+            col_iv.metric("IV — geral",  f"{resultado['iv']:.3f}",
                           help="Variabilidade intradiária: o quanto a atividade se fragmenta ao longo do dia.")
-            col_l5.metric("L5 — geral", f"{valor_l5:.3f}",
+            col_l5.metric("L5 — geral",  f"{resultado['l5']:.3f}",
                           help="Atividade média durante as 5 horas menos ativas do dia (média entre todos os dias do registro).")
-            col_m10.metric("M10 — geral", f"{valor_m10:.3f}",
+            col_m10.metric("M10 — geral", f"{resultado['m10']:.3f}",
                            help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
-    except _ERROS_METRICA_RITMO:
-        st.info(_AVISO_DADOS_INSUFICIENTES)
 
+
+# ── Página principal ──────────────────────────────────────────────────────────
 
 def analises2_page():
     st.title("Análise 2")
@@ -284,9 +327,9 @@ def analises2_page():
         st.info("Nenhum arquivo enviado ainda. Acesse **Conjunto de dados** para fazer upload.")
         return
 
-    opcoes = {arq["nome"]: arq for arq in arquivos}
-    nome_escolhido = st.selectbox("Arquivo", list(opcoes.keys()))
-    arquivo_id = opcoes[nome_escolhido]["id"]
+    opcoes_arquivo = {arq["nome"]: arq for arq in arquivos}
+    nome_escolhido = st.selectbox("Arquivo", list(opcoes_arquivo.keys()))
+    arquivo_id = opcoes_arquivo[nome_escolhido]["id"]
 
     metadata, df = _carregar_actigrafia(arquivo_id, usuario_id)
     if df.empty:
@@ -294,15 +337,13 @@ def analises2_page():
         return
 
     nome_sujeito = metadata.get("SUBJECT_NAME")
-
     col_nome, col_sexo, col_nascimento = st.columns(3)
     col_nome.caption(f"**Paciente:** {nome_sujeito.strip().upper() if nome_sujeito else '—'}")
     col_sexo.caption(f"**Sexo:** {_rotulo_genero(metadata.get('SUBJECT_GENDER'))}")
     col_nascimento.caption(f"**Data de nascimento:** {metadata.get('SUBJECT_DATE_OF_BIRTH', '—')}")
 
-    # recorte aplicado ao registro inteiro, antes de qualquer outro cálculo —
-    # diferente dos filtros de exibição abaixo, este afeta os dados analisados
-    # (métricas, faixas e dias disponíveis), não só o que é desenhado na tela
+    # ── Recorte do registro ───────────────────────────────────────────────────
+    # aplicado antes de qualquer cálculo — afeta métricas, faixas e dias
     descartar_inicio = st.checkbox(
         "Descartar as primeiras horas do registro",
         help=(
@@ -312,9 +353,6 @@ def analises2_page():
         ),
     )
     if descartar_inicio:
-        import datetime as _dt
-        from typing import cast
-
         inicio_dt = cast(_dt.datetime, pd.Timestamp(df["DATE/TIME"].iloc[0]))
         fim_dt    = cast(_dt.datetime, pd.Timestamp(df["DATE/TIME"].iloc[-1]))
 
@@ -324,23 +362,23 @@ def analises2_page():
             default="Por duração",
             label_visibility="collapsed",
         )
-        limite_dt: _dt.datetime | None = None
+        limite_dt:     _dt.datetime | None = None
         limite_fim_dt: _dt.datetime | None = None
 
         if modo_descarte == "Por duração":
             col_dur_ini, col_dur_fim = st.columns(2)
-            duracao_descarte_h = col_dur_ini.pills(
+            duracao_ini_h = col_dur_ini.pills(
                 "Duração a descartar do início do registro",
                 _DURACOES_DESCARTE_H, default=2, required=True, format_func=lambda h: f"{h}h",
-                help="Remove os dados anteriores a esse intervalo, contado a partir do primeiro registro do arquivo.",
+                help="Remove os dados anteriores a esse intervalo, contado a partir do primeiro registro.",
             )
-            if duracao_descarte_h:
-                limite_dt = inicio_dt + _dt.timedelta(hours=int(duracao_descarte_h))
+            if duracao_ini_h is not None:
+                limite_dt = inicio_dt + _dt.timedelta(hours=int(duracao_ini_h))
 
             duracao_fim_h = col_dur_fim.pills(
                 "Duração a descartar do fim do registro",
                 _DURACOES_DESCARTE_H, default=None, format_func=lambda h: f"{h}h",
-                help="Remove os dados posteriores a esse intervalo, contado a partir do último registro do arquivo.",
+                help="Remove os dados posteriores a esse intervalo, contado a partir do último registro.",
             )
             if duracao_fim_h is not None:
                 limite_fim_dt = fim_dt - _dt.timedelta(hours=int(duracao_fim_h))
@@ -349,36 +387,29 @@ def analises2_page():
             col_label_ini, _, col_label_fim = st.columns([2, 0.5, 2])
             col_label_ini.markdown("**Início**")
             col_label_fim.markdown("**Fim**")
-            col_data_ini, col_hora_ini, col_sep, col_data_fim, col_hora_fim = st.columns([2, 2, 0.5, 2, 2])
+            col_data_ini, col_hora_ini, _sep, col_data_fim, col_hora_fim = st.columns([2, 2, 0.5, 2, 2])
+
             data_ini = col_data_ini.date_input(
                 "Data de início da análise",
-                value=inicio_dt.date(),
-                min_value=inicio_dt.date(),
-                max_value=fim_dt.date(),
+                value=inicio_dt.date(), min_value=inicio_dt.date(), max_value=fim_dt.date(),
                 format="DD/MM/YYYY",
             )
-            hora_ini = col_hora_ini.time_input(
-                "Hora de início da análise",
-                value=inicio_dt.time(),
-                step=300,
+            hora_ini_corte = col_hora_ini.time_input(
+                "Hora de início da análise", value=inicio_dt.time(), step=300,
             )
-            if isinstance(data_ini, _dt.date) and hora_ini:
-                limite_dt = _dt.datetime.combine(data_ini, hora_ini)
+            if isinstance(data_ini, _dt.date) and hora_ini_corte:
+                limite_dt = _dt.datetime.combine(data_ini, hora_ini_corte)
 
             data_fim = col_data_fim.date_input(
                 "Data de fim da análise",
-                value=fim_dt.date(),
-                min_value=inicio_dt.date(),
-                max_value=fim_dt.date(),
+                value=fim_dt.date(), min_value=inicio_dt.date(), max_value=fim_dt.date(),
                 format="DD/MM/YYYY",
             )
-            hora_fim = col_hora_fim.time_input(
-                "Hora de fim da análise",
-                value=fim_dt.time(),
-                step=300,
+            hora_fim_corte = col_hora_fim.time_input(
+                "Hora de fim da análise", value=fim_dt.time(), step=300,
             )
-            if isinstance(data_fim, _dt.date) and hora_fim:
-                limite_fim_dt = _dt.datetime.combine(data_fim, hora_fim)
+            if isinstance(data_fim, _dt.date) and hora_fim_corte:
+                limite_fim_dt = _dt.datetime.combine(data_fim, hora_fim_corte)
 
         if limite_dt is not None and limite_dt > inicio_dt:
             df = df[df["DATE/TIME"] >= limite_dt].copy()
@@ -390,39 +421,25 @@ def analises2_page():
 
     tem_evento = "EVENT" in df.columns
 
-    # nem todo arquivo Condor registra os três modos de atividade — oferecer
-    # um modo cuja coluna não existe faz _construir_raw (df[coluna]) lançar
-    # KeyError e quebrar a página inteira, inclusive o cálculo de IS/IV/L5/M10
     modos_disponiveis = [modo for modo in MODOS_ATIVIDADE if modo in df.columns]
     if not modos_disponiveis:
         st.warning("Este arquivo não possui nenhuma coluna de atividade reconhecida (PIM, TAT ou ZCM).")
         return
 
-    # luz e temperatura são opcionais — nem todo dispositivo Condor as registra,
-    # e quando a coluna existe mas vem vazia, max()/min() retornam NaN, o que
-    # quebraria a faixa do eixo y do gráfico — por isso a checagem de "tem
-    # dados utilizáveis" precisa rodar antes de montar as opções de exibição
-    def _coluna_numerica_utilizavel(nome_coluna: str) -> pd.Series | None:
-        if nome_coluna not in df.columns:
-            return None
-        valores = pd.to_numeric(df[nome_coluna], errors="coerce")
-        return valores if valores.notna().any() else None
-
-    luz_bruta = _coluna_numerica_utilizavel("LIGHT")
-    temp_bruta = _coluna_numerica_utilizavel("TEMPERATURE")
-    tem_luz = luz_bruta is not None
+    luz_bruta  = _coluna_numerica_utilizavel(df, "LIGHT")
+    temp_bruta = _coluna_numerica_utilizavel(df, "TEMPERATURE")
+    tem_luz         = luz_bruta  is not None
     tem_temperatura = temp_bruta is not None
 
-    faixa_total_luz = (0.0, float(luz_bruta.max())) if luz_bruta is not None else None
-    faixa_total_temp = (float(temp_bruta.min()), float(temp_bruta.max())) if temp_bruta is not None else None
+    faixa_total_luz  = (0.0, float(luz_bruta.max()))                                if luz_bruta  is not None else None
+    faixa_total_temp = (float(temp_bruta.min()), float(temp_bruta.max()))            if temp_bruta is not None else None
 
+    # ── Opções de exibição ────────────────────────────────────────────────────
     with st.expander("Opções de exibição"):
         modo_atividade = st.radio(
             "Modo de atividade", modos_disponiveis, horizontal=True,
             help="Medida de atividade motora usada no gráfico e no cálculo do ritmo de repouso-atividade.",
         )
-        # a faixa total depende do modo escolhido acima, então só pode ser
-        # calculada aqui dentro — ao contrário de luz/temperatura, que não mudam
         faixa_total_atividade = (0.0, float(df[modo_atividade].max()))
 
         mascarar_inatividade = st.checkbox(
@@ -448,12 +465,14 @@ def analises2_page():
         st.divider()
         st.caption("Sinais exibidos no gráfico")
         col_a, col_l, col_t = st.columns(3, gap="medium")
+
         mostrar_atividade = col_a.checkbox(f"Atividade ({modo_atividade})", value=True)
         escala_atividade = faixa_total_atividade
         if mostrar_atividade and faixa_total_atividade[0] < faixa_total_atividade[1]:
             escala_atividade = col_a.slider(
                 f"Faixa exibida ({modo_atividade})",
-                min_value=faixa_total_atividade[0], max_value=faixa_total_atividade[1], value=faixa_total_atividade,
+                min_value=faixa_total_atividade[0], max_value=faixa_total_atividade[1],
+                value=faixa_total_atividade,
                 help="Recorta o eixo da atividade para a faixa de valores selecionada, sem alterar os dados originais.",
             )
 
@@ -461,12 +480,11 @@ def analises2_page():
             "Luz", value=tem_luz, disabled=not tem_luz,
             help=None if tem_luz else "Este arquivo não possui registros de luz utilizáveis (coluna LIGHT).",
         )
-        # cada faixa de valores fica logo abaixo do checkbox do seu sinal —
-        # agrupamento por proximidade — e só aparece quando há variação a recortar
         escala_luz = faixa_total_luz
         if mostrar_luz and faixa_total_luz is not None and faixa_total_luz[0] < faixa_total_luz[1]:
             escala_luz = col_l.slider(
-                "Faixa exibida (Lux)", min_value=faixa_total_luz[0], max_value=faixa_total_luz[1], value=faixa_total_luz,
+                "Faixa exibida (Lux)",
+                min_value=faixa_total_luz[0], max_value=faixa_total_luz[1], value=faixa_total_luz,
                 help="Recorta o eixo da luz para a faixa de valores selecionada, sem alterar os dados originais.",
             )
 
@@ -477,10 +495,10 @@ def analises2_page():
         escala_temperatura = faixa_total_temp
         if mostrar_temperatura and faixa_total_temp is not None and faixa_total_temp[0] < faixa_total_temp[1]:
             escala_temperatura = col_t.slider(
-                "Faixa exibida (°C)", min_value=faixa_total_temp[0], max_value=faixa_total_temp[1], value=faixa_total_temp,
+                "Faixa exibida (°C)",
+                min_value=faixa_total_temp[0], max_value=faixa_total_temp[1], value=faixa_total_temp,
                 help="Recorta o eixo da temperatura para a faixa de valores selecionada, sem alterar os dados originais.",
             )
-
 
         st.divider()
         mostrar_eventos = st.checkbox(
@@ -489,16 +507,22 @@ def analises2_page():
             help=None if tem_evento else "Este arquivo não possui registros de marcação de evento (coluna EVENT).",
         )
 
-    raw = _construir_raw(nome_escolhido, df, modo_atividade)
-    if mascarar_inatividade and duracao_mascara_h is not None:
-        raw.create_inactivity_mask(f"{duracao_mascara_h}h")
-        raw.mask_inactivity = True
-    dias = ArquivoController.dias_disponiveis(df)
+    # mask_h consolidado uma única vez; alimenta tanto o raw dos gráficos
+    # quanto as funções cacheadas de cálculo de métricas
+    mask_h = int(duracao_mascara_h) if mascarar_inatividade and duracao_mascara_h is not None else None
 
-    # numeração original ("Dia N") preservada mesmo com filtro aplicado —
-    # senão "Dia 1" mudaria de data conforme a seleção de dias da semana
+    # raw usado apenas para raw.data.loc[dia] nos gráficos;
+    # @st.cache_data entrega uma cópia deserializada → mutação da máscara é segura
+    raw = _construir_raw_cached(nome_escolhido, df, modo_atividade)
+    if mask_h is not None:
+        raw.create_inactivity_mask(f"{mask_h}h")
+        raw.mask_inactivity = True
+
+    dias = ArquivoController.dias_disponiveis(df)
+    # numeração "Dia N" preservada antes da filtragem de exibição
     numero_por_dia = {dia: numero for numero, dia in enumerate(dias, start=1)}
 
+    # ── Filtros de exibição ───────────────────────────────────────────────────
     with st.expander("Filtrar dias exibidos"):
         st.caption("Filtros apenas de exibição — recortam os gráficos abaixo sem alterar os dados nem as métricas do registro completo.")
 
@@ -506,8 +530,6 @@ def analises2_page():
 
         with col_semana:
             st.caption("Dia da semana")
-            # pills em vez de multiselect: com só 7 opções fixas, selecionar
-            # clicando é mais rápido do que abrir um dropdown e marcar uma a uma
             dias_semana_escolhidos = st.pills(
                 "Dia da semana", _DIAS_SEMANA, selection_mode="multi", default=_DIAS_SEMANA,
                 label_visibility="collapsed",
@@ -534,23 +556,29 @@ def analises2_page():
         if _DIAS_SEMANA[pd.Timestamp(dia).weekday()] in dias_semana_escolhidos
     ]
 
+    # DatetimeIndex pré-computado uma única vez e reutilizado nas três séries
+    dt_index = pd.DatetimeIndex(df["DATE/TIME"])
+
     serie_evento = None
     if mostrar_eventos and tem_evento:
-        eventos = pd.to_numeric(df["EVENT"], errors="coerce")
-        serie_evento = pd.Series(eventos.to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="evento")
+        serie_evento = pd.Series(
+            pd.to_numeric(df["EVENT"], errors="coerce").to_numpy(),
+            index=dt_index, name="evento",
+        )
 
     serie_luz = None
     if mostrar_luz and luz_bruta is not None:
-        serie_luz = pd.Series(luz_bruta.to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="luz")
+        serie_luz = pd.Series(luz_bruta.to_numpy(), index=dt_index, name="luz")
 
     serie_temp = None
     if mostrar_temperatura and temp_bruta is not None:
-        serie_temp = pd.Series(temp_bruta.to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="temperatura")
+        serie_temp = pd.Series(temp_bruta.to_numpy(), index=dt_index, name="temperatura")
 
     if not (mostrar_atividade or serie_luz is not None or serie_temp is not None):
         st.info("Selecione ao menos um sinal em **Opções de exibição** para gerar o gráfico.")
         return
 
+    # ── Configurações de métricas não paramétricas ────────────────────────────
     with st.expander("Configurações das medidas não paramétricas"):
         st.caption("Ajustam o cálculo de IS, IV, L5 e M10 abaixo — não alteram os dados nem os gráficos.")
         col_freq, col_limiar = st.columns(2, gap="medium")
@@ -573,33 +601,26 @@ def analises2_page():
             "Calcular por período",
             help="Usa ISp, IVp, L5p e M10p — calcula as medidas separadamente para cada janela de tempo do registro.",
         )
+        periodo_metricas = "7D"
         if usar_periodo:
-            _PERIODOS_FIXOS = [
-                (1, "1 dia",    "1D"),
-                (3, "3 dias",   "3D"),
-                (7, "7 dias",   "7D"),
-                (14, "14 dias", "14D"),
-                (30, "30 dias", "30D"),
-            ]
-            dias_registro = len(dias)
-            opcoes = [(label, val) for d, label, val in _PERIODOS_FIXOS if d <= dias_registro // 2]
-            if not opcoes:
-                opcoes = [("1 dia", "1D")]
-            labels   = [l for l, _ in opcoes]
-            vals_map = {l: v for l, v in opcoes}
-            escolha  = st.selectbox(
-                "Período de análise",
-                labels,
+            dias_registro  = len(dias)
+            opcoes_periodo = [(label, val) for d, label, val in _PERIODOS_FIXOS if d <= dias_registro // 2]
+            if not opcoes_periodo:
+                opcoes_periodo = [("1 dia", "1D")]
+            labels_periodo   = [l for l, _ in opcoes_periodo]
+            vals_map_periodo = {l: v for l, v in opcoes_periodo}
+            escolha_periodo  = st.selectbox(
+                "Período de análise", labels_periodo,
                 help=f"Registro com {dias_registro} dia(s). Apenas períodos que permitem ao menos 2 janelas são exibidos.",
             )
-            periodo_metricas = vals_map[escolha] if escolha else "1D"
-        else:
-            periodo_metricas = "7D"
+            periodo_metricas = vals_map_periodo[escolha_periodo] if escolha_periodo else "1D"
 
     _metricas_ritmo(
-        raw, titulo="Ritmo de repouso-atividade — registro completo",
+        df=df, nome=nome_escolhido, coluna=modo_atividade,
+        titulo="Ritmo de repouso-atividade — registro completo",
         freq=frequencia_metricas, limiar=int(limiar_atividade),
         usar_periodo=usar_periodo, periodo=periodo_metricas,
+        mask_h=mask_h,
     )
     st.divider()
 
@@ -607,13 +628,13 @@ def analises2_page():
         st.info("Nenhum dia do registro corresponde aos filtros selecionados em **Filtrar dias exibidos**.")
         return
 
-    # um gráfico combinado por dia — cada um com seus próprios eixos —
-    # em vez de um único grid, que ficaria ilegível com 3 sinais sobrepostos
     for dia in dias_exibidos:
         st.plotly_chart(
             _grafico_combinado_dia(
-                dia, numero_por_dia[dia], raw.data.loc[dia], escala_atividade, modo_atividade, cor_atividade=COR_LINHA,
-                mostrar_atividade=mostrar_atividade, serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
+                dia, numero_por_dia[dia], raw.data.loc[dia],
+                escala_atividade, modo_atividade, cor_atividade=COR_LINHA,
+                mostrar_atividade=mostrar_atividade,
+                serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
                 escala_luz=escala_luz, escala_temperatura=escala_temperatura,
                 hora_inicio=hora_inicio, hora_fim=hora_fim,
             ),
