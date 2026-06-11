@@ -17,7 +17,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` é chamado na inicialização e cria as cinco tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
+The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` é chamado na inicialização e cria as seis tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
 
 ## Dependencies
 
@@ -29,9 +29,9 @@ Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
 | `psycopg2-binary` | 2.9.12 | Driver PostgreSQL; `RealDictCursor` para SELECT como dict |
 | `bcrypt` | 5.0.0 | Hash de senhas em `UserModel.criar_usuario` e verificação no login |
 | `streamlit-keyup` | 0.3.0 | `st_keyup` — dispara rerun a cada tecla (busca em tempo real em `conjunto_de_dados.py`) |
-| `pyActigraphy` | 1.2.2 | Parsing/análise de actigrafia: `BaseRaw`, métricas IS/IV/L5/M10, máscara de inatividade — usado em `view/pages/analises2.py` |
-| `pandas` | 2.1.4 | DataFrames/séries temporais — usado por `model/condor_parser.py` e nas páginas de análise |
-| `plotly` | 6.7.0 | Gráficos interativos (`graph_objects`/`express`) nas páginas `analises.py`/`analises2.py` |
+| `pyActigraphy` | 1.2.2 | Parsing/análise de actigrafia: `BaseRaw`, métricas IS/IV/L5/M10, máscara de inatividade — usado em `view/pages/analises.py` |
+| `pandas` | 2.1.4 | DataFrames/séries temporais — usado por `model/condor_parser.py` e na página de análise |
+| `plotly` | 6.7.0 | Gráficos interativos (`graph_objects`/`express`) em `view/pages/analises.py` |
 
 ## File Structure
 
@@ -44,13 +44,15 @@ Activity/
 │   └── secrets.toml                # Google OAuth credentials — NÃO COMMITAR
 │
 ├── model/                          # Camada de dados — acesso a BD + lógica de domínio
-│   ├── database.py                 # get_connection(), db_cursor(), init_db() — cria as 5 tabelas
+│   ├── database.py                 # get_connection(), db_cursor(), init_db() — cria as 6 tabelas
 │   ├── user_model.py               # CRUD de usuários + foto + senha
 │   ├── arquivo_model.py            # CRUD de arquivos .txt (salvar, listar, buscar, deletar)
 │   ├── sessao_model.py             # CRUD de sessões persistentes (criar, buscar, deletar)
 │   ├── paciente_model.py           # CRUD de pacientes + vínculo com arquivos
+│   ├── relatorio_model.py          # CRUD de relatórios exportados (.zip) por usuário
 │   └── condor_parser.py            # Parser de arquivos Condor (actigrafia): carregar_condor,
-│                                   #   dias_disponiveis, filtrar_dia — sem acesso a BD
+│                                   #   dias_disponiveis, filtrar_dia, gerar_txt, gerar_csv —
+│                                   #   sem acesso a BD
 │
 ├── controller/                     # Camada de negócio — validação + orquestração
 │   ├── user_controller.py          # cadastrar, login, atualizar_perfil, atualizar_foto,
@@ -59,9 +61,11 @@ Activity/
 │   │                               #   iniciar_sessao, encerrar_sessao, restaurar_sessao
 │   ├── arquivo_controller.py       # fazer_upload, listar, baixar, atualizar_metadados,
 │   │                               #   substituir_arquivo, deletar, gerar_zip,
-│   │                               #   carregar_actigrafia, dias_disponiveis, filtrar_dia
-│   └── paciente_controller.py      # cadastrar, listar, buscar, atualizar, deletar,
-│                                   #   listar_arquivos, arquivos_disponiveis, sincronizar_arquivos
+│   │                               #   carregar_actigrafia, dias_disponiveis, filtrar_dia,
+│   │                               #   exportar_dados
+│   ├── paciente_controller.py      # cadastrar, listar, buscar, atualizar, deletar,
+│   │                               #   listar_arquivos, arquivos_disponiveis, sincronizar_arquivos
+│   └── relatorio_controller.py     # salvar, listar, baixar, deletar relatórios exportados
 │
 └── view/                           # Camada de apresentação — UI Streamlit
     ├── ui.py                       # Utilitários compartilhados (ver seção "view/ui.py")
@@ -70,10 +74,9 @@ Activity/
     ├── home.py                     # home_page(): navbar, sidebar, roteamento lazy
     └── pages/                      # Uma página por arquivo; importadas lazily por home.py
         ├── analises.py             # analises_page()          [em desenvolvimento]
-        ├── analises2.py            # analises2_page()         [em desenvolvimento]
         ├── conjunto_de_dados.py    # conjunto_de_dados_page() [implementado]
         ├── registro_de_pacientes.py# registro_de_pacientes_page() [implementado]
-        ├── exportar_relatorio.py   # exportar_relatorio_page() [em desenvolvimento]
+        ├── exportar_relatorio.py   # exportar_relatorio_page() [implementado]
         └── configuracoes.py        # configuracoes_page()     [implementado]
 ```
 
@@ -94,7 +97,7 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 4. Tenta restaurar sessão via `UserController.restaurar_sessao(token)` se não autenticado
 5. Roteia: públicas (`login`, `cadastro`) ou protegidas (`home`)
 
-**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. `db_cursor(write, dict_row)` é um context manager que abre cursor, commita/faz rollback automaticamente e fecha a conexão — usado por todos os models. `init_db()` cria as cinco tabelas (`usuarios`, `arquivos`, `sessoes`, `pacientes`, `paciente_arquivos`) via `CREATE TABLE IF NOT EXISTS`.
+**`model/database.py`** — única fonte de verdade de conexão. `get_connection()` retorna uma conexão psycopg2 bruta. `db_cursor(write, dict_row)` é um context manager que abre cursor, commita/faz rollback automaticamente e fecha a conexão — usado por todos os models. `init_db()` cria as seis tabelas (`usuarios`, `arquivos`, `sessoes`, `pacientes`, `paciente_arquivos`, `relatorios`) via `CREATE TABLE IF NOT EXISTS`.
 
 **`model/user_model.py`** — operações de BD puras, sem validação. Usa `db_cursor(dict_row=True)` para SELECT. O helper `_row()` converte `RealDictRow` em `dict` e transforma colunas `BYTEA` (foto_perfil) de `memoryview` para `bytes`.
 
@@ -104,7 +107,9 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`model/paciente_model.py`** — operações de BD para as tabelas `pacientes` e `paciente_arquivos`. Todos os métodos de paciente filtram por `usuario_id`. Vínculo com arquivos via `vincular_arquivo` / `desvincular_arquivo` (ON CONFLICT DO NOTHING). `listar_arquivos_ocupados(usuario_id, paciente_id_atual)` retorna arquivos vinculados a outros pacientes do mesmo usuário.
 
-**`model/condor_parser.py`** — lógica de domínio para arquivos Condor (actigrafia). Não acessa BD. Funções: `carregar_condor(path_ou_bytes)` → `(metadata, DataFrame)`; `dias_disponiveis(df)` → `list[str]`; `filtrar_dia(df, data_str)` → `DataFrame`. Consumido exclusivamente por `ArquivoController`.
+**`model/condor_parser.py`** — lógica de domínio para arquivos Condor (actigrafia). Não acessa BD. Funções: `carregar_condor(path_ou_bytes)` → `(metadata, DataFrame)`; `dias_disponiveis(df)` → `list[str]`; `filtrar_dia(df, data_str)` → `DataFrame`; `gerar_txt(raw_original, df)` → `bytes` (reconstrói o .txt Condor preservando cabeçalho/campos, com os dados de `df`); `gerar_csv(df)` → `bytes` (CSV simples com os campos e valores). Consumido exclusivamente por `ArquivoController`.
+
+**`model/relatorio_model.py`** — operações de BD para a tabela `relatorios`. Todos os métodos filtram por `usuario_id`. `salvar(usuario_id, nome, arquivo_origem, tamanho_bytes, conteudo)` → `int` (id); `listar`/`buscar`/`deletar` seguem o mesmo padrão de `arquivo_model.py`.
 
 **`controller/user_controller.py`** — toda lógica de negócio de usuário e sessão:
 
@@ -137,6 +142,7 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 | `carregar_actigrafia(arquivo_id, usuario_id)` | Baixa e processa Condor; retorna `(metadata, DataFrame)` |
 | `dias_disponiveis(df)` | Lista datas únicas do DataFrame Condor |
 | `filtrar_dia(df, data_str)` | Filtra DataFrame para um único dia |
+| `exportar_dados(arquivo_id, usuario_id, df)` | Gera ZIP com `.txt` (formato Condor original) + `.csv` a partir de `df`; retorna `(bytes, nome)` |
 
 **`controller/paciente_controller.py`** — validação e orquestração de pacientes e vínculos:
 
@@ -151,6 +157,15 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 | `arquivos_disponiveis(usuario_id, paciente_id)` | Retorna `(disponíveis, ocupados_por_outros)` |
 | `sincronizar_arquivos(paciente_id, novos_ids)` | Diff-based: vincula/desvincula para atingir `novos_ids` |
 
+**`controller/relatorio_controller.py`** — orquestração de relatórios exportados (tabela `relatorios`):
+
+| Método | Descrição |
+|--------|-----------|
+| `salvar(usuario_id, nome, arquivo_origem, conteudo)` | Salva o ZIP exportado; retorna `int` (id) |
+| `listar(usuario_id)` | Lista metadados dos relatórios do usuário |
+| `baixar(relatorio_id, usuario_id)` | Retorna `(bytes, nome)` do ZIP |
+| `deletar(relatorio_id, usuario_id)` | Remove relatório; retorna `(bool, str)` |
+
 **`view/ui.py`** — módulo de utilitários compartilhados (ver seção dedicada abaixo).
 
 **`view/login.py`** — layout dois colunas. Sucesso no login: chama `UserController.iniciar_sessao()`, armazena o token em `_set_cookie` e `_session_token` no session_state, seta `logado`/`usuario`/`pagina` e chama `st.rerun()`. O cookie é gravado no browser no render seguinte por `app.py`.
@@ -163,17 +178,18 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip automático via JS), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`. Download em massa delega para `ArquivoController.gerar_zip()` e dispara o browser via JS (`window.parent.document.createElement('a')`) injetado com `st.iframe()`.
 
-**`view/pages/analises.py`** — visualização de actigrafia. Seleciona arquivo (do banco via `ArquivoController.listar`) e dia; carrega e processa via `ArquivoController.carregar_actigrafia` (cacheado em `_carregar_actigrafia` no nível de módulo com `@st.cache_data(ttl=120)`). Exibe métricas (PIM, temperatura) e gráficos (PIM, temperatura, luz, melanopic EDI).
-
-**`view/pages/analises2.py`** — segunda versão (mais completa) da análise de actigrafia, construída em torno do objeto `BaseRaw` do pyActigraphy (`_construir_raw`, módulo `pyActigraphy.io`). Estrutura:
+**`view/pages/analises.py`** — visualização de actigrafia, construída em torno do objeto `BaseRaw` do pyActigraphy (`_construir_raw`, módulo `pyActigraphy.io`). Estrutura:
 - Carrega o arquivo escolhido (cacheado via `_carregar_actigrafia`/`@st.cache_data(ttl=120)`) e exibe nome, sexo e data de nascimento do sujeito a partir de `metadata` (`SUBJECT_NAME`, `SUBJECT_GENDER`, `SUBJECT_DATE_OF_BIRTH`, normalizados por `_rotulo_genero`).
 - **Descartar início do registro**: checkbox + `st.pills` (0h–12h, passo 2h) que recorta `df` a partir de `primeiro_registro + duração`, antes de qualquer outro cálculo — afeta métricas, faixas e dias disponíveis, não só a exibição.
 - **Opções de exibição** (`st.expander`): escolha do modo de atividade (PIM/TAT/ZCM via `st.radio`, com `MODOS_ATIVIDADE` filtrado pelas colunas existentes); **mascaramento de inatividade** via `raw.create_inactivity_mask(f"{duração}h")` + `raw.mask_inactivity = True` (checkbox + `st.pills` 0h–12h, passo 2h) — propaga automaticamente para `raw.data`, afetando gráficos e métricas sem alterar `df`; checkboxes e sliders de faixa de valores (escala) para atividade, luz e temperatura.
 - **Parâmetros das métricas não paramétricas** (`st.expander`): `selectbox` de frequência de reamostragem (`10min`–`2H`, padrão `1H`) e `number_input` de limiar de binarização (padrão `4`), repassados a `raw.IS()`/`raw.IV()`/`raw.L5()`/`raw.M10()` via `_metricas_ritmo(raw, freq=..., limiar=...)`.
 - **Filtrar dias exibidos** (`st.expander`): filtros somente de exibição — dia da semana (`st.pills`, multi) e período do dia (`st.segmented_control`: Manhã/Tarde/Noite/Personalizado, este último com `st.slider` de intervalo de horas) — recortam os gráficos por dia (`_grafico_combinado_dia`) sem alterar dados nem métricas. A numeração "Dia N" é preservada via `numero_por_dia`, calculado antes da filtragem.
 - Gráficos combinados por dia (`_grafico_combinado_dia`, Plotly `go.Figure`): atividade + eixos extras de luz/temperatura sobrepostos, sombreamento do período noturno (`_sombrear_periodo_noturno`) e de marcações de evento (`_sombrear_eventos`/`_intervalos_marcados`).
+- **Exportar dados** (ao final da página): `_preparar_df_exportacao` copia `df` e zera/esvazia valores conforme a seleção atual — sinais não marcados em "Opções de exibição" e linhas fora de "Filtrar dias exibidos" saem zerados; valores fora das faixas exibidas saem zerados; períodos mascarados como inatividade saem vazios (NaN). O resultado vai para `ArquivoController.exportar_dados`, que monta um ZIP (`.txt` Condor + `.csv`) via `_gerar_export_zip`/`@st.cache_data(ttl=120)`. O `st.download_button` usa `on_click=_salvar_relatorio`, que chama `RelatorioController.salvar(usuario_id, zip_nome, nome_origem, zip_bytes)` — toda exportação baixada também fica disponível em **Exportar relatório**.
 
 **`view/pages/registro_de_pacientes.py`** — CRUD completo de pacientes com paginação (8/página) e busca por nome/e-mail. Cadastro e edição via `@st.dialog("Paciente", width="large")` com duas abas: **Dados** (campos do paciente) e **Arquivos vinculados** (multiselect dos arquivos disponíveis do usuário). Exclusão com confirmação inline. Regra de negócio: um arquivo só pode ser vinculado a um paciente — arquivos já ocupados ficam invisíveis no multiselect.
+
+**`view/pages/exportar_relatorio.py`** — lista os relatórios (.zip) salvos por `_salvar_relatorio` em `analises.py`. Listagem paginada (8/página, `paginacao` de `view/ui.py`) com nome, arquivo de origem e tamanho; cada linha tem `download_button` (conteúdo cacheado via `@st.cache_data(ttl=120)`) e botão **Excluir** com confirmação via `@st.dialog`.
 
 ## view/ui.py — Utilitários compartilhados
 
@@ -249,7 +265,7 @@ O Google OAuth não usa este mecanismo — a persistência é gerenciada pelo pr
 
 **Nível 1 — `app.py`**: `st.session_state["pagina"]` → `"login"` | `"cadastro"` | `"home"`.
 
-**Nível 2 — `home.py`**: `st.session_state["pagina_atual"]` → `"Análises"` | `"Análise 2"` | `"Conjunto de dados"` | `"Registro de pacientes"` | `"Exportar relatório"` | `"Configurações"`.
+**Nível 2 — `home.py`**: `st.session_state["pagina_atual"]` → `"Análises"` | `"Conjunto de dados"` | `"Registro de pacientes"` | `"Exportar relatório"` | `"Configurações"`.
 
 Para adicionar uma nova página autenticada:
 1. Criar `view/pages/minha_pagina.py` com `minha_pagina_page()`.
@@ -329,4 +345,16 @@ Conexão hardcoded em `model/database.py` (`localhost:5432`, database `Activity`
 | —           | —       | PRIMARY KEY (paciente_id, arquivo_id)          |
 | —           | —       | UNIQUE (arquivo_id) — 1 arquivo → 1 paciente  |
 
-As cinco tabelas são criadas com esquema completo em `init_db()` via `CREATE TABLE IF NOT EXISTS`.
+### Tabela `relatorios`
+
+| Coluna         | Tipo         | Constraint                                  |
+|----------------|--------------|----------------------------------------------|
+| id             | SERIAL       | PRIMARY KEY                                 |
+| usuario_id     | INTEGER      | NOT NULL, FK → usuarios(id) ON DELETE CASCADE |
+| nome           | VARCHAR(255) | NOT NULL (nome do .zip exportado)           |
+| arquivo_origem | VARCHAR(255) | nullable (nome do arquivo .txt de origem)   |
+| tamanho_bytes  | INTEGER      | NOT NULL                                    |
+| conteudo       | BYTEA        | NOT NULL                                    |
+| criado_em      | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                   |
+
+As seis tabelas são criadas com esquema completo em `init_db()` via `CREATE TABLE IF NOT EXISTS`.

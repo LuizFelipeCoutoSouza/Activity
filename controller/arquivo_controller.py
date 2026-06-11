@@ -8,6 +8,8 @@ from model.condor_parser import (
     carregar_condor      as _carregar_condor,
     dias_disponiveis     as _dias_disponiveis,
     filtrar_dia          as _filtrar_dia,
+    gerar_txt            as _gerar_txt,
+    gerar_csv            as _gerar_csv,
 )
 
 
@@ -150,6 +152,23 @@ class ArquivoController:
     def filtrar_dia(df: pd.DataFrame, data_str: str) -> pd.DataFrame:
         """Filtra o DataFrame para um único dia."""
         return _filtrar_dia(df, data_str)
+
+    @staticmethod
+    def exportar_dados(arquivo_id: int, usuario_id: int, df: pd.DataFrame) -> tuple:
+        """Compacta os dados (após edições) em um ZIP com .txt (formato Condor original) e .csv.
+
+        Retorna (zip_bytes, nome_arquivo) ou (None, None) se o arquivo original não for encontrado.
+        """
+        raw, nome = ArquivoController.baixar(arquivo_id, usuario_id)
+        if not raw:
+            return None, None
+
+        nome_base = nome.rsplit(".", 1)[0]
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"{nome_base}.txt", _gerar_txt(raw, df))
+            zf.writestr(f"{nome_base}.csv", _gerar_csv(df))
+        return buf.getvalue(), f"{nome_base}_exportado.zip"
 
     # ── ZIP ───────────────────────────────────────────────────────────────────
 

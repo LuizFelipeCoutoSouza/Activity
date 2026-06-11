@@ -70,3 +70,42 @@ def dias_disponiveis(df: pd.DataFrame) -> list[str]:
 
 def filtrar_dia(df: pd.DataFrame, data_str: str) -> pd.DataFrame:
     return df[df["DATE/TIME"].dt.date.astype(str) == data_str].copy()
+
+
+def gerar_txt(raw_original: bytes, df: pd.DataFrame) -> bytes:
+    """
+    Reconstrói o arquivo Condor (.txt), preservando todas as linhas de
+    cabeçalho (incluindo a linha de campos) e substituindo as linhas de
+    dados pelos valores de df.
+    """
+    linhas = raw_original.decode("utf-8", errors="replace").splitlines()
+
+    cabecalho = None
+    fim_cabecalho = len(linhas)
+    for i, linha in enumerate(linhas):
+        if linha.startswith("DATE/TIME"):
+            cabecalho = linha
+            continue
+        if _LINHA_DE_DADOS.match(linha):
+            fim_cabecalho = i
+            break
+
+    colunas = cabecalho.split(";") if cabecalho else df.columns.tolist()
+
+    linhas_dados = []
+    for _, registro in df.iterrows():
+        valores = []
+        for col in colunas:
+            valor = registro.get(col, "")
+            if col == "DATE/TIME":
+                valor = pd.Timestamp(valor).strftime("%d/%m/%Y %H:%M:%S")
+            valores.append("" if pd.isna(valor) else str(valor))
+        linhas_dados.append(";".join(valores))
+
+    conteudo = "\n".join(linhas[:fim_cabecalho] + linhas_dados) + "\n"
+    return conteudo.encode("utf-8")
+
+
+def gerar_csv(df: pd.DataFrame) -> bytes:
+    """Gera um CSV contendo apenas os campos (colunas) e seus valores."""
+    return df.to_csv(index=False).encode("utf-8")
