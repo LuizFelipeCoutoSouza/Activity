@@ -121,6 +121,18 @@ def init_db():
         );
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relatorios (
+            id             SERIAL       PRIMARY KEY,
+            usuario_id     INTEGER      NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            nome           VARCHAR(255) NOT NULL,
+            arquivo_origem VARCHAR(255),
+            tamanho_bytes  INTEGER      NOT NULL,
+            conteudo       BYTEA        NOT NULL,
+            criado_em      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()

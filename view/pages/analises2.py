@@ -7,7 +7,8 @@ import plotly.graph_objs as go
 from pyActigraphy.io import BaseRaw
 import streamlit as st
 from controller.arquivo_controller import ArquivoController
-from view.ui import render_toast, get_usuario_id
+from controller.relatorio_controller import RelatorioController
+from view.ui import render_toast, set_toast, get_usuario_id
 
 
 COR_LINHA = "#234cbe"
@@ -388,6 +389,13 @@ def _metricas_ritmo(
                            help="Atividade média durante as 10 horas mais ativas do dia (média entre todos os dias do registro).")
 
 
+# ── Callback de exportação ─────────────────────────────────────────────────────
+
+def _salvar_relatorio(usuario_id: int, nome_origem: str, zip_nome: str, zip_bytes: bytes) -> None:
+    RelatorioController.salvar(usuario_id, zip_nome, nome_origem, zip_bytes)
+    set_toast("Relatório exportado e salvo em Exportar relatório.")
+
+
 # ── Página principal ──────────────────────────────────────────────────────────
 
 def analises2_page():
@@ -737,6 +745,10 @@ def analises2_page():
     )
     zip_bytes, zip_nome = _gerar_export_zip(arquivo_id, usuario_id, df_exportar)
     if zip_bytes:
-        st.download_button("Baixar dados (.zip)", data=zip_bytes, file_name=zip_nome, mime="application/zip")
+        st.download_button(
+            "Baixar dados (.zip)", data=zip_bytes, file_name=zip_nome, mime="application/zip",
+            on_click=_salvar_relatorio, args=(usuario_id, nome_escolhido, zip_nome, zip_bytes),
+        )
+        st.caption("Uma cópia também é salva em **Exportar relatório**.")
     else:
         st.warning("Não foi possível gerar a exportação.")
