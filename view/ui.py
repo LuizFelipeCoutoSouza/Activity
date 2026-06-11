@@ -135,7 +135,7 @@ def avatar_html(nome: str, foto: bytes | None, foto_tipo: str | None, tamanho: i
 
 def get_usuario_id() -> int | None:
     """
-    Retorna o id do usuário logado por e-mail, ou None para contas Google.
+    Retorna o id do usuário logado, ou None se não disponível.
     Exibe aviso automático quando não há id — use o retorno como guard:
 
         usuario_id = get_usuario_id()
@@ -144,7 +144,7 @@ def get_usuario_id() -> int | None:
     """
     uid = st.session_state.get("usuario", {}).get("id")
     if not uid:
-        st.info("Esta funcionalidade está disponível apenas para usuários cadastrados com e-mail.")
+        st.info("Esta funcionalidade está disponível apenas para usuários autenticados.")
     return uid
 
 

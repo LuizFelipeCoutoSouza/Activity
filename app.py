@@ -5,7 +5,7 @@ Responsabilidades:
   - Inicializar o banco de dados (init_db).
   - Processar operações pendentes de cookie (set / delete).
   - Restaurar sessão a partir de cookie persistido entre refreshes.
-  - Detectar autenticação por e-mail ou Google OAuth.
+  - Detectar autenticação por e-mail.
   - Normalizar os dados do usuário em st.session_state["usuario"].
   - Rotear para as áreas públicas (login, cadastro) ou protegidas (home).
 """
@@ -61,22 +61,12 @@ if st.session_state.pop("_delete_cookie", False):
 
 # ── Detecção de autenticação ──────────────────────────────────────────────────
 
-google_logado = st.user.is_logged_in
-email_logado  = st.session_state.get("logado", False)
-
-# Normaliza dados do usuário Google na sessão (executa uma vez após o callback OAuth)
-if google_logado and "usuario" not in st.session_state:
-    st.session_state["usuario"] = {
-        "nome":      st.user.name,
-        "email":     st.user.email,
-        "tipo_auth": "google",
-    }
+email_logado = st.session_state.get("logado", False)
 
 # ── Restauração de sessão por cookie ─────────────────────────────────────────
 # Lê o token do cookie HTTP (disponível desde o primeiro render via st.context).
-# Válido apenas para login por e-mail — Google usa o próprio mecanismo OAuth.
 
-if not email_logado and not google_logado:
+if not email_logado:
     _token = st.context.cookies.get(_COOKIE)
     if _token:
         from controller.user_controller import UserController
@@ -92,7 +82,7 @@ if "pagina" not in st.session_state:
     st.session_state["pagina"] = "login"
 
 pagina      = st.session_state["pagina"]
-autenticado = google_logado or email_logado
+autenticado = email_logado
 
 # ── Rotas públicas (sem login) ────────────────────────────────────────────────
 

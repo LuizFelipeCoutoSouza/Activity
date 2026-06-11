@@ -3,7 +3,7 @@ view/pages/configuracoes.py — Página de configurações de perfil do usuário
 
 Seções:
   - Perfil : foto, dados pessoais e profissionais
-  - Segurança: troca de senha (somente contas e-mail)
+  - Segurança: troca de senha
 """
 
 import streamlit as st
@@ -25,9 +25,8 @@ FOTO_TIPOS     = ["jpg", "jpeg", "png"]
 # ── Entrada principal ─────────────────────────────────────────────────────────
 
 def configuracoes_page():
-    usuario   = st.session_state.get("usuario", {})
-    email     = usuario.get("email")
-    tipo_auth = usuario.get("tipo_auth", "email")
+    usuario = st.session_state.get("usuario", {})
+    email   = usuario.get("email")
 
     dados = UserController.buscar_perfil_por_email(email)
     if not dados:
@@ -44,10 +43,10 @@ def configuracoes_page():
     with tab_perfil:
         _secao_foto(dados)
         st.divider()
-        _formulario_perfil(dados, tipo_auth)
+        _formulario_perfil(dados)
 
     with tab_seguranca:
-        _secao_senha(dados, tipo_auth)
+        _secao_senha(dados)
 
 
 # ── Cabeçalho ─────────────────────────────────────────────────────────────────
@@ -130,7 +129,7 @@ def _secao_foto(dados: dict):
 
 # ── Formulário de perfil ───────────────────────────────────────────────────────
 
-def _formulario_perfil(dados: dict, tipo_auth: str):
+def _formulario_perfil(dados: dict):
     st.subheader("Dados do perfil")
 
     with st.form("form_perfil"):
@@ -142,8 +141,6 @@ def _formulario_perfil(dados: dict, tipo_auth: str):
             email = st.text_input(
                 "E-mail *",
                 value=dados.get("email") or "",
-                disabled=tipo_auth == "google",
-                help="Conta Google: e-mail gerenciado pelo Google.",
             )
             cpf = st.text_input(
                 "CPF *",
@@ -183,15 +180,14 @@ def _formulario_perfil(dados: dict, tipo_auth: str):
         st.caption("* Campos obrigatórios")
 
         if st.form_submit_button("Salvar alterações", type="primary", width="stretch"):
-            email_salvo = dados["email"] if tipo_auth == "google" else email
             ok, msg = UserController.atualizar_perfil(
-                dados["id"], nome, email_salvo, cpf, profissao,
+                dados["id"], nome, email, cpf, profissao,
                 telefone, data_nascimento if data_nascimento else None, bio,
             )
             if ok:
                 if "usuario" in st.session_state:
                     st.session_state["usuario"].update(
-                        {"nome": nome, "email": email_salvo, "profissao": profissao}
+                        {"nome": nome, "email": email, "profissao": profissao}
                     )
                 set_toast(msg)
                 st.rerun()
@@ -201,15 +197,8 @@ def _formulario_perfil(dados: dict, tipo_auth: str):
 
 # ── Segurança / senha ──────────────────────────────────────────────────────────
 
-def _secao_senha(dados: dict, tipo_auth: str):
+def _secao_senha(dados: dict):
     st.subheader("Alterar senha")
-
-    if tipo_auth == "google":
-        st.info(
-            "Sua conta usa autenticação Google. "
-            "A senha é gerenciada pelo Google e não pode ser alterada aqui."
-        )
-        return
 
     with st.form("form_senha"):
         senha_atual = st.text_input("Senha atual",         type="password", placeholder="Digite sua senha atual")

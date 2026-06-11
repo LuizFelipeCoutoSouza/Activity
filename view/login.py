@@ -86,12 +86,11 @@ def login_page():
                 dias  = 30 if manter_conectado else 0
                 token = UserController.iniciar_sessao(usuario["id"], dias)
 
-                st.session_state["usuario"]              = usuario
-                st.session_state["usuario"]["tipo_auth"] = "email"
-                st.session_state["logado"]               = True
-                st.session_state["pagina"]               = "home"
-                st.session_state["_session_token"]       = token
-                st.session_state["_set_cookie"]          = {"token": token, "dias": dias}
+                st.session_state["usuario"]        = usuario
+                st.session_state["logado"]         = True
+                st.session_state["pagina"]         = "home"
+                st.session_state["_session_token"] = token
+                st.session_state["_set_cookie"]    = {"token": token, "dias": dias}
                 st.rerun()
             else:
                 st.error(mensagem)

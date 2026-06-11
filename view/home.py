@@ -17,11 +17,10 @@ PAGINAS = [
 
 
 def home_page():
-    usuario   = st.session_state.get("usuario", {})
-    tipo_auth = usuario.get("tipo_auth", "email")
+    usuario = st.session_state.get("usuario", {})
 
     _navbar(usuario)
-    _sidebar(tipo_auth)
+    _sidebar()
     _conteudo()
 
 
@@ -42,7 +41,7 @@ def _navbar(usuario: dict):
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
-def _sidebar(tipo_auth: str):
+def _sidebar():
     pagina_atual = st.session_state.get("pagina_atual", "Análises")
 
     with st.sidebar:
@@ -122,7 +121,7 @@ def _sidebar(tipo_auth: str):
             st.rerun()
 
         if st.button("🚪  Sair", width="stretch", key="nav_logout"):
-            _logout(tipo_auth)
+            _logout()
 
 
 # ── Roteamento de conteúdo ────────────────────────────────────────────────────
@@ -149,18 +148,14 @@ def _conteudo():
 
 # ── Logout ────────────────────────────────────────────────────────────────────
 
-def _logout(tipo_auth: str):
-    if tipo_auth == "email":
-        token = st.session_state.pop("_session_token", None)
-        if token:
-            UserController.encerrar_sessao(token)
-        st.session_state["_delete_cookie"] = True
+def _logout():
+    token = st.session_state.pop("_session_token", None)
+    if token:
+        UserController.encerrar_sessao(token)
+    st.session_state["_delete_cookie"] = True
 
     for chave in ("logado", "usuario", "pagina_atual"):
         st.session_state.pop(chave, None)
     st.session_state["pagina"] = "login"
 
-    if tipo_auth == "google":
-        st.logout()
-    else:
-        st.rerun()
+    st.rerun()

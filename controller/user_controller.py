@@ -130,12 +130,9 @@ class UserController:
     def restaurar_sessao(token: str) -> dict | None:
         """
         Valida o token e recarrega o perfil do usuário.
-        Retorna o dict do usuário com tipo_auth='email', ou None se inválido/expirado.
+        Retorna o dict do usuário, ou None se inválido/expirado.
         """
         uid = SessaoModel.buscar_usuario_id(token)
         if not uid:
             return None
-        dados = UserModel.buscar_por_id(uid)
-        if dados:
-            dados["tipo_auth"] = "email"
-        return dados
+        return UserModel.buscar_por_id(uid)

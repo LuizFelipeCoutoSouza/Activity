@@ -40,8 +40,7 @@ Activity/
 ├── app.py                          # Entry point: cookie ops, session restore, auth guard, routing
 ├── requirements.txt                # Dependências diretas com versões pinadas
 ├── .streamlit/
-│   ├── config.toml                 # Streamlit theme (light)
-│   └── secrets.toml                # Google OAuth credentials — NÃO COMMITAR
+│   └── config.toml                 # Streamlit theme (light)
 │
 ├── model/                          # Camada de dados — acesso a BD + lógica de domínio
 │   ├── database.py                 # get_connection(), db_cursor(), init_db() — cria as 6 tabelas
@@ -93,7 +92,7 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 **`app.py`** — única fonte de verdade de autenticação. Ordem de execução em cada render:
 1. `init_db()` (idempotente)
 2. Processa operações pendentes de cookie (`_set_cookie` / `_delete_cookie` em session_state) via `st.iframe()`
-3. Detecta `google_logado` e `email_logado`
+3. Detecta `email_logado`
 4. Tenta restaurar sessão via `UserController.restaurar_sessao(token)` se não autenticado
 5. Roteia: públicas (`login`, `cadastro`) ou protegidas (`home`)
 
@@ -123,7 +122,7 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 | `listar()` | Lista todos os usuários |
 | `deletar(user_id)` | Remove usuário |
 | `buscar_perfil(usuario_id)` | Retorna perfil completo pelo id |
-| `buscar_perfil_por_email(email)` | Retorna perfil pelo e-mail (contas Google) |
+| `buscar_perfil_por_email(email)` | Retorna perfil pelo e-mail |
 | `iniciar_sessao(usuario_id, dias)` | Cria sessão persistente; retorna token UUID |
 | `encerrar_sessao(token)` | Invalida sessão no banco |
 | `restaurar_sessao(token)` | Valida token + recarrega perfil; retorna dict ou None |
@@ -172,9 +171,9 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`view/cadastro.py`** — formulário de cadastro. Usa `Profissao.opcoes()` e `forca_senha()` de `view/ui.py`.
 
-**`view/home.py`** — shell autenticado. Renderiza navbar (logo + avatar via `avatar_html()`), sidebar (botões de navegação + logout) e roteia para `view/pages/` via import lazy. Logout e-mail: chama `UserController.encerrar_sessao()`, agenda deleção do cookie (`_delete_cookie = True`) e chama `st.rerun()`. Logout Google: `st.logout()`.
+**`view/home.py`** — shell autenticado. Renderiza navbar (logo + avatar via `avatar_html()`), sidebar (botões de navegação + logout) e roteia para `view/pages/` via import lazy. Logout: chama `UserController.encerrar_sessao()`, agenda deleção do cookie (`_delete_cookie = True`) e chama `st.rerun()`.
 
-**`view/pages/configuracoes.py`** — duas abas: **Perfil** (foto + formulário de dados) e **Segurança** (troca de senha). Aba Segurança desabilitada para contas Google. Usa `UserController.buscar_perfil_por_email()` para carregar dados frescos do banco. Usa `render_toast()` e `set_toast()` de `view/ui.py`.
+**`view/pages/configuracoes.py`** — duas abas: **Perfil** (foto + formulário de dados) e **Segurança** (troca de senha). Usa `UserController.buscar_perfil_por_email()` para carregar dados frescos do banco. Usa `render_toast()` e `set_toast()` de `view/ui.py`.
 
 **`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip automático via JS), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`. Download em massa delega para `ArquivoController.gerar_zip()` e dispara o browser via JS (`window.parent.document.createElement('a')`) injetado com `st.iframe()`.
 
@@ -225,18 +224,11 @@ render_toast()
 
 ## Authentication
 
-Dois métodos coexistem; `app.py` combina antes de rotear:
+Login por e-mail; `app.py` detecta via `st.session_state["logado"] == True`.
 
-| Método | Detectar | `st.session_state["usuario"]` |
-|--------|----------|-------------------------------|
-| E-mail | `st.session_state["logado"] == True` | dict completo do banco (inclui `id`, `cpf`, `foto_perfil`, etc.) |
-| Google OAuth | `st.user.is_logged_in` | `{"nome", "email", "tipo_auth": "google"}` (sem `id` se usuário não estiver no banco) |
+`st.session_state["usuario"]` contém todos os campos do perfil retornados por `UserModel.buscar_por_id()`, incluindo `foto_perfil` (bytes ou None). Novas páginas devem ler apenas esse dict.
 
-`st.session_state["usuario"]` para usuários e-mail contém todos os campos do perfil retornados por `UserModel.buscar_por_id()`, incluindo `foto_perfil` (bytes ou None). Novas páginas devem ler apenas esse dict, nunca `st.user` diretamente.
-
-Credenciais OAuth em `.streamlit/secrets.toml` — **não commitar**.
-
-### Persistência de sessão entre refreshes (login por e-mail)
+### Persistência de sessão entre refreshes
 
 `st.session_state` é volátil — zerado em cada refresh de página. Para o login por e-mail, a sessão é persistida via cookie HTTP + tabela `sessoes` no banco:
 
@@ -258,8 +250,6 @@ Credenciais OAuth em `.streamlit/secrets.toml` — **não commitar**.
 | `_session_token` | `str` | Token UUID da sessão ativa; usado pelo logout para deletar do banco |
 | `_set_cookie` | `dict` | `{"token": str, "dias": int}` — agendado por login, consumido por `app.py` |
 | `_delete_cookie` | `bool` | `True` — agendado por logout, consumido por `app.py` |
-
-O Google OAuth não usa este mecanismo — a persistência é gerenciada pelo próprio Streamlit.
 
 ## Navigation
 
