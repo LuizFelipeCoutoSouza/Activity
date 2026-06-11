@@ -55,6 +55,11 @@ def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
     return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
 
 
+@st.cache_data(ttl=120, show_spinner=False)
+def _gerar_export_zip(arquivo_id: int, usuario_id: int, df: pd.DataFrame) -> tuple:
+    return ArquivoController.exportar_dados(arquivo_id, usuario_id, df)
+
+
 # ── Construção do objeto BaseRaw ──────────────────────────────────────────────
 
 def _construir_raw(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
@@ -185,6 +190,79 @@ def _coluna_numerica_utilizavel(df: pd.DataFrame, nome_coluna: str) -> pd.Series
         return None
     valores = pd.to_numeric(df[nome_coluna], errors="coerce")
     return valores if valores.notna().any() else None
+
+
+# ── Preparação dos dados para exportação ──────────────────────────────────────
+
+def _preparar_df_exportacao(
+    df: pd.DataFrame,
+    dt_index: pd.DatetimeIndex,
+    modos_disponiveis: list[str],
+    modo_atividade: str,
+    mostrar_atividade: bool,
+    escala_atividade: tuple[float, float],
+    raw: BaseRaw,
+    mask_h: int | None,
+    mostrar_luz: bool,
+    escala_luz: tuple[float, float] | None,
+    mostrar_temperatura: bool,
+    escala_temperatura: tuple[float, float] | None,
+    dias_exibidos: list[str],
+    hora_inicio: int,
+    hora_fim: int,
+) -> pd.DataFrame:
+    """
+    Copia df e zera os valores de atividade/luz/temperatura que não
+    correspondem aos sinais e filtros selecionados em "Opções de exibição"
+    e "Filtrar dias exibidos" — preserva todas as colunas e linhas.
+    """
+    df = df.copy()
+
+    def _zerar_fora_da_faixa(nome_coluna: str, faixa: tuple[float, float] | None) -> None:
+        if faixa is None:
+            return
+        valores = pd.to_numeric(df[nome_coluna], errors="coerce")
+        fora = (valores < faixa[0]) | (valores > faixa[1])
+        df.loc[fora.fillna(False).to_numpy(), nome_coluna] = 0
+
+    # atividade: mantém apenas o modo selecionado, se exibido
+    for coluna in modos_disponiveis:
+        if coluna not in df.columns:
+            continue
+        if coluna != modo_atividade or not mostrar_atividade:
+            df[coluna] = 0
+
+    if mostrar_atividade and modo_atividade in df.columns:
+        _zerar_fora_da_faixa(modo_atividade, escala_atividade)
+        if mask_h is not None:
+            # períodos mascarados (sensor removido) viram dado ausente —
+            # zerar não teria efeito, pois o mascaramento já incide sobre
+            # trechos de atividade igual a zero
+            df[modo_atividade] = df[modo_atividade].astype(float)
+            mascarado = raw.data.reindex(dt_index).isna().to_numpy()
+            df.loc[mascarado, modo_atividade] = float("nan")
+
+    if "LIGHT" in df.columns:
+        if not mostrar_luz:
+            df["LIGHT"] = 0
+        else:
+            _zerar_fora_da_faixa("LIGHT", escala_luz)
+
+    if "TEMPERATURE" in df.columns:
+        if not mostrar_temperatura:
+            df["TEMPERATURE"] = 0
+        else:
+            _zerar_fora_da_faixa("TEMPERATURE", escala_temperatura)
+
+    # filtro de dias/período exibidos: zera os sinais fora da seleção
+    dia_str = pd.Series(dt_index.date).astype(str)
+    hora = dt_index.hour + dt_index.minute / 60
+    fora_do_filtro = ~(dia_str.isin(dias_exibidos).to_numpy() & (hora >= hora_inicio) & (hora < hora_fim))
+    colunas_sinais = [c for c in (*modos_disponiveis, "LIGHT", "TEMPERATURE") if c in df.columns]
+    if colunas_sinais:
+        df.loc[fora_do_filtro, colunas_sinais] = 0
+
+    return df
 
 
 # ── Gráfico diário cacheado ───────────────────────────────────────────────────
@@ -626,17 +704,39 @@ def analises2_page():
 
     if not dias_exibidos:
         st.info("Nenhum dia do registro corresponde aos filtros selecionados em **Filtrar dias exibidos**.")
-        return
+    else:
+        for dia in dias_exibidos:
+            st.plotly_chart(
+                _grafico_combinado_dia(
+                    dia, numero_por_dia[dia], raw.data.loc[dia],
+                    escala_atividade, modo_atividade, cor_atividade=COR_LINHA,
+                    mostrar_atividade=mostrar_atividade,
+                    serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
+                    escala_luz=escala_luz, escala_temperatura=escala_temperatura,
+                    hora_inicio=hora_inicio, hora_fim=hora_fim,
+                ),
+                width="stretch",
+            )
 
-    for dia in dias_exibidos:
-        st.plotly_chart(
-            _grafico_combinado_dia(
-                dia, numero_por_dia[dia], raw.data.loc[dia],
-                escala_atividade, modo_atividade, cor_atividade=COR_LINHA,
-                mostrar_atividade=mostrar_atividade,
-                serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
-                escala_luz=escala_luz, escala_temperatura=escala_temperatura,
-                hora_inicio=hora_inicio, hora_fim=hora_fim,
-            ),
-            width="stretch",
-        )
+    # ── Exportação dos dados ───────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Exportar dados")
+    st.caption(
+        "Gera um .zip com os dados do registro após os recortes aplicados acima: "
+        "um .txt no formato original (mesmas linhas de cabeçalho e campos) e um "
+        ".csv apenas com os campos e seus valores. Sinais não selecionados em "
+        "**Opções de exibição**, valores fora das faixas exibidas e linhas fora "
+        "de **Filtrar dias exibidos** são exportados zerados; períodos mascarados "
+        "como inatividade são exportados vazios (dado ausente)."
+    )
+    df_exportar = _preparar_df_exportacao(
+        df, dt_index, modos_disponiveis, modo_atividade,
+        mostrar_atividade, escala_atividade, raw, mask_h,
+        mostrar_luz, escala_luz, mostrar_temperatura, escala_temperatura,
+        dias_exibidos, hora_inicio, hora_fim,
+    )
+    zip_bytes, zip_nome = _gerar_export_zip(arquivo_id, usuario_id, df_exportar)
+    if zip_bytes:
+        st.download_button("Baixar dados (.zip)", data=zip_bytes, file_name=zip_nome, mime="application/zip")
+    else:
+        st.warning("Não foi possível gerar a exportação.")
