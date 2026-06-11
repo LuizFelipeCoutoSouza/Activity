@@ -1,7 +1,7 @@
 """
 view/pages/exportar_relatorio.py — Relatórios exportados pelo usuário.
 
-Lista os arquivos .zip gerados em "Análise 2" e salvos no banco, permitindo
+Lista os arquivos .zip gerados em "Análises" e salvos no banco, permitindo
 baixar novamente ou excluir.
 """
 
@@ -61,7 +61,7 @@ def exportar_relatorio_page():
 
     if not relatorios:
         st.info(
-            "Nenhum relatório exportado ainda. Acesse **Análise 2** e use o botão "
+            "Nenhum relatório exportado ainda. Acesse **Análises** e use o botão "
             "\"Baixar dados (.zip)\" ao final da página para gerar um."
         )
         return
