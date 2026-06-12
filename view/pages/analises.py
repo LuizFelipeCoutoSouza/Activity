@@ -18,6 +18,34 @@ COR_LEGENDA = "black"
 COR_SOMBRA_NOITE = "rgba(25, 35, 90, 0.12)"
 COR_SOMBRA_EVENTO = "rgba(34, 139, 34, 0.18)"
 
+# Paleta de cores para comparação entre pacientes (até 5)
+_CORES_COMPARACAO = {
+    0: {
+        "atividade": "#234cbe",
+        "temperatura": "#5d7df0",
+        "luz": "#9bb5ff",
+    },
+    1: {
+        "atividade": "#e84545",
+        "temperatura": "#ff7a7a",
+        "luz": "#ffb3b3",
+    },
+    2: {
+        "atividade": "#2eb872",
+        "temperatura": "#60d89b",
+        "luz": "#9ff0c8",
+    },
+    3: {
+        "atividade": "#f5a623",
+        "temperatura": "#ffc55f",
+        "luz": "#ffe09d",
+    },
+    4: {
+        "atividade": "#9b59b6",
+        "temperatura": "#bc7dd6",
+        "luz": "#ddbef0",
+    },
+}
 MODOS_ATIVIDADE = ["PIM", "TAT", "ZCM"]
 
 _DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
@@ -191,6 +219,25 @@ def _coluna_numerica_utilizavel(df: pd.DataFrame, nome_coluna: str) -> pd.Series
         return None
     valores = pd.to_numeric(df[nome_coluna], errors="coerce")
     return valores if valores.notna().any() else None
+
+
+# ── Filtro global baseado em luz ──────────────────────────────────────────────
+
+def _aplicar_filtro_global_luz(
+    df: pd.DataFrame,
+    faixa_filtro_luz: tuple[float, float],
+) -> pd.DataFrame:
+    """
+    Remove do DataFrame todas as linhas cujo valor LIGHT está fora da faixa
+    especificada. Retorna um novo DataFrame (não modifica o original).
+    Usado quando o filtro global por luz está ativado — afeta gráficos,
+    métricas e exportação.
+    """
+    if "LIGHT" not in df.columns:
+        return df
+    luz = pd.to_numeric(df["LIGHT"], errors="coerce")
+    mascara = luz.between(faixa_filtro_luz[0], faixa_filtro_luz[1], inclusive="both")
+    return df[mascara].copy()
 
 
 # ── Preparação dos dados para exportação ──────────────────────────────────────
@@ -396,6 +443,420 @@ def _salvar_relatorio(usuario_id: int, nome_origem: str, zip_nome: str, zip_byte
     set_toast("Relatório exportado e salvo em Exportar relatório.")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ABA DE COMPARAÇÃO — funções auxiliares
+# ══════════════════════════════════════════════════════════════════════════════
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _carregar_varios_arquivos(
+    arquivo_ids: tuple[int, ...], usuario_id: int
+) -> list[tuple[dict, pd.DataFrame]]:
+    """
+    Carrega múltiplos arquivos de actigrafia preservando o cache por tupla de IDs.
+    Retorna lista de (metadata, DataFrame) na mesma ordem dos IDs fornecidos.
+    """
+    return [_carregar_actigrafia(arq_id, usuario_id) for arq_id in arquivo_ids]
+
+
+def _alinhar_dia_relativo(df: pd.DataFrame, dia_relativo: int) -> pd.DataFrame | None:
+    """
+    Retorna o subconjunto do DataFrame correspondente ao dia relativo (1-based).
+    Exemplo: dia_relativo=1 → primeiro dia do registro.
+    Retorna None se o dia não existir no registro.
+    """
+    dias = sorted(df["DATE/TIME"].dt.date.unique())
+    if dia_relativo < 1 or dia_relativo > len(dias):
+        return None
+    data_alvo = dias[dia_relativo - 1]
+    fatia = df[df["DATE/TIME"].dt.date == data_alvo].copy()
+    # Normaliza o índice temporal para 00:00 do dia relativo (1970-01-01 + dia_relativo-1)
+    # Isso alinha os eixos X de pacientes com datas reais diferentes.
+    data_base = pd.Timestamp("1970-01-01") + pd.Timedelta(days=dia_relativo - 1)
+    delta = data_base - pd.Timestamp(data_alvo)
+    fatia = fatia.copy()
+    fatia["DATE/TIME"] = fatia["DATE/TIME"] + delta
+    return fatia
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _estatisticas_comparacao(
+    df: pd.DataFrame,
+    nome_arquivo: str,
+    modo_atividade: str,
+    dia_ini: int,
+    dia_fim: int,
+) -> dict:
+    """
+    Calcula média, mediana e desvio padrão de atividade, luz e temperatura
+    para o intervalo de dias relativos [dia_ini, dia_fim].
+    """
+    dias = sorted(df["DATE/TIME"].dt.date.unique())
+    dias_sel = dias[dia_ini - 1 : dia_fim]
+    df_sel = df[df["DATE/TIME"].dt.date.isin(dias_sel)]
+
+    def _stats(serie: pd.Series | None) -> dict:
+        if serie is None or serie.dropna().empty:
+            return {"Média": "—", "Mediana": "—", "Desvio padrão": "—"}
+        s = pd.to_numeric(serie, errors="coerce").dropna()
+        return {
+            "Média":         f"{s.mean():.2f}",
+            "Mediana":       f"{s.median():.2f}",
+            "Desvio padrão": f"{s.std():.2f}",
+        }
+
+    ativ = _coluna_numerica_utilizavel(df_sel, modo_atividade) if modo_atividade in df_sel.columns else None
+    luz  = _coluna_numerica_utilizavel(df_sel, "LIGHT")
+    temp = _coluna_numerica_utilizavel(df_sel, "TEMPERATURE")
+
+    return {
+        "arquivo":    nome_arquivo,
+        "atividade":  _stats(ativ),
+        "luz":        _stats(luz),
+        "temperatura": _stats(temp),
+    }
+
+
+def _grafico_comparacao_dia(
+    dia_relativo: int,
+    pacientes: list[dict],  # lista de {nome, numero, df, cores}
+    modo_atividade: str,
+    mostrar_atividade: bool,
+    mostrar_luz: bool,
+    mostrar_temperatura: bool,
+) -> go.Figure:
+    """
+    Gera um gráfico comparativo para um dia relativo, sobrepondo os sinais de
+    todos os pacientes. O eixo X representa as 24h normalizadas.
+    """
+    # Data base de referência (eixo X)
+    data_base = pd.Timestamp("1970-01-01") + pd.Timedelta(days=dia_relativo - 1)
+    inicio = data_base
+    fim    = data_base + pd.Timedelta(hours=24) - pd.Timedelta(seconds=1)
+
+    atividade_traces: list[tuple[pd.DatetimeIndex, pd.Series, int, dict]] = []
+    luz_traces: list[tuple[pd.DatetimeIndex, pd.Series, int, dict]] = []
+    temp_traces: list[tuple[pd.DatetimeIndex, pd.Series, int, dict]] = []
+
+    for pac in pacientes:
+        nome = pac["nome"]
+        numero = pac["numero"]
+        df   = pac["df"]
+        cores = pac["cores"]
+        fatia = _alinhar_dia_relativo(df, dia_relativo)
+        if fatia is None or fatia.empty:
+            continue
+        dt_idx = pd.DatetimeIndex(fatia["DATE/TIME"])
+        fatia_range = fatia[(fatia["DATE/TIME"] >= inicio) & (fatia["DATE/TIME"] <= fim)]
+        if fatia_range.empty:
+            continue
+
+        # Atividade
+        if mostrar_atividade and modo_atividade in fatia_range.columns:
+            ativ = pd.to_numeric(fatia_range[modo_atividade], errors="coerce")
+            if ativ.notna().any():
+                atividade_traces.append((fatia_range["DATE/TIME"], ativ, numero, cores))
+
+        # Luz
+        if mostrar_luz and "LIGHT" in fatia_range.columns:
+            luz = pd.to_numeric(fatia_range["LIGHT"], errors="coerce")
+            if luz.notna().any():
+                luz_traces.append((fatia_range["DATE/TIME"], luz, numero, cores))
+
+        # Temperatura
+        if mostrar_temperatura and "TEMPERATURE" in fatia_range.columns:
+            temp = pd.to_numeric(fatia_range["TEMPERATURE"], errors="coerce")
+            if temp.notna().any():
+                temp_traces.append((fatia_range["DATE/TIME"], temp, numero, cores))
+
+    tem_luz_algum = bool(luz_traces)
+    tem_temp_algum = bool(temp_traces)
+
+    extras_presentes = int(tem_luz_algum) + int(tem_temp_algum)
+    fim_dominio_x = 1 - _LARGURA_EIXO_EXTRA * extras_presentes
+
+    fig = go.Figure()
+
+    for x_vals, y_vals, numero, cores in atividade_traces:
+        fig.add_trace(go.Scatter(
+            x=x_vals, y=y_vals.values, mode="lines",
+            name=f"Atividade - Paciente {numero}",
+            line=dict(color=cores["atividade"]),
+        ))
+
+    for x_vals, y_vals, numero, cores in luz_traces:
+        fig.add_trace(go.Scatter(
+            x=x_vals, y=y_vals.values, mode="lines",
+            name=f"Luz - Paciente {numero}",
+            line=dict(color=cores["luz"], dash="dot"),
+            yaxis="y2",
+        ))
+
+    temperatura_axis = "y3" if tem_luz_algum else "y2"
+    for x_vals, y_vals, numero, cores in temp_traces:
+        fig.add_trace(go.Scatter(
+            x=x_vals, y=y_vals.values, mode="lines",
+            name=f"Temperatura - Paciente {numero}",
+            line=dict(color=cores["temperatura"], dash="dashdot"),
+            yaxis=temperatura_axis,
+        ))
+
+    layout: dict = dict(
+        title=dict(
+            text=f"Dia relativo {dia_relativo}",
+            x=0.01, xanchor="left", font=dict(size=14, color=COR_LEGENDA),
+        ),
+        xaxis=dict(
+            title="Hora", domain=[0, fim_dominio_x],
+            range=[inicio, fim], tickformat="%H:%M",
+        ),
+        yaxis=dict(
+            title=dict(text=modo_atividade, font=dict(color=COR_LEGENDA)),
+            tickfont=dict(color=COR_LEGENDA),
+        ),
+        height=400,
+        margin=dict(l=0, r=0, t=60, b=0),
+        hovermode="x unified",
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+            bgcolor="rgba(255, 255, 255, 0.75)",
+            bordercolor="rgba(0, 0, 0, 0.15)", borderwidth=1,
+            font=dict(size=11, color=COR_LEGENDA),
+        ),
+    )
+
+    # Eixo Y2 para o primeiro sinal extra exibido
+    if tem_luz_algum or tem_temp_algum:
+        layout["yaxis2"] = dict(
+            title=dict(
+                text="Luz (Lux)" if tem_luz_algum else "Temperatura (°C)",
+                font=dict(color=COR_LUZ if tem_luz_algum else COR_TEMPERATURA),
+            ),
+            tickfont=dict(color=COR_LUZ if tem_luz_algum else COR_TEMPERATURA),
+            overlaying="y", side="right",
+        )
+
+    # Eixo Y3 para o segundo sinal extra exibido
+    if tem_luz_algum and tem_temp_algum:
+        eixo_temp: dict = dict(
+            title=dict(text="Temperatura (°C)", font=dict(color=COR_TEMPERATURA)),
+            tickfont=dict(color=COR_TEMPERATURA),
+            overlaying="y", side="right",
+        )
+        eixo_temp["anchor"] = "free"
+        eixo_temp["position"] = fim_dominio_x + _LARGURA_EIXO_EXTRA
+        layout["yaxis3"] = eixo_temp
+
+    fig.update_layout(**layout)
+    _sombrear_periodo_noturno(fig, data_base)
+    return fig
+
+
+def _tabela_resumo_comparacao(
+    pacientes: list[dict],
+    modo_atividade: str,
+    dia_ini: int,
+    dia_fim: int,
+) -> None:
+    """
+    Exibe tabela de resumo estatístico com uma linha por paciente e colunas
+    agrupadas por sinal (atividade, luz e temperatura).
+    """
+    linhas = []
+    for pac in pacientes:
+        stats = _estatisticas_comparacao(
+            pac["df"], pac["nome"], modo_atividade, dia_ini, dia_fim
+        )
+        atividade = stats["atividade"]
+        luz = stats["luz"]
+        temperatura = stats["temperatura"]
+        linhas.append({
+            "Paciente": f"Paciente {pac['numero']}",
+            f"Atividade Média ({modo_atividade})": atividade["Média"],
+            f"Atividade Mediana ({modo_atividade})": atividade["Mediana"],
+            f"Atividade DesvioPadrão ({modo_atividade})": atividade["Desvio padrão"],
+            "Luz Média (Lux)": luz["Média"],
+            "Luz Mediana (Lux)": luz["Mediana"],
+            "Luz DesvioPadrão (Lux)": luz["Desvio padrão"],
+            "Temp Média (°C)": temperatura["Média"],
+            "Temp Mediana (°C)": temperatura["Mediana"],
+            "Temp DesvioPadrão(°C)": temperatura["Desvio padrão"],
+        })
+
+    if linhas:
+        tabela = pd.DataFrame(linhas).sort_values("Paciente")
+        st.dataframe(tabela, use_container_width=True, hide_index=True)
+
+
+# ── Aba de comparação entre pacientes ────────────────────────────────────────
+
+def _aba_comparacao(usuario_id: int, arquivos: list) -> None:
+    """
+    Renderiza a aba de comparação entre pacientes.
+    Permite selecionar até 5 arquivos, escolher o modo de atividade,
+    definir um intervalo de dias relativos e visualizar gráficos sobrepostos.
+    """
+    st.subheader("Comparação entre pacientes")
+    st.caption(
+        "Selecione de 2 a 5 arquivos para comparar. A comparação usa **dias relativos** — "
+        "o Dia 1 de cada paciente é o primeiro dia do respectivo registro, "
+        "independente da data real."
+    )
+
+    opcoes = {arq["nome"]: arq["id"] for arq in arquivos}
+    nomes_selecionados: list[str] = st.multiselect(
+        "Arquivos para comparar",
+        options=list(opcoes.keys()),
+        max_selections=5,
+        placeholder="Selecione de 2 a 5 arquivos...",
+    )
+
+    if nomes_selecionados:
+        legenda_pacientes = "\n".join(
+            f"- Paciente {numero}: {nome}"
+            for numero, nome in enumerate(nomes_selecionados, start=1)
+        )
+        st.info(f"**Identificação dos pacientes**\n{legenda_pacientes}")
+
+    if len(nomes_selecionados) < 2:
+        st.info("Selecione pelo menos 2 arquivos para iniciar a comparação.")
+        return
+    if len(nomes_selecionados) > 5:
+        st.warning("Selecione no máximo 5 arquivos.")
+        return
+
+    # Carrega todos os arquivos selecionados (com cache)
+    ids_selecionados = tuple(opcoes[n] for n in nomes_selecionados)
+    with st.spinner("Carregando arquivos..."):
+        dados_carregados = _carregar_varios_arquivos(ids_selecionados, usuario_id)
+
+    # Valida e monta lista de pacientes válidos
+    pacientes_validos: list[dict] = []
+    for numero, nome, (metadata, df) in zip(
+        range(1, len(nomes_selecionados) + 1),
+        nomes_selecionados,
+        dados_carregados,
+    ):
+        if df.empty:
+            st.warning(f"Não foi possível processar **{nome}** — arquivo ignorado.")
+            continue
+        pacientes_validos.append({"nome": nome, "numero": numero, "metadata": metadata, "df": df})
+
+    if len(pacientes_validos) < 2:
+        st.error("Pelo menos 2 arquivos válidos são necessários para a comparação.")
+        return
+
+    # Atribui cores a cada paciente
+    for i, pac in enumerate(pacientes_validos):
+        pac["cores"] = _CORES_COMPARACAO[i % len(_CORES_COMPARACAO)]
+
+    # Determina modos de atividade disponíveis na interseção dos arquivos
+    modos_comuns = [
+        modo for modo in MODOS_ATIVIDADE
+        if all(modo in pac["df"].columns for pac in pacientes_validos)
+    ]
+    if not modos_comuns:
+        # Fallback: união — usa o primeiro disponível em cada arquivo
+        modos_uniao = list({
+            modo for pac in pacientes_validos
+            for modo in MODOS_ATIVIDADE if modo in pac["df"].columns
+        })
+        if not modos_uniao:
+            st.error("Nenhum modo de atividade reconhecido (PIM, TAT, ZCM) nos arquivos selecionados.")
+            return
+        st.warning(
+            f"Nem todos os arquivos possuem os mesmos modos de atividade. "
+            f"Apenas os arquivos com o modo selecionado serão plotados."
+        )
+        modos_disponiveis_comp = modos_uniao
+    else:
+        modos_disponiveis_comp = modos_comuns
+
+    col_modo, col_sinais = st.columns([2, 3])
+    with col_modo:
+        modo_atividade_comp = st.radio(
+            "Modo de atividade",
+            modos_disponiveis_comp, horizontal=True,
+            key="comp_modo_atividade",
+        )
+    with col_sinais:
+        st.caption("Sinais adicionais")
+        mostrar_atividade_comp = st.checkbox(
+            "Atividade", key="comp_mostrar_atividade", value=True,
+            help="Exibe as curvas de atividade de todos os pacientes.",
+        )
+        mostrar_luz_comp = st.checkbox(
+            "Luz", key="comp_mostrar_luz", value=True,
+            help="Exibe curvas de luz sobrepostas (somente arquivos com coluna LIGHT).",
+        )
+        mostrar_temp_comp = st.checkbox(
+            "Temperatura", key="comp_mostrar_temp", value=True,
+            help="Exibe curvas de temperatura sobrepostas (somente arquivos com coluna TEMPERATURE).",
+        )
+
+    # Determina o intervalo máximo de dias relativos (mínimo entre todos os pacientes)
+    max_dias = min(
+        len(pac["df"]["DATE/TIME"].dt.date.unique())
+        for pac in pacientes_validos
+    )
+    if max_dias < 1:
+        st.error("Nenhum paciente possui dados suficientes para comparação.")
+        return
+
+    col_ini, col_fim = st.columns(2)
+    dia_ini_comp = col_ini.number_input(
+        "Dia relativo inicial", min_value=1, max_value=max_dias, value=1,
+        step=1, key="comp_dia_ini",
+        help="Dia 1 = primeiro dia do registro de cada paciente.",
+    )
+    dia_fim_comp = col_fim.number_input(
+        "Dia relativo final", min_value=1, max_value=max_dias, value=min(7, max_dias),
+        step=1, key="comp_dia_fim",
+    )
+
+    if dia_ini_comp > dia_fim_comp:
+        st.warning("O dia inicial deve ser menor ou igual ao dia final.")
+        return
+
+    st.divider()
+
+    # Gera um gráfico por dia relativo no intervalo selecionado
+    for dia_rel in range(int(dia_ini_comp), int(dia_fim_comp) + 1):
+        # Filtra apenas pacientes que possuem dados neste dia relativo
+        pacientes_dia = [
+            pac for pac in pacientes_validos
+            if _alinhar_dia_relativo(pac["df"], dia_rel) is not None
+            and modo_atividade_comp in pac["df"].columns
+        ]
+        if not pacientes_dia:
+            st.caption(f"Dia relativo {dia_rel} — sem dados em nenhum arquivo.")
+            continue
+
+        fig = _grafico_comparacao_dia(
+            dia_relativo=dia_rel,
+            pacientes=pacientes_dia,
+            modo_atividade=modo_atividade_comp,
+            mostrar_atividade=mostrar_atividade_comp,
+            mostrar_luz=mostrar_luz_comp,
+            mostrar_temperatura=mostrar_temp_comp,
+        )
+        st.plotly_chart(fig, width="stretch", key=f"comp_plot_{dia_rel}")
+
+        # Tabela de resumo abaixo de cada gráfico
+        with st.expander(f"Resumo estatístico — Dia relativo {dia_rel}"):
+            _tabela_resumo_comparacao(
+                pacientes_dia, modo_atividade_comp,
+                dia_ini=dia_rel, dia_fim=dia_rel,
+            )
+
+    # Resumo geral do intervalo completo
+    st.divider()
+    st.subheader(f"Resumo estatístico — Dias {int(dia_ini_comp)} a {int(dia_fim_comp)}")
+    _tabela_resumo_comparacao(
+        pacientes_validos, modo_atividade_comp,
+        dia_ini=int(dia_ini_comp), dia_fim=int(dia_fim_comp),
+    )
+
+
 # ── Página principal ──────────────────────────────────────────────────────────
 
 def analises_page():
@@ -413,8 +874,32 @@ def analises_page():
         st.info("Nenhum arquivo enviado ainda. Acesse **Conjunto de dados** para fazer upload.")
         return
 
+    # ── Divisão em abas ───────────────────────────────────────────────────────
+    aba_individual,aba_filtro_luz, aba_comparacao  = st.tabs([
+        "📊  Análise Individual",
+        "💡  Filtro de Luz Global",
+        "👥  Comparação entre Pacientes",
+    ])
+
+    with aba_comparacao:
+        _aba_comparacao(usuario_id, arquivos)
+
+    # ── Aba individual (lógica original, inalterada) ──────────────────────────
+    with aba_individual:
+        _aba_individual(usuario_id, arquivos)
+
+    with aba_filtro_luz:
+        _aba_filtro_luz(usuario_id, arquivos)
+
+
+def _aba_individual(usuario_id: int, arquivos: list) -> None:
+    """
+    Aba de análise individual — lógica original sem nenhuma alteração.
+    Não contém nenhuma referência ao filtro global de luz; esse filtro
+    vive exclusivamente em _aba_filtro_luz().
+    """
     opcoes_arquivo = {arq["nome"]: arq for arq in arquivos}
-    nome_escolhido = st.selectbox("Arquivo", list(opcoes_arquivo.keys()))
+    nome_escolhido = st.selectbox("Arquivo", list(opcoes_arquivo.keys()), key="ind_arquivo")
     arquivo_id = opcoes_arquivo[nome_escolhido]["id"]
 
     metadata, df = _carregar_actigrafia(arquivo_id, usuario_id)
@@ -429,9 +914,9 @@ def analises_page():
     col_nascimento.caption(f"**Data de nascimento:** {metadata.get('SUBJECT_DATE_OF_BIRTH', '—')}")
 
     # ── Recorte do registro ───────────────────────────────────────────────────
-    # aplicado antes de qualquer cálculo — afeta métricas, faixas e dias
     descartar_inicio = st.checkbox(
         "Descartar as primeiras horas do registro",
+        key="ind_descartar",
         help=(
             "Remove o início do registro — por exemplo, o período de adaptação ao "
             "dispositivo, antes que o paciente retome a rotina normal. Afeta as "
@@ -447,6 +932,7 @@ def analises_page():
             ["Por duração", "Por data e hora"],
             default="Por duração",
             label_visibility="collapsed",
+            key="ind_modo_descarte",
         )
         limite_dt:     _dt.datetime | None = None
         limite_fim_dt: _dt.datetime | None = None
@@ -517,8 +1003,8 @@ def analises_page():
     tem_luz         = luz_bruta  is not None
     tem_temperatura = temp_bruta is not None
 
-    faixa_total_luz  = (0.0, float(luz_bruta.max()))                                if luz_bruta  is not None else None
-    faixa_total_temp = (float(temp_bruta.min()), float(temp_bruta.max()))            if temp_bruta is not None else None
+    faixa_total_luz  = (0.0, float(luz_bruta.max()))                      if luz_bruta  is not None else None
+    faixa_total_temp = (float(temp_bruta.min()), float(temp_bruta.max())) if temp_bruta is not None else None
 
     # ── Opções de exibição ────────────────────────────────────────────────────
     with st.expander("Opções de exibição"):
@@ -724,6 +1210,7 @@ def analises_page():
                     hora_inicio=hora_inicio, hora_fim=hora_fim,
                 ),
                 width="stretch",
+                key=f"ind_plot_{dia}",
             )
 
     # ── Exportação dos dados ───────────────────────────────────────────────────
@@ -748,6 +1235,315 @@ def analises_page():
         st.download_button(
             "Baixar dados (.zip)", data=zip_bytes, file_name=zip_nome, mime="application/zip",
             on_click=_salvar_relatorio, args=(usuario_id, nome_escolhido, zip_nome, zip_bytes),
+        )
+        st.caption("Uma cópia também é salva em **Exportar relatório**.")
+    else:
+        st.warning("Não foi possível gerar a exportação.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ABA DE ANÁLISE POR FAIXA DE LUZ
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _aba_filtro_luz(usuario_id: int, arquivos: list) -> None:
+    """
+    Aba isolada para análise por faixa de iluminação.
+
+    Reutiliza o mesmo arquivo selecionado na aba individual e aplica
+    _aplicar_filtro_global_luz() ao DataFrame completo antes de qualquer
+    cálculo. Toda a lógica de gráficos, métricas e exportação é idêntica
+    à aba individual — a única diferença é que o df já chega filtrado.
+
+    Não interfere em nenhuma variável de state da aba individual.
+    """
+    opcoes_arquivo = {arq["nome"]: arq for arq in arquivos}
+    nome_escolhido = st.selectbox("Arquivo", list(opcoes_arquivo.keys()), key="ind_arquivo_luz")
+    arquivo_id = opcoes_arquivo[nome_escolhido]["id"]
+
+    arquivo_id = next(
+        (arq["id"] for arq in arquivos if arq["nome"] == nome_escolhido), None
+    )
+    if arquivo_id is None:
+        st.warning("Arquivo não encontrado.")
+        return
+
+    metadata, df_original = _carregar_actigrafia(arquivo_id, usuario_id)
+    if df_original.empty:
+        st.warning("Não foi possível processar este arquivo.")
+        return
+
+    nome_sujeito = metadata.get("SUBJECT_NAME")
+    col_nome, col_sexo, col_nasc = st.columns(3)
+    col_nome.caption(f"**Paciente:** {nome_sujeito.strip().upper() if nome_sujeito else '—'}")
+    col_sexo.caption(f"**Sexo:** {_rotulo_genero(metadata.get('SUBJECT_GENDER'))}")
+    col_nasc.caption(f"**Data de nascimento:** {metadata.get('SUBJECT_DATE_OF_BIRTH', '—')}")
+
+    # ── Verificação de coluna LIGHT ───────────────────────────────────────────
+    luz_original = _coluna_numerica_utilizavel(df_original, "LIGHT")
+    if luz_original is None:
+        st.warning(
+            "Este arquivo não possui registros de luz utilizáveis (coluna LIGHT). "
+            "A análise por faixa de luz não está disponível para este arquivo."
+        )
+        return
+
+    faixa_total_luz = (0.0, float(luz_original.max()))
+
+    # ── Filtro Global Baseado em Luz ──────────────────────────────────────────
+    st.subheader("Filtro Global Baseado em Luz")
+    st.caption(
+        "Considera apenas os momentos em que a luz (Lux) esteve dentro da faixa "
+        "selecionada."
+    )
+
+    faixa_filtro_luz: tuple[float, float] = faixa_total_luz
+    if faixa_total_luz[0] < faixa_total_luz[1]:
+        faixa_filtro_luz = st.slider(
+            "Faixa de luz (Lux)",
+            min_value=faixa_total_luz[0],
+            max_value=faixa_total_luz[1],
+            value=faixa_total_luz,
+            key="fl_slider_luz",
+            help=(
+                "Apenas os registros com LIGHT dentro desta faixa serão mantidos. "
+                "Os eixos dos gráficos, métricas e exportação são recalculados "
+                "automaticamente com base nos dados restantes."
+            ),
+        )
+    else:
+        st.info(f"A coluna LIGHT possui valor único ({faixa_total_luz[0]:.0f} Lux) — nenhuma filtragem disponível.")
+        return
+
+    # ── Aplicar filtro ao DataFrame completo ──────────────────────────────────
+    # A partir daqui, df é o DataFrame filtrado. Nenhuma série, faixa ou
+    # variável calculada antes deste ponto é reutilizada nos cálculos abaixo.
+    df = _aplicar_filtro_global_luz(df_original, faixa_filtro_luz)
+
+    n_original = len(df_original)
+    n_filtrado = len(df)
+    st.caption(
+        f"Registros mantidos: **{n_filtrado:,}** de {n_original:,} "
+        f"({100 * n_filtrado / n_original:.1f}%) — "
+        f"faixa: {faixa_filtro_luz[0]:.0f}–{faixa_filtro_luz[1]:.0f} Lux."
+    )
+
+    if df.empty:
+        st.warning(
+            "O filtro removeu todos os registros. "
+            "Amplie a faixa de luz para incluir mais dados."
+        )
+        return
+
+    # ── Reconstrução de todas as séries e faixas com base no df filtrado ──────
+    modos_disponiveis = [modo for modo in MODOS_ATIVIDADE if modo in df.columns]
+    if not modos_disponiveis:
+        st.warning("O df filtrado não possui nenhuma coluna de atividade reconhecida (PIM, TAT ou ZCM).")
+        return
+
+    tem_evento      = "EVENT" in df.columns
+    luz_filtrada    = _coluna_numerica_utilizavel(df, "LIGHT")
+    temp_filtrada   = _coluna_numerica_utilizavel(df, "TEMPERATURE")
+    tem_temperatura = temp_filtrada is not None
+
+    # Faixas recalculadas exclusivamente com os dados que sobraram
+    modo_atividade = modos_disponiveis[0]
+    faixa_ativ = (
+        float(df[modo_atividade].min()),
+        float(df[modo_atividade].max()),
+    )
+    faixa_luz = (
+        float(luz_filtrada.min()),
+        float(luz_filtrada.max()),
+    ) if luz_filtrada is not None else None
+    faixa_temp = (
+        float(temp_filtrada.min()),
+        float(temp_filtrada.max()),
+    ) if temp_filtrada is not None else None
+
+    mostrar_atividade = True
+    mostrar_luz = True
+    mostrar_temperatura = tem_temperatura
+
+    # ── Opções de exibição ────────────────────────────────────────────────────
+    with st.expander("Opções de exibição"):
+        modo_atividade = st.radio(
+            "Modo de atividade", modos_disponiveis, horizontal=True,
+            key="fl_modo_atividade",
+            help="Medida de atividade motora usada no gráfico e no cálculo do ritmo de repouso-atividade.",
+        )
+        faixa_ativ = (
+            float(df[modo_atividade].min()),
+            float(df[modo_atividade].max()),
+        )
+
+        mascarar_inatividade = st.checkbox(
+            "Mascarar períodos de inatividade prolongada",
+            key="fl_mascarar",
+            help=(
+                "Usa o pyActigraphy para identificar sequências de valor zero mais longas "
+                "que a duração escolhida e tratá-las como dados ausentes."
+            ),
+        )
+        duracao_mascara_h = None
+        if mascarar_inatividade:
+            duracao_mascara_h = st.pills(
+                "Duração mínima considerada inatividade",
+                _DURACOES_MASCARA_H, default=2, required=True, format_func=lambda h: f"{h}h",
+                key="fl_duracao_mascara",
+                help="Sequências de zeros mais curtas que esse intervalo são preservadas.",
+            )
+
+        st.divider()
+        mostrar_eventos = st.checkbox(
+            "Destacar marcações de evento (botão)",
+            key="fl_show_eventos", disabled=not tem_evento,
+            help=None if tem_evento else "Este arquivo não possui registros de marcação de evento.",
+        )
+
+    # ── Construção das séries temporais (todas a partir do df filtrado) ────────
+    mask_h = int(duracao_mascara_h) if mascarar_inatividade and duracao_mascara_h is not None else None
+
+    raw = _construir_raw_cached(nome_escolhido, df, modo_atividade)
+    if mask_h is not None:
+        raw.create_inactivity_mask(f"{mask_h}h")
+        raw.mask_inactivity = True
+
+    dias = ArquivoController.dias_disponiveis(df)
+    numero_por_dia = {dia: numero for numero, dia in enumerate(dias, start=1)}
+
+    # ── Filtros de exibição ───────────────────────────────────────────────────
+    with st.expander("Filtrar dias exibidos"):
+        st.caption("Filtros apenas de exibição — não alteram os dados filtrados nem as métricas.")
+
+        col_semana, col_periodo = st.columns(2, gap="large")
+        with col_semana:
+            st.caption("Dia da semana")
+            dias_semana_escolhidos = st.pills(
+                "Dia da semana", _DIAS_SEMANA, selection_mode="multi",
+                default=_DIAS_SEMANA, label_visibility="collapsed",
+                key="fl_dias_semana",
+            ) or []
+        with col_periodo:
+            st.caption("Período do dia")
+            rotulo_periodo = st.segmented_control(
+                "Período do dia", [*_PERIODOS_DIA.keys(), "Personalizado"],
+                default="Dia inteiro", required=True, label_visibility="collapsed",
+                key="fl_periodo_dia",
+            )
+            if rotulo_periodo == "Personalizado":
+                hora_inicio, hora_fim = st.slider(
+                    "Intervalo de horário personalizado", min_value=0, max_value=24,
+                    value=(0, 24), step=1, format="%dh", label_visibility="collapsed",
+                    key="fl_hora_personalizada",
+                )
+            else:
+                hora_inicio, hora_fim = _PERIODOS_DIA[rotulo_periodo]
+
+    dias_exibidos = [
+        dia for dia in dias
+        if _DIAS_SEMANA[pd.Timestamp(dia).weekday()] in dias_semana_escolhidos
+    ]
+
+    dt_index = pd.DatetimeIndex(df["DATE/TIME"])
+
+    serie_evento = None
+    if tem_evento:
+        serie_evento = pd.Series(
+            pd.to_numeric(df["EVENT"], errors="coerce").to_numpy(),
+            index=dt_index, name="evento",
+        )
+
+    serie_luz = pd.Series(luz_filtrada.to_numpy(), index=dt_index, name="luz") if luz_filtrada is not None else None
+    serie_temp = pd.Series(temp_filtrada.to_numpy(), index=dt_index, name="temperatura") if temp_filtrada is not None else None
+
+    escala_atividade = faixa_ativ
+    escala_luz = faixa_luz
+    escala_temperatura = faixa_temp
+
+    # ── Configurações de métricas não paramétricas ────────────────────────────
+    with st.expander("Configurações das medidas não paramétricas"):
+        st.caption("Ajustam o cálculo de IS, IV, L5 e M10 — calculados sobre os dados filtrados por luz.")
+        col_freq, col_limiar = st.columns(2, gap="medium")
+        frequencia_metricas = col_freq.selectbox(
+            "Frequência de reamostragem (IS e IV)",
+            ["10min", "15min", "30min", "1H", "2H"], index=3,
+            key="fl_freq_metricas",
+            help="Janela de tempo usada para agregar os dados antes de calcular IS e IV.",
+        )
+        limiar_atividade = col_limiar.number_input(
+            "Limiar de binarização (IS, IV, L5 e M10)",
+            min_value=0, value=4, step=1, key="fl_limiar_atividade",
+            help="Valores a partir deste limiar contam como 'ativo' (1); abaixo dele, como 'inativo' (0).",
+        )
+        st.divider()
+        usar_periodo = st.checkbox(
+            "Calcular por período", key="fl_usar_periodo",
+            help="Usa ISp, IVp, L5p e M10p — calcula as medidas para cada janela de tempo.",
+        )
+        periodo_metricas = "7D"
+        if usar_periodo:
+            dias_registro  = len(dias)
+            opcoes_periodo = [(label, val) for d, label, val in _PERIODOS_FIXOS if d <= dias_registro // 2]
+            if not opcoes_periodo:
+                opcoes_periodo = [("1 dia", "1D")]
+            labels_periodo   = [l for l, _ in opcoes_periodo]
+            vals_map_periodo = {l: v for l, v in opcoes_periodo}
+            escolha_periodo  = st.selectbox(
+                "Período de análise", labels_periodo, key="fl_periodo_escolhido",
+                help=f"Registro com {dias_registro} dia(s). Apenas períodos que permitem ao menos 2 janelas são exibidos.",
+            )
+            periodo_metricas = vals_map_periodo[escolha_periodo] if escolha_periodo else "1D"
+
+    # Métricas calculadas sobre o df filtrado
+    _metricas_ritmo(
+        df=df, nome=nome_escolhido, coluna=modo_atividade,
+        titulo="Ritmo de repouso-atividade — dados filtrados por luz",
+        freq=frequencia_metricas, limiar=int(limiar_atividade),
+        usar_periodo=usar_periodo, periodo=periodo_metricas,
+        mask_h=mask_h,
+    )
+    st.divider()
+
+    # ── Gráficos diários ──────────────────────────────────────────────────────
+    if not dias_exibidos:
+        st.info("Nenhum dia do registro corresponde aos filtros selecionados em **Filtrar dias exibidos**.")
+    else:
+        for dia in dias_exibidos:
+            st.plotly_chart(
+                _grafico_combinado_dia(
+                    dia, numero_por_dia[dia], raw.data.loc[dia],
+                    escala_atividade, modo_atividade, cor_atividade=COR_LINHA,
+                    mostrar_atividade=True,
+                    serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
+                    escala_luz=escala_luz, escala_temperatura=escala_temperatura,
+                    hora_inicio=hora_inicio, hora_fim=hora_fim,
+                ),
+                width="stretch",
+                key=f"fl_plot_{dia}",
+            )
+
+    # ── Exportação dos dados filtrados ────────────────────────────────────────
+    st.divider()
+    st.subheader("Exportar dados filtrados")
+    st.caption(
+        "Gera um .zip com os dados após o filtro de luz e os recortes de exibição. "
+        "Os registros fora da faixa de Lux já foram removidos do DataFrame — "
+        "não constam na exportação."
+    )
+    df_exportar = _preparar_df_exportacao(
+        df, dt_index, modos_disponiveis, modo_atividade,
+        True, faixa_ativ, raw, mask_h,
+        True, faixa_luz, mostrar_temperatura, faixa_temp,
+        dias_exibidos, hora_inicio, hora_fim,
+    )
+    zip_bytes, zip_nome = _gerar_export_zip(arquivo_id, usuario_id, df_exportar)
+    if zip_bytes:
+        nome_zip_filtrado = zip_nome.replace("_exportado", "_filtrado_luz")
+        st.download_button(
+            "Baixar dados filtrados (.zip)", data=zip_bytes,
+            file_name=nome_zip_filtrado, mime="application/zip",
+            on_click=_salvar_relatorio,
+            args=(usuario_id, nome_escolhido, nome_zip_filtrado, zip_bytes),
         )
         st.caption("Uma cópia também é salva em **Exportar relatório**.")
     else:
