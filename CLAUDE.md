@@ -25,7 +25,7 @@ Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
 
 | Pacote | Versão | Uso |
 |---|---|---|
-| `streamlit` | 1.57.0 | Framework principal de UI |
+| `streamlit` | 1.50.0 | Framework principal de UI |
 | `psycopg2-binary` | 2.9.12 | Driver PostgreSQL; `RealDictCursor` para SELECT como dict |
 | `bcrypt` | 5.0.0 | Hash de senhas em `UserModel.criar_usuario` e verificação no login |
 | `streamlit-keyup` | 0.3.0 | `st_keyup` — dispara rerun a cada tecla (busca em tempo real em `conjunto_de_dados.py`) |
@@ -91,7 +91,7 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`app.py`** — única fonte de verdade de autenticação. Ordem de execução em cada render:
 1. `init_db()` (idempotente)
-2. Processa operações pendentes de cookie (`_set_cookie` / `_delete_cookie` em session_state) via `st.iframe()`
+2. Processa operações pendentes de cookie (`_set_cookie` / `_delete_cookie` em session_state) via `st.components.v1.html()`
 3. Detecta `email_logado`
 4. Tenta restaurar sessão via `UserController.restaurar_sessao(token)` se não autenticado
 5. Roteia: públicas (`login`, `cadastro`) ou protegidas (`home`)
@@ -175,7 +175,7 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`view/pages/configuracoes.py`** — duas abas: **Perfil** (foto + formulário de dados) e **Segurança** (troca de senha). Usa `UserController.buscar_perfil_por_email()` para carregar dados frescos do banco. Usa `render_toast()` e `set_toast()` de `view/ui.py`.
 
-**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip automático via JS), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`. Download em massa delega para `ArquivoController.gerar_zip()` e dispara o browser via JS (`window.parent.document.createElement('a')`) injetado com `st.iframe()`.
+**`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip automático via JS), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`. Download em massa delega para `ArquivoController.gerar_zip()` e dispara o browser via JS (`window.parent.document.createElement('a')`) injetado com `st.components.v1.html()`.
 
 **`view/pages/analises.py`** — visualização de actigrafia, construída em torno do objeto `BaseRaw` do pyActigraphy (`_construir_raw`, módulo `pyActigraphy.io`). Estrutura:
 - Carrega o arquivo escolhido (cacheado via `_carregar_actigrafia`/`@st.cache_data(ttl=120)`) e exibe nome, sexo e data de nascimento do sujeito a partir de `metadata` (`SUBJECT_NAME`, `SUBJECT_GENDER`, `SUBJECT_DATE_OF_BIRTH`, normalizados por `_rotulo_genero`).
@@ -235,7 +235,7 @@ Login por e-mail; `app.py` detecta via `st.session_state["logado"] == True`.
 | Evento | O que acontece |
 |--------|----------------|
 | Login | `UserController.iniciar_sessao()` grava token UUID → `_set_cookie` agendado em session_state |
-| Próximo render | `app.py` detecta `_set_cookie` → injeta JS via `st.iframe()` que escreve o cookie |
+| Próximo render | `app.py` detecta `_set_cookie` → injeta JS via `st.components.v1.html()` que escreve o cookie |
 | Refresh (F5) | `st.context.cookies` lê o token → `UserController.restaurar_sessao()` valida + recarrega perfil |
 | Logout | `UserController.encerrar_sessao()` remove token do banco → `_delete_cookie` agendado → JS apaga o cookie |
 

@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16
+    container_name: activity-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: Activity
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: activity-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: Activity
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    ports:
+      - "8501"
+
+volumes:
+  db_data:

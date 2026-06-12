@@ -5,6 +5,8 @@ Funcionalidades: cadastro, listagem paginada com busca, edição,
 exclusão e vinculação de arquivos de actigrafia.
 """
 
+from __future__ import annotations
+
 from datetime import date
 
 import streamlit as st

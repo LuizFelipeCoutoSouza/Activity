@@ -5,6 +5,8 @@ Cada sessão é identificada por um UUID aleatório e tem uma data de expiraçã
 Permite manter o usuário autenticado entre refreshes de página via cookie.
 """
 
+from __future__ import annotations
+
 import uuid
 from datetime import datetime, timedelta
 

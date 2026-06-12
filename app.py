@@ -15,6 +15,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
+import streamlit.components.v1 as components
 from model.database import init_db
 
 st.set_page_config(page_title="Activity", initial_sidebar_state="expanded", layout="wide")
@@ -37,14 +38,14 @@ def _gravar_cookie(token: str, dias: int) -> None:
               f'{_COOKIE}={token};max-age={dias * 86400};path=/;SameSite=Strict";')
     else:
         js = f'window.parent.document.cookie="{_COOKIE}={token};path=/;SameSite=Strict";'
-    st.iframe(f"<script>{js}</script>", height=1)
+    components.html(f"<script>{js}</script>", height=0)
 
 
 def _apagar_cookie() -> None:
     """Remove o cookie de sessão via JS (expiração no passado)."""
     js = (f'window.parent.document.cookie="'
           f'{_COOKIE}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;";')
-    st.iframe(f"<script>{js}</script>", height=1)
+    components.html(f"<script>{js}</script>", height=0)
 
 
 # ── Operações pendentes de cookie (agendadas por login / logout) ───────────────

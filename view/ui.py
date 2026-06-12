@@ -14,6 +14,8 @@ Exporta:
   Toast   : set_toast, render_toast
 """
 
+from __future__ import annotations
+
 import re
 import base64
 from enum import Enum

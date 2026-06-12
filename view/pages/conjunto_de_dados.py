@@ -12,6 +12,7 @@ import base64
 from datetime import timedelta
 
 import streamlit as st
+import streamlit.components.v1 as components
 from st_keyup import st_keyup
 from controller.arquivo_controller import ArquivoController
 from view.ui import set_toast, render_toast, get_usuario_id, paginacao
@@ -262,7 +263,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
     if "zip_pronto" in st.session_state:
         zip_bytes, zip_nome, n_zip = st.session_state.pop("zip_pronto")
         b64 = base64.b64encode(zip_bytes).decode()
-        st.iframe(
+        components.html(
             f"""<script>
             (function() {{
                 var a = window.parent.document.createElement('a');
@@ -273,7 +274,7 @@ def _secao_listagem(usuario_id: int, arquivos: list):
                 window.parent.document.body.removeChild(a);
             }})();
             </script>""",
-            height=1,
+            height=0,
         )
         st.toast(f"{n_zip} arquivo(s) compactado(s). Download iniciado.", icon="✅")
 

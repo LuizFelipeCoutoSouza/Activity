@@ -6,6 +6,8 @@ Seções:
   - Segurança: troca de senha
 """
 
+from __future__ import annotations
+
 import streamlit as st
 from datetime import date
 

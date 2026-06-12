@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from model.paciente_model import PacienteModel
 from controller.arquivo_controller import ArquivoController

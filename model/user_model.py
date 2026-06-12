@@ -5,6 +5,8 @@ Senhas armazenadas com hash bcrypt. Colunas BYTEA (foto_perfil) são convertidas
 para bytes pelo helper interno `_row`.
 """
 
+from __future__ import annotations
+
 import bcrypt
 
 from model.database import db_cursor

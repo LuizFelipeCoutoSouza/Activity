@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from model.database import db_cursor
 
 

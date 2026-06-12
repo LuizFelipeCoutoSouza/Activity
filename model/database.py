@@ -8,6 +8,7 @@ Expõe:
   init_db()        — cria as tabelas com o esquema completo (idempotente via IF NOT EXISTS).
 """
 
+import os
 from contextlib import contextmanager
 
 import psycopg2
@@ -16,11 +17,11 @@ from psycopg2.extras import RealDictCursor
 
 def get_connection():
     return psycopg2.connect(
-        host="localhost",
-        database="Activity",
-        user="postgres",
-        password="postgres",
-        port=5432,
+        host=os.environ.get("DB_HOST", "localhost"),
+        database=os.environ.get("DB_NAME", "Activity"),
+        user=os.environ.get("DB_USER", "postgres"),
+        password=os.environ.get("DB_PASSWORD", "postgres"),
+        port=os.environ.get("DB_PORT", "5432"),
     )
 
 

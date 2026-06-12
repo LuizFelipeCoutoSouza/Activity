@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 import datetime as _dt
 from typing import cast
@@ -372,7 +373,7 @@ def _metricas_ritmo(
         if resultado is None:
             st.info(_AVISO_DADOS_INSUFICIENTES)
         else:
-            st.dataframe(resultado.style.format("{:.3f}"), use_container_width=True)
+            st.dataframe(resultado.style.format("{:.3f}"), width="stretch")
     else:
         resultado = _computar_metricas_globais(df, nome, coluna, freq, limiar, mask_h)
         if resultado is None:
@@ -455,11 +456,12 @@ def analises_page():
             col_dur_ini, col_dur_fim = st.columns(2)
             duracao_ini_h = col_dur_ini.pills(
                 "Duração a descartar do início do registro",
-                _DURACOES_DESCARTE_H, default=2, required=True, format_func=lambda h: f"{h}h",
+                _DURACOES_DESCARTE_H, default=2, format_func=lambda h: f"{h}h",
                 help="Remove os dados anteriores a esse intervalo, contado a partir do primeiro registro.",
             )
-            if duracao_ini_h is not None:
-                limite_dt = inicio_dt + _dt.timedelta(hours=int(duracao_ini_h))
+            if duracao_ini_h is None:
+                duracao_ini_h = 2
+            limite_dt = inicio_dt + _dt.timedelta(hours=int(duracao_ini_h))
 
             duracao_fim_h = col_dur_fim.pills(
                 "Duração a descartar do fim do registro",
@@ -540,13 +542,15 @@ def analises_page():
         if mascarar_inatividade:
             duracao_mascara_h = st.pills(
                 "Duração mínima considerada inatividade",
-                _DURACOES_MASCARA_H, default=2, required=True, format_func=lambda h: f"{h}h",
+                _DURACOES_MASCARA_H, default=2, format_func=lambda h: f"{h}h",
                 help=(
                     "Sequências de zeros mais curtas que esse intervalo são preservadas — "
                     "provavelmente são períodos normais de repouso, não remoção do sensor. "
                     "O pyActigraphy recomenda ao menos 2h para não mascarar o sono."
                 ),
             )
+            if duracao_mascara_h is None:
+                duracao_mascara_h = 2
 
         st.divider()
         st.caption("Sinais exibidos no gráfico")
@@ -626,9 +630,11 @@ def analises_page():
             st.caption("Período do dia")
             rotulo_periodo = st.segmented_control(
                 "Período do dia", [*_PERIODOS_DIA.keys(), "Personalizado"],
-                default="Dia inteiro", required=True, label_visibility="collapsed",
+                default="Dia inteiro", label_visibility="collapsed",
                 help="Recorta a janela de horário exibida em cada gráfico diário.",
             )
+            if rotulo_periodo is None:
+                rotulo_periodo = "Dia inteiro"
             if rotulo_periodo == "Personalizado":
                 hora_inicio, hora_fim = st.slider(
                     "Intervalo de horário personalizado", min_value=0, max_value=24, value=(0, 24),
@@ -723,7 +729,6 @@ def analises_page():
                     escala_luz=escala_luz, escala_temperatura=escala_temperatura,
                     hora_inicio=hora_inicio, hora_fim=hora_fim,
                 ),
-                width="stretch",
             )
 
     # ── Exportação dos dados ───────────────────────────────────────────────────

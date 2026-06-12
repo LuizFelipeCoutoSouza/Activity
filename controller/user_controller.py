@@ -5,6 +5,8 @@ Cada método retorna (bool, str) ou (bool, str, dict) para facilitar o tratament
 de erros nas views sem expor exceções brutas.
 """
 
+from __future__ import annotations
+
 import re
 import bcrypt
 from model.user_model import UserModel
