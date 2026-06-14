@@ -30,7 +30,6 @@ _PERIODOS_DIA = {
     "Noite (18h–24h)":  (18, 24),
 }
 
-_DURACOES_MASCARA_H  = list(range(0, 13, 2))
 _DURACOES_DESCARTE_H = list(range(0, 13, 2))
 
 _PERIODOS_FIXOS = [
@@ -85,12 +84,9 @@ def _construir_raw_cached(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
 @st.cache_data(ttl=120, show_spinner=False)
 def _computar_metricas_globais(
     df: pd.DataFrame, nome: str, coluna: str,
-    freq: str, limiar: int, mask_h: int | None,
+    freq: str, limiar: int,
 ) -> dict | None:
     raw = _construir_raw_cached(nome, df, coluna)
-    if mask_h is not None:
-        raw.create_inactivity_mask(f"{mask_h}h")
-        raw.mask_inactivity = True
     try:
         return {
             "is":  float(raw.IS(freq=freq, threshold=limiar)),
@@ -105,12 +101,9 @@ def _computar_metricas_globais(
 @st.cache_data(ttl=120, show_spinner=False)
 def _computar_metricas_periodo(
     df: pd.DataFrame, nome: str, coluna: str,
-    freq: str, limiar: int, mask_h: int | None, periodo: str,
+    freq: str, limiar: int, periodo: str,
 ) -> pd.DataFrame | None:
     raw = _construir_raw_cached(nome, df, coluna)
-    if mask_h is not None:
-        raw.create_inactivity_mask(f"{mask_h}h")
-        raw.mask_inactivity = True
     try:
         vals_is  = raw.ISp(period=periodo, freq=freq, threshold=limiar)
         vals_iv  = raw.IVp(period=periodo, freq=freq, threshold=limiar)
@@ -203,8 +196,6 @@ def _preparar_df_exportacao(
     modo_atividade: str,
     mostrar_atividade: bool,
     escala_atividade: tuple[float, float],
-    raw: BaseRaw,
-    mask_h: int | None,
     mostrar_luz: bool,
     escala_luz: tuple[float, float] | None,
     mostrar_temperatura: bool,
@@ -236,13 +227,6 @@ def _preparar_df_exportacao(
 
     if mostrar_atividade and modo_atividade in df.columns:
         _zerar_fora_da_faixa(modo_atividade, escala_atividade)
-        if mask_h is not None:
-            # períodos mascarados (sensor removido) viram dado ausente —
-            # zerar não teria efeito, pois o mascaramento já incide sobre
-            # trechos de atividade igual a zero
-            df[modo_atividade] = df[modo_atividade].astype(float)
-            mascarado = raw.data.reindex(dt_index).isna().to_numpy()
-            df.loc[mascarado, modo_atividade] = float("nan")
 
     if "LIGHT" in df.columns:
         if not mostrar_luz:
@@ -312,7 +296,10 @@ def _grafico_combinado_dia(
 
     layout = dict(
         title=dict(text=_rotulo_dia(numero_dia, dia), x=0.01, xanchor="left", font=dict(size=14, color=COR_LEGENDA)),
-        xaxis=dict(title="Hora", domain=[0, fim_dominio_x], range=[inicio, fim], tickformat="%H:%M"),
+        xaxis=dict(
+            title="Hora", domain=[0, fim_dominio_x], range=[inicio, fim], tickformat="%H:%M",
+            dtick=3600000, showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)", griddash="dot",
+        ),
         yaxis=dict(
             title=dict(text=rotulo_atividade, font=dict(color=cor_atividade)),
             tickfont=dict(color=cor_atividade),
@@ -365,17 +352,16 @@ def _metricas_ritmo(
     limiar: int = 4,
     usar_periodo: bool = False,
     periodo: str = "7D",
-    mask_h: int | None = None,
 ) -> None:
     st.subheader(titulo)
     if usar_periodo:
-        resultado = _computar_metricas_periodo(df, nome, coluna, freq, limiar, mask_h, periodo)
+        resultado = _computar_metricas_periodo(df, nome, coluna, freq, limiar, periodo)
         if resultado is None:
             st.info(_AVISO_DADOS_INSUFICIENTES)
         else:
             st.dataframe(resultado.style.format("{:.3f}"), width="stretch")
     else:
-        resultado = _computar_metricas_globais(df, nome, coluna, freq, limiar, mask_h)
+        resultado = _computar_metricas_globais(df, nome, coluna, freq, limiar)
         if resultado is None:
             st.info(_AVISO_DADOS_INSUFICIENTES)
         else:
@@ -530,28 +516,6 @@ def analises_page():
         )
         faixa_total_atividade = (0.0, float(df[modo_atividade].max()))
 
-        mascarar_inatividade = st.checkbox(
-            "Mascarar períodos de inatividade prolongada",
-            help=(
-                "Usa o pyActigraphy para identificar sequências de valor zero mais longas "
-                "que a duração escolhida — provavelmente o sensor foi removido — e tratá-las "
-                "como dados ausentes, tanto no gráfico quanto nas métricas de ritmo."
-            ),
-        )
-        duracao_mascara_h = None
-        if mascarar_inatividade:
-            duracao_mascara_h = st.pills(
-                "Duração mínima considerada inatividade",
-                _DURACOES_MASCARA_H, default=2, format_func=lambda h: f"{h}h",
-                help=(
-                    "Sequências de zeros mais curtas que esse intervalo são preservadas — "
-                    "provavelmente são períodos normais de repouso, não remoção do sensor. "
-                    "O pyActigraphy recomenda ao menos 2h para não mascarar o sono."
-                ),
-            )
-            if duracao_mascara_h is None:
-                duracao_mascara_h = 2
-
         st.divider()
         st.caption("Sinais exibidos no gráfico")
         col_a, col_l, col_t = st.columns(3, gap="medium")
@@ -597,16 +561,8 @@ def analises_page():
             help=None if tem_evento else "Este arquivo não possui registros de marcação de evento (coluna EVENT).",
         )
 
-    # mask_h consolidado uma única vez; alimenta tanto o raw dos gráficos
-    # quanto as funções cacheadas de cálculo de métricas
-    mask_h = int(duracao_mascara_h) if mascarar_inatividade and duracao_mascara_h is not None else None
-
-    # raw usado apenas para raw.data.loc[dia] nos gráficos;
-    # @st.cache_data entrega uma cópia deserializada → mutação da máscara é segura
+    # raw usado apenas para raw.data.loc[dia] nos gráficos
     raw = _construir_raw_cached(nome_escolhido, df, modo_atividade)
-    if mask_h is not None:
-        raw.create_inactivity_mask(f"{mask_h}h")
-        raw.mask_inactivity = True
 
     dias = ArquivoController.dias_disponiveis(df)
     # numeração "Dia N" preservada antes da filtragem de exibição
@@ -712,7 +668,6 @@ def analises_page():
         titulo="Ritmo de repouso-atividade — registro completo",
         freq=frequencia_metricas, limiar=int(limiar_atividade),
         usar_periodo=usar_periodo, periodo=periodo_metricas,
-        mask_h=mask_h,
     )
     st.divider()
 
@@ -739,12 +694,11 @@ def analises_page():
         "um .txt no formato original (mesmas linhas de cabeçalho e campos) e um "
         ".csv apenas com os campos e seus valores. Sinais não selecionados em "
         "**Opções de exibição**, valores fora das faixas exibidas e linhas fora "
-        "de **Filtrar dias exibidos** são exportados zerados; períodos mascarados "
-        "como inatividade são exportados vazios (dado ausente)."
+        "de **Filtrar dias exibidos** são exportados zerados."
     )
     df_exportar = _preparar_df_exportacao(
         df, dt_index, modos_disponiveis, modo_atividade,
-        mostrar_atividade, escala_atividade, raw, mask_h,
+        mostrar_atividade, escala_atividade,
         mostrar_luz, escala_luz, mostrar_temperatura, escala_temperatura,
         dias_exibidos, hora_inicio, hora_fim,
     )
