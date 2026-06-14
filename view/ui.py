@@ -7,7 +7,7 @@ view/ui.py — Utilitários de UI compartilhados entre as views.
 Exporta:
   Enums   : Profissao
   Tamanhos: AVATAR_NAV, AVATAR_SM, AVATAR_LG
-  Helpers : fmt_cpf, fmt_telefone, forca_senha
+  Helpers : fmt_cpf, fmt_telefone, forca_senha, rotulo_genero, calcular_idade
   Avatar  : img_b64_tag, avatar_html
   Auth    : get_usuario_id
   Navegação: paginacao
@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import re
 import base64
+from datetime import date, datetime
 from enum import Enum
 
+import pandas as pd
 import streamlit as st
 
 
@@ -90,6 +92,41 @@ def forca_senha(senha: str) -> tuple[int, str, str]:
     }
     emoji, label = tabela[score]
     return score, label, emoji
+
+
+# ── Dados de sujeito (Condor) ────────────────────────────────────────────────
+
+def rotulo_genero(valor: str | None) -> str:
+    """Normaliza o campo SUBJECT_GENDER do Condor para MASCULINO/FEMININO/—."""
+    if not valor:
+        return "—"
+    inicial = valor.strip().upper()[:1]
+    if inicial == "M":
+        return "MASCULINO"
+    if inicial == "F":
+        return "FEMININO"
+    return valor.strip().upper()
+
+
+def calcular_idade(data_nascimento: str | None) -> str:
+    """Calcula a idade a partir do campo SUBJECT_DATE_OF_BIRTH do Condor (DD/MM/YYYY)."""
+    if not data_nascimento:
+        return "—"
+    try:
+        nascimento = datetime.strptime(data_nascimento.strip(), "%d/%m/%Y").date()
+    except ValueError:
+        return "—"
+    hoje = date.today()
+    idade = hoje.year - nascimento.year - ((hoje.month, hoje.day) < (nascimento.month, nascimento.day))
+    return f"{idade} anos"
+
+
+def coluna_numerica_utilizavel(df: pd.DataFrame, nome_coluna: str) -> pd.Series | None:
+    """Retorna a coluna como Series numérica se existir e tiver ao menos um valor não nulo, senão None."""
+    if nome_coluna not in df.columns:
+        return None
+    valores = pd.to_numeric(df[nome_coluna], errors="coerce")
+    return valores if valores.notna().any() else None
 
 
 # ── Avatar / imagem ───────────────────────────────────────────────────────────

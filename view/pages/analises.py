@@ -15,7 +15,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from controller.arquivo_controller import ArquivoController
 from controller.relatorio_controller import RelatorioController
-from view.ui import render_toast, set_toast, get_usuario_id
+from view.ui import render_toast, set_toast, get_usuario_id, rotulo_genero, coluna_numerica_utilizavel
 
 
 COR_LINHA = "#234cbe"
@@ -180,24 +180,6 @@ def _rotulo_dia(numero_dia: int, dia: str) -> str:
     return f"Dia {numero_dia} — {ts.strftime('%d/%m/%Y')} · {dia_semana}"
 
 
-def _rotulo_genero(valor: str | None) -> str:
-    if not valor:
-        return "—"
-    inicial = valor.strip().upper()[:1]
-    if inicial == "M":
-        return "MASCULINO"
-    if inicial == "F":
-        return "FEMININO"
-    return valor.strip().upper()
-
-
-def _coluna_numerica_utilizavel(df: pd.DataFrame, nome_coluna: str) -> pd.Series | None:
-    if nome_coluna not in df.columns:
-        return None
-    valores = pd.to_numeric(df[nome_coluna], errors="coerce")
-    return valores if valores.notna().any() else None
-
-
 # ── Preparação dos dados para exportação ──────────────────────────────────────
 
 def _preparar_df_exportacao(
@@ -214,6 +196,7 @@ def _preparar_df_exportacao(
     dias_exibidos: list[str],
     hora_inicio: int,
     hora_fim: int,
+    faixa_luz_filtro: tuple[float, float] | None = None,
 ) -> pd.DataFrame:
     """
     Copia df e zera os valores de atividade/luz/temperatura que não
@@ -259,6 +242,14 @@ def _preparar_df_exportacao(
     if colunas_sinais:
         df.loc[fora_do_filtro, colunas_sinais] = 0
 
+    # filtro de luz: zera atividade e temperatura fora da faixa de Lux selecionada
+    if faixa_luz_filtro is not None and "LIGHT" in df.columns:
+        luz = pd.to_numeric(df["LIGHT"], errors="coerce")
+        fora_da_luz = ~luz.between(*faixa_luz_filtro)
+        colunas_atividade_temp = [c for c in (modo_atividade, "TEMPERATURE") if c in df.columns]
+        if colunas_atividade_temp:
+            df.loc[fora_da_luz.fillna(False).to_numpy(), colunas_atividade_temp] = 0
+
     return df
 
 
@@ -280,12 +271,20 @@ def _grafico_combinado_dia(
     escala_temperatura: tuple[float, float] | None = None,
     hora_inicio: int = 0,
     hora_fim: int = 24,
+    serie_luz_filtro: pd.Series | None = None,
+    faixa_luz_filtro: tuple[float, float] | None = None,
 ) -> go.Figure:
     inicio_dia = pd.Timestamp(dia)
     inicio = inicio_dia + pd.Timedelta(hours=hora_inicio)
     fim    = inicio_dia + pd.Timedelta(hours=hora_fim) - pd.Timedelta(seconds=1)
 
     serie_atividade = serie_atividade.loc[inicio:fim]
+
+    mascara_luz = None
+    if serie_luz_filtro is not None and faixa_luz_filtro is not None:
+        fatia_luz_filtro = serie_luz_filtro.loc[inicio:fim]
+        mascara_luz = fatia_luz_filtro.between(*faixa_luz_filtro)
+        serie_atividade = serie_atividade.where(mascara_luz)
 
     extras = [
         (rotulo, cor, serie, faixa)
@@ -331,6 +330,8 @@ def _grafico_combinado_dia(
         indice_eixo = i + 2
         eixo_id = f"y{indice_eixo}"
         fatia = serie.loc[inicio:fim]
+        if mascara_luz is not None and rotulo == "Temperatura (°C)":
+            fatia = fatia.where(mascara_luz)
         fig.add_trace(go.Scatter(
             x=fatia.index, y=fatia.values, mode="lines",
             name=rotulo, line=dict(color=cor, dash="dot"), yaxis=eixo_id,
@@ -370,6 +371,8 @@ def _gerar_colagem_graficos(
     escala_temperatura: tuple[float, float] | None,
     hora_inicio: int,
     hora_fim: int,
+    serie_luz_filtro: pd.Series | None = None,
+    faixa_luz_filtro: tuple[float, float] | None = None,
 ) -> bytes:
     """Renderiza o gráfico de cada dia como imagem e empilha verticalmente — uma linha por dia."""
     imagens = []
@@ -381,6 +384,7 @@ def _gerar_colagem_graficos(
             serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
             escala_luz=escala_luz, escala_temperatura=escala_temperatura,
             hora_inicio=hora_inicio, hora_fim=hora_fim,
+            serie_luz_filtro=serie_luz_filtro, faixa_luz_filtro=faixa_luz_filtro,
         )
         # round-trip via PlotlyJSONEncoder: serializa Timestamps/numpy antes do kaleido,
         # que não os aceita diretamente em add_vrect (x0/x1) e nos eixos
@@ -472,7 +476,7 @@ def analises_page():
     nome_sujeito = metadata.get("SUBJECT_NAME")
     col_nome, col_sexo, col_nascimento = st.columns(3)
     col_nome.caption(f"**Paciente:** {nome_sujeito.strip().upper() if nome_sujeito else '—'}")
-    col_sexo.caption(f"**Sexo:** {_rotulo_genero(metadata.get('SUBJECT_GENDER'))}")
+    col_sexo.caption(f"**Sexo:** {rotulo_genero(metadata.get('SUBJECT_GENDER'))}")
     col_nascimento.caption(f"**Data de nascimento:** {metadata.get('SUBJECT_DATE_OF_BIRTH', '—')}")
 
     # ── Recorte do registro ───────────────────────────────────────────────────
@@ -560,8 +564,8 @@ def analises_page():
         st.warning("Este arquivo não possui nenhuma coluna de atividade reconhecida (PIM, TAT ou ZCM).")
         return
 
-    luz_bruta  = _coluna_numerica_utilizavel(df, "LIGHT")
-    temp_bruta = _coluna_numerica_utilizavel(df, "TEMPERATURE")
+    luz_bruta  = coluna_numerica_utilizavel(df, "LIGHT")
+    temp_bruta = coluna_numerica_utilizavel(df, "TEMPERATURE")
     tem_luz         = luz_bruta  is not None
     tem_temperatura = temp_bruta is not None
 
@@ -659,6 +663,20 @@ def analises_page():
             else:
                 hora_inicio, hora_fim = _PERIODOS_DIA[rotulo_periodo]
 
+        st.divider()
+        st.caption("Faixa de luz (Lux)")
+        filtrar_por_luz = st.checkbox(
+            "Mostrar atividade e temperatura apenas quando a luz estiver na faixa selecionada",
+            value=False, disabled=not tem_luz,
+            help=None if tem_luz else "Este arquivo não possui registros de luz utilizáveis (coluna LIGHT).",
+        )
+        faixa_luz_filtro = None
+        if filtrar_por_luz and faixa_total_luz is not None and faixa_total_luz[0] < faixa_total_luz[1]:
+            faixa_luz_filtro = st.slider(
+                "Faixa de Lux", min_value=faixa_total_luz[0], max_value=faixa_total_luz[1], value=faixa_total_luz,
+                help="Oculta, nos gráficos de atividade e temperatura, os pontos cujo valor de luz esteja fora dessa faixa.",
+            )
+
     dias_exibidos = [
         dia for dia in dias
         if _DIAS_SEMANA[pd.Timestamp(dia).weekday()] in dias_semana_escolhidos
@@ -681,6 +699,10 @@ def analises_page():
     serie_temp = None
     if mostrar_temperatura and temp_bruta is not None:
         serie_temp = pd.Series(temp_bruta.to_numpy(), index=dt_index, name="temperatura")
+
+    serie_luz_filtro = None
+    if faixa_luz_filtro is not None and luz_bruta is not None:
+        serie_luz_filtro = pd.Series(luz_bruta.to_numpy(), index=dt_index, name="luz_filtro")
 
     if not (mostrar_atividade or serie_luz is not None or serie_temp is not None):
         st.info("Selecione ao menos um sinal em **Opções de exibição** para gerar o gráfico.")
@@ -743,6 +765,7 @@ def analises_page():
                     serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
                     escala_luz=escala_luz, escala_temperatura=escala_temperatura,
                     hora_inicio=hora_inicio, hora_fim=hora_fim,
+                    serie_luz_filtro=serie_luz_filtro, faixa_luz_filtro=faixa_luz_filtro,
                 ),
             )
 
@@ -753,8 +776,9 @@ def analises_page():
         "Selecione o que deseja incluir no .zip exportado. **Dados**: .txt no formato "
         "original (mesmas linhas de cabeçalho e campos) e .csv apenas com os campos e "
         "seus valores, após os recortes aplicados acima — sinais não selecionados em "
-        "**Opções de exibição**, valores fora das faixas exibidas e linhas fora de "
-        "**Filtrar dias exibidos** são exportados zerados. **Gráficos**: imagem única "
+        "**Opções de exibição**, valores fora das faixas exibidas, linhas fora de "
+        "**Filtrar dias exibidos** e, se ativado, pontos fora da **faixa de luz** "
+        "selecionada são exportados zerados. **Gráficos**: imagem única "
         "com os gráficos diários exibidos acima, empilhados verticalmente — cada linha "
         "corresponde a um dia do registro."
     )
@@ -798,6 +822,7 @@ def analises_page():
                     escala_atividade, modo_atividade, COR_LINHA, mostrar_atividade,
                     serie_luz, serie_temp, serie_evento, escala_luz, escala_temperatura,
                     hora_inicio, hora_fim,
+                    serie_luz_filtro=serie_luz_filtro, faixa_luz_filtro=faixa_luz_filtro,
                 )
                 extras[f"{nome_base}_graficos.png"] = colagem_bytes
 
@@ -806,6 +831,7 @@ def analises_page():
                 mostrar_atividade, escala_atividade,
                 mostrar_luz, escala_luz, mostrar_temperatura, escala_temperatura,
                 dias_exibidos, hora_inicio, hora_fim,
+                faixa_luz_filtro=faixa_luz_filtro,
             )
             zip_bytes, zip_nome = _gerar_export_zip(
                 arquivo_id, usuario_id, df_exportar, incluir_dados, tuple(extras.items()),
