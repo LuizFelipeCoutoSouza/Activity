@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import base64
 import datetime as _dt
+import io
+import json
 from typing import cast
 
 import pandas as pd
 import plotly.graph_objs as go
+import plotly.io as pio
+from PIL import Image
 from pyActigraphy.io import BaseRaw
 import streamlit as st
+import streamlit.components.v1 as components
 from controller.arquivo_controller import ArquivoController
 from controller.relatorio_controller import RelatorioController
 from view.ui import render_toast, set_toast, get_usuario_id
@@ -41,6 +47,8 @@ _PERIODOS_FIXOS = [
 ]
 
 _LARGURA_EIXO_EXTRA = 0.08
+_LARGURA_COLAGEM = 1600
+_ALTURA_GRAFICO_COLAGEM = 340
 
 _ERROS_METRICA_RITMO = (KeyError, ValueError, ZeroDivisionError)
 _AVISO_DADOS_INSUFICIENTES = (
@@ -57,8 +65,11 @@ def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
 
 
 @st.cache_data(ttl=120, show_spinner=False)
-def _gerar_export_zip(arquivo_id: int, usuario_id: int, df: pd.DataFrame) -> tuple:
-    return ArquivoController.exportar_dados(arquivo_id, usuario_id, df)
+def _gerar_export_zip(
+    arquivo_id: int, usuario_id: int, df: pd.DataFrame,
+    incluir_dados: bool, extras: tuple[tuple[str, bytes], ...],
+) -> tuple:
+    return ArquivoController.exportar_dados(arquivo_id, usuario_id, df, incluir_dados, dict(extras))
 
 
 # ── Construção do objeto BaseRaw ──────────────────────────────────────────────
@@ -339,6 +350,55 @@ def _grafico_combinado_dia(
     if serie_evento is not None:
         _sombrear_eventos(fig, serie_evento, dia)
     return fig
+
+
+# ── Colagem dos gráficos diários ──────────────────────────────────────────────
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _gerar_colagem_graficos(
+    dias_exibidos: list[str],
+    numero_por_dia: dict[str, int],
+    raw_data: pd.Series,
+    escala_atividade: tuple[float, float],
+    rotulo_atividade: str,
+    cor_atividade: str,
+    mostrar_atividade: bool,
+    serie_luz: pd.Series | None,
+    serie_temp: pd.Series | None,
+    serie_evento: pd.Series | None,
+    escala_luz: tuple[float, float] | None,
+    escala_temperatura: tuple[float, float] | None,
+    hora_inicio: int,
+    hora_fim: int,
+) -> bytes:
+    """Renderiza o gráfico de cada dia como imagem e empilha verticalmente — uma linha por dia."""
+    imagens = []
+    for dia in dias_exibidos:
+        fig = _grafico_combinado_dia(
+            dia, numero_por_dia[dia], raw_data.loc[dia],
+            escala_atividade, rotulo_atividade, cor_atividade=cor_atividade,
+            mostrar_atividade=mostrar_atividade,
+            serie_luz=serie_luz, serie_temp=serie_temp, serie_evento=serie_evento,
+            escala_luz=escala_luz, escala_temperatura=escala_temperatura,
+            hora_inicio=hora_inicio, hora_fim=hora_fim,
+        )
+        # round-trip via PlotlyJSONEncoder: serializa Timestamps/numpy antes do kaleido,
+        # que não os aceita diretamente em add_vrect (x0/x1) e nos eixos
+        fig_serializavel = go.Figure(json.loads(pio.to_json(fig)))
+        png = fig_serializavel.to_image(format="png", width=_LARGURA_COLAGEM, height=_ALTURA_GRAFICO_COLAGEM, scale=2)
+        imagens.append(Image.open(io.BytesIO(png)))
+
+    largura = max(im.width for im in imagens)
+    altura_total = sum(im.height for im in imagens)
+    colagem = Image.new("RGB", (largura, altura_total), "white")
+    y = 0
+    for im in imagens:
+        colagem.paste(im, (0, y))
+        y += im.height
+
+    buf = io.BytesIO()
+    colagem.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 # ── Exibição de métricas ──────────────────────────────────────────────────────
@@ -686,28 +746,74 @@ def analises_page():
                 ),
             )
 
-    # ── Exportação dos dados ───────────────────────────────────────────────────
+    # ── Exportação ─────────────────────────────────────────────────────────────
     st.divider()
-    st.subheader("Exportar dados")
+    st.subheader("Exportar")
     st.caption(
-        "Gera um .zip com os dados do registro após os recortes aplicados acima: "
-        "um .txt no formato original (mesmas linhas de cabeçalho e campos) e um "
-        ".csv apenas com os campos e seus valores. Sinais não selecionados em "
-        "**Opções de exibição**, valores fora das faixas exibidas e linhas fora "
-        "de **Filtrar dias exibidos** são exportados zerados."
+        "Selecione o que deseja incluir no .zip exportado. **Dados**: .txt no formato "
+        "original (mesmas linhas de cabeçalho e campos) e .csv apenas com os campos e "
+        "seus valores, após os recortes aplicados acima — sinais não selecionados em "
+        "**Opções de exibição**, valores fora das faixas exibidas e linhas fora de "
+        "**Filtrar dias exibidos** são exportados zerados. **Gráficos**: imagem única "
+        "com os gráficos diários exibidos acima, empilhados verticalmente — cada linha "
+        "corresponde a um dia do registro."
     )
-    df_exportar = _preparar_df_exportacao(
-        df, dt_index, modos_disponiveis, modo_atividade,
-        mostrar_atividade, escala_atividade,
-        mostrar_luz, escala_luz, mostrar_temperatura, escala_temperatura,
-        dias_exibidos, hora_inicio, hora_fim,
-    )
-    zip_bytes, zip_nome = _gerar_export_zip(arquivo_id, usuario_id, df_exportar)
-    if zip_bytes:
-        st.download_button(
-            "Baixar dados (.zip)", data=zip_bytes, file_name=zip_nome, mime="application/zip",
-            on_click=_salvar_relatorio, args=(usuario_id, nome_escolhido, zip_nome, zip_bytes),
+
+    # Dispara o download automaticamente após a exportação ser gerada
+    export_pronto = st.session_state.pop("_export_pronto", None)
+    if export_pronto and export_pronto[0] == arquivo_id:
+        _, zip_bytes_pronto, zip_nome_pronto = export_pronto
+        b64 = base64.b64encode(zip_bytes_pronto).decode()
+        components.html(
+            f"""<script>
+            (function() {{
+                var a = window.parent.document.createElement('a');
+                a.href = 'data:application/zip;base64,{b64}';
+                a.download = '{zip_nome_pronto}';
+                window.parent.document.body.appendChild(a);
+                a.click();
+                window.parent.document.body.removeChild(a);
+            }})();
+            </script>""",
+            height=0,
         )
-        st.caption("Uma cópia também é salva em **Exportar relatório**.")
-    else:
-        st.warning("Não foi possível gerar a exportação.")
+
+    col_chk_dados, col_chk_graficos = st.columns(2)
+    incluir_dados = col_chk_dados.checkbox("Dados (.txt + .csv)", value=True)
+    incluir_graficos = col_chk_graficos.checkbox(
+        "Gráficos (.png)", value=True, disabled=not dias_exibidos,
+        help=None if dias_exibidos else "Nenhum dia exibido — ajuste os filtros em **Filtrar dias exibidos**.",
+    )
+    st.caption("Uma cópia também é salva em **Exportar relatório**.")
+
+    if not incluir_dados and not incluir_graficos:
+        st.info("Selecione ao menos uma opção para gerar a exportação.")
+    elif st.button("Baixar exportação (.zip)", type="primary"):
+        with st.spinner("Gerando exportação..."):
+            nome_base = nome_escolhido.rsplit(".", 1)[0]
+            extras: dict[str, bytes] = {}
+            if incluir_graficos and dias_exibidos:
+                colagem_bytes = _gerar_colagem_graficos(
+                    dias_exibidos, numero_por_dia, raw.data,
+                    escala_atividade, modo_atividade, COR_LINHA, mostrar_atividade,
+                    serie_luz, serie_temp, serie_evento, escala_luz, escala_temperatura,
+                    hora_inicio, hora_fim,
+                )
+                extras[f"{nome_base}_graficos.png"] = colagem_bytes
+
+            df_exportar = _preparar_df_exportacao(
+                df, dt_index, modos_disponiveis, modo_atividade,
+                mostrar_atividade, escala_atividade,
+                mostrar_luz, escala_luz, mostrar_temperatura, escala_temperatura,
+                dias_exibidos, hora_inicio, hora_fim,
+            )
+            zip_bytes, zip_nome = _gerar_export_zip(
+                arquivo_id, usuario_id, df_exportar, incluir_dados, tuple(extras.items()),
+            )
+
+        if zip_bytes:
+            _salvar_relatorio(usuario_id, nome_escolhido, zip_nome, zip_bytes)
+            st.session_state["_export_pronto"] = (arquivo_id, zip_bytes, zip_nome)
+            st.rerun()
+        else:
+            st.warning("Não foi possível gerar a exportação.")

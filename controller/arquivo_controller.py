@@ -154,8 +154,12 @@ class ArquivoController:
         return _filtrar_dia(df, data_str)
 
     @staticmethod
-    def exportar_dados(arquivo_id: int, usuario_id: int, df: pd.DataFrame) -> tuple:
-        """Compacta os dados (após edições) em um ZIP com .txt (formato Condor original) e .csv.
+    def exportar_dados(
+        arquivo_id: int, usuario_id: int, df: pd.DataFrame,
+        incluir_dados: bool = True, extras: dict[str, bytes] | None = None,
+    ) -> tuple:
+        """Compacta em um ZIP o .txt (formato Condor original) e o .csv (se incluir_dados)
+        mais quaisquer arquivos extras (ex.: imagens de gráficos).
 
         Retorna (zip_bytes, nome_arquivo) ou (None, None) se o arquivo original não for encontrado.
         """
@@ -166,8 +170,11 @@ class ArquivoController:
         nome_base = nome.rsplit(".", 1)[0]
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr(f"{nome_base}.txt", _gerar_txt(raw, df))
-            zf.writestr(f"{nome_base}.csv", _gerar_csv(df))
+            if incluir_dados:
+                zf.writestr(f"{nome_base}.txt", _gerar_txt(raw, df))
+                zf.writestr(f"{nome_base}.csv", _gerar_csv(df))
+            for nome_extra, conteudo in (extras or {}).items():
+                zf.writestr(nome_extra, conteudo)
         return buf.getvalue(), f"{nome_base}_exportado.zip"
 
     # ── ZIP ───────────────────────────────────────────────────────────────────
