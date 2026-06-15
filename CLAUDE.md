@@ -29,10 +29,10 @@ Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
 | `psycopg2-binary` | 2.9.12 | Driver PostgreSQL; `RealDictCursor` para SELECT como dict |
 | `bcrypt` | 5.0.0 | Hash de senhas em `UserModel.criar_usuario` e verificação no login |
 | `streamlit-keyup` | 0.3.0 | `st_keyup` — dispara rerun a cada tecla (busca em tempo real em `conjunto_de_dados.py`) |
-| `pyActigraphy` | 1.2.2 | Parsing/análise de actigrafia: `BaseRaw`, métricas IS/IV/L5/M10, máscara de inatividade — usado em `view/pages/analises.py` |
-| `pandas` | 2.1.4 | DataFrames/séries temporais — usado por `model/condor_parser.py` e na página de análise |
-| `plotly` | 6.7.0 | Gráficos interativos (`graph_objects`/`express`) em `view/pages/analises.py` |
-| `kaleido` | 1.3.0 | Engine de renderização estática do plotly (`fig.to_image`) — exporta cada gráfico diário como PNG em `view/pages/analises.py` |
+| `pyActigraphy` | 1.2.2 | Parsing/análise de actigrafia: `BaseRaw`, métricas IS/IV/L5/M10, máscara de inatividade — `construir_raw`/`construir_raw_cached` em `view/ui.py`, usado por `analises.py` e `comparacao.py` |
+| `pandas` | 2.1.4 | DataFrames/séries temporais — usado por `model/condor_parser.py` e pelas páginas de análise/comparação |
+| `plotly` | 6.7.0 | Gráficos interativos (`graph_objects`/`express`) — `grafico_combinado_dia` em `view/ui.py` (usado por `analises.py`), gráfico próprio em `comparacao.py` e `analise_temperatura.py` |
+| `kaleido` | 1.3.0 | Engine de renderização estática do plotly (`fig.to_image`) — exporta gráficos como PNG em `view/pages/analises.py` e `view/pages/analise_temperatura.py` |
 | `pillow` | 12.2.0 | Empilha os PNGs diários em uma colagem vertical (`_gerar_colagem_graficos`) em `view/pages/analises.py` |
 
 ## File Structure
@@ -74,11 +74,13 @@ Activity/
     ├── cadastro.py                 # cadastro_page()
     ├── home.py                     # home_page(): navbar, sidebar, roteamento lazy
     └── pages/                      # Uma página por arquivo; importadas lazily por home.py
-        ├── analises.py             # analises_page()          [em desenvolvimento]
-        ├── conjunto_de_dados.py    # conjunto_de_dados_page() [implementado]
-        ├── registro_de_pacientes.py# registro_de_pacientes_page() [implementado]
-        ├── exportar_relatorio.py   # exportar_relatorio_page() [implementado]
-        └── configuracoes.py        # configuracoes_page()     [implementado]
+        ├── analises.py             # analises_page()              [em desenvolvimento]
+        ├── analise_temperatura.py  # analise_temperatura_page()   [implementado]
+        ├── comparacao.py           # comparacao_page()            [implementado]
+        ├── conjunto_de_dados.py    # conjunto_de_dados_page()      [implementado]
+        ├── registro_de_pacientes.py# registro_de_pacientes_page()  [implementado]
+        ├── exportar_relatorio.py   # exportar_relatorio_page()     [implementado]
+        └── configuracoes.py        # configuracoes_page()          [implementado]
 ```
 
 ## Architecture
@@ -179,14 +181,18 @@ Qualquer acesso a banco de dados, parsing de arquivos ou lógica de sessão deve
 
 **`view/pages/conjunto_de_dados.py`** — gerencia arquivos .txt. Abas: listagem paginada com busca (`st_keyup`), filtros com padrão draft/aplicado, seleção em massa, download (zip automático via JS), exclusão; upload com descrição individual por arquivo. Cache de conteúdo via `@st.cache_data(ttl=120)`. Download em massa delega para `ArquivoController.gerar_zip()` e dispara o browser via JS (`window.parent.document.createElement('a')`) injetado com `st.components.v1.html()`.
 
-**`view/pages/analises.py`** — visualização de actigrafia, construída em torno do objeto `BaseRaw` do pyActigraphy (`_construir_raw`, módulo `pyActigraphy.io`). Estrutura:
-- Carrega o arquivo escolhido (cacheado via `_carregar_actigrafia`/`@st.cache_data(ttl=120)`) e exibe nome, sexo e data de nascimento do sujeito a partir de `metadata` (`SUBJECT_NAME`, `SUBJECT_GENDER`, `SUBJECT_DATE_OF_BIRTH`, normalizados por `_rotulo_genero`).
+**`view/pages/analises.py`** — visualização de actigrafia, construída em torno do objeto `BaseRaw` do pyActigraphy (`construir_raw`/`construir_raw_cached`, de `view/ui.py`). Estrutura:
+- Carrega o arquivo escolhido (cacheado via `carregar_actigrafia_cached`, de `view/ui.py`) e exibe nome, sexo e data de nascimento do sujeito a partir de `metadata` (`SUBJECT_NAME`, `SUBJECT_GENDER`, `SUBJECT_DATE_OF_BIRTH`, normalizados por `rotulo_genero`).
 - **Descartar início do registro**: checkbox + `st.pills` (0h–12h, passo 2h) que recorta `df` a partir de `primeiro_registro + duração`, antes de qualquer outro cálculo — afeta métricas, faixas e dias disponíveis, não só a exibição.
 - **Opções de exibição** (`st.expander`): escolha do modo de atividade (PIM/TAT/ZCM via `st.radio`, com `MODOS_ATIVIDADE` filtrado pelas colunas existentes); **mascaramento de inatividade** via `raw.create_inactivity_mask(f"{duração}h")` + `raw.mask_inactivity = True` (checkbox + `st.pills` 0h–12h, passo 2h) — propaga automaticamente para `raw.data`, afetando gráficos e métricas sem alterar `df`; checkboxes e sliders de faixa de valores (escala) para atividade, luz e temperatura.
 - **Parâmetros das métricas não paramétricas** (`st.expander`): `selectbox` de frequência de reamostragem (`10min`–`2H`, padrão `1H`) e `number_input` de limiar de binarização (padrão `4`), repassados a `raw.IS()`/`raw.IV()`/`raw.L5()`/`raw.M10()` via `_metricas_ritmo(raw, freq=..., limiar=...)`.
-- **Filtrar dias exibidos** (`st.expander`): filtros somente de exibição — dia da semana (`st.pills`, multi) e período do dia (`st.segmented_control`: Manhã/Tarde/Noite/Personalizado, este último com `st.slider` de intervalo de horas) — recortam os gráficos por dia (`_grafico_combinado_dia`) sem alterar dados nem métricas. A numeração "Dia N" é preservada via `numero_por_dia`, calculado antes da filtragem.
-- Gráficos combinados por dia (`_grafico_combinado_dia`, Plotly `go.Figure`): atividade + eixos extras de luz/temperatura sobrepostos, sombreamento do período noturno (`_sombrear_periodo_noturno`) e de marcações de evento (`_sombrear_eventos`/`_intervalos_marcados`).
-- **Exportar** (ao final da página): dois checkboxes definem o conteúdo do .zip exportado — **Dados (.txt + .csv)** e **Gráficos (.png)** (desabilitado se nenhum dia estiver em `dias_exibidos`). O processamento só ocorre ao clicar em **"Baixar exportação (.zip)"** (`st.button`, dentro de `st.spinner`) — evita reprocessar a cada interação da página. "Dados": `_preparar_df_exportacao` copia `df` e zera/esvazia valores conforme a seleção atual — sinais não marcados em "Opções de exibição" e linhas fora de "Filtrar dias exibidos" saem zerados; valores fora das faixas exibidas saem zerados; períodos mascarados como inatividade saem vazios (NaN). "Gráficos": `_gerar_colagem_graficos`/`@st.cache_data(ttl=120)` renderiza o `_grafico_combinado_dia` de cada dia em `dias_exibidos` como PNG via `fig.to_image()` (kaleido) e empilha as imagens verticalmente com Pillow — uma linha por dia, na mesma ordem/numeração "Dia N" exibida nos gráficos. Os itens selecionados vão para `ArquivoController.exportar_dados(..., incluir_dados, extras)`, que monta um único ZIP (`.txt`/`.csv` e/ou `_graficos.png`) via `_gerar_export_zip`/`@st.cache_data(ttl=120)`. Ao concluir: `_salvar_relatorio` salva o ZIP em `RelatorioController.salvar(usuario_id, zip_nome, nome_origem, zip_bytes)` (toda exportação baixada também fica disponível em **Exportar relatório**) e o resultado é guardado em `st.session_state["_export_pronto"]` (chaveado por `arquivo_id`) seguido de `st.rerun()`. No próximo render, o download é disparado automaticamente via JS (`window.parent.document.createElement('a')` + `.click()`, base64 do ZIP) injetado com `st.components.v1.html()` — mesmo padrão de download em massa de `conjunto_de_dados.py` — resultando em um clique único do usuário.
+- **Filtrar dias exibidos** (`st.expander`): filtros somente de exibição — dia da semana (`st.pills`, multi, opções `DIAS_SEMANA` de `view/ui.py`) e período do dia (`st.segmented_control`: Manhã/Tarde/Noite/Personalizado, este último com `st.slider` de intervalo de horas) — recortam os gráficos por dia (`grafico_combinado_dia`) sem alterar dados nem métricas. A numeração "Dia N" é preservada via `numero_por_dia`, calculado antes da filtragem.
+- Gráficos combinados por dia via `grafico_combinado_dia` (de `view/ui.py`, Plotly `go.Figure`): atividade + eixos extras de luz/temperatura sobrepostos, sombreamento do período noturno (`sombrear_periodo_noturno`) e de marcações de evento.
+- **Exportar** (ao final da página): dois checkboxes definem o conteúdo do .zip exportado — **Dados (.txt + .csv)** e **Gráficos (.png)** (desabilitado se nenhum dia estiver em `dias_exibidos`). O processamento só ocorre ao clicar em **"Baixar exportação (.zip)"** (`st.button`, dentro de `st.spinner`) — evita reprocessar a cada interação da página. "Dados": `_preparar_df_exportacao` copia `df` e zera/esvazia valores conforme a seleção atual — sinais não marcados em "Opções de exibição" e linhas fora de "Filtrar dias exibidos" saem zerados; valores fora das faixas exibidas saem zerados; períodos mascarados como inatividade saem vazios (NaN). "Gráficos": `_gerar_colagem_graficos`/`@st.cache_data(ttl=120)` renderiza o `grafico_combinado_dia` de cada dia em `dias_exibidos` como PNG via `fig.to_image()` (kaleido) e empilha as imagens verticalmente com Pillow — uma linha por dia, na mesma ordem/numeração "Dia N" exibida nos gráficos. Os itens selecionados vão para `ArquivoController.exportar_dados(..., incluir_dados, extras)`, que monta um único ZIP (`.txt`/`.csv` e/ou `_graficos.png`) via `_gerar_export_zip`/`@st.cache_data(ttl=120)`. Ao concluir: `_salvar_relatorio` salva o ZIP em `RelatorioController.salvar(usuario_id, zip_nome, nome_origem, zip_bytes)` (toda exportação baixada também fica disponível em **Exportar relatório**) e o resultado é guardado em `st.session_state["_export_pronto"]` (chaveado por `arquivo_id`) seguido de `st.rerun()`. No próximo render, o download é disparado automaticamente via JS (`window.parent.document.createElement('a')` + `.click()`, base64 do ZIP) injetado com `st.components.v1.html()` — mesmo padrão de download em massa de `conjunto_de_dados.py` — resultando em um clique único do usuário.
+
+**`view/pages/analise_temperatura.py`** — análise de temperatura de um único arquivo. Carrega o arquivo escolhido via `carregar_actigrafia_cached` e exibe nome, sexo e idade do sujeito (`rotulo_genero`, `calcular_idade`). Para `TEMPERATURE` e/ou `EXT TEMPERATURE` (via `coluna_numerica_utilizavel`, ignorando colunas ausentes ou totalmente nulas): monta uma matriz dia × hora com a temperatura média de cada hora (`_matriz_temperatura_horaria`, com linha/coluna "Média"), renderiza um gráfico de linha com a média por hora (`_grafico_medias_horarias`) e exibe a matriz estilizada com escala de cores azul→vermelho (`_estilizar_matriz`/`_renderizar_matriz`) mais um cartão de estatísticas descritivas (`_exibir_estatisticas`: média, mediana, mín, máx, amplitude, desvio padrão, variância). **Exportar**: checkboxes para **Tabelas (.csv)** (matrizes + estatísticas) e **Gráfico (.png)**; ao clicar em **"Baixar exportação (.zip)"**, monta os extras e delega a `ArquivoController.exportar_dados(..., incluir_dados=False, extras=...)` via `_gerar_export_zip`/`@st.cache_data(ttl=120)`; salva cópia em **Exportar relatório** (`_salvar_relatorio`) e dispara o download automático no próximo render, mesmo padrão de `analises.py`.
+
+**`view/pages/comparacao.py`** — sobrepõe gráficos de N arquivos selecionados (`st.multiselect`) em um único `go.Figure` por dia comparado, reaproveitando `grafico_combinado_dia`'s building blocks de `view/ui.py` (`sombrear_periodo_noturno`, cores, `LARGURA_EIXO_EXTRA`, `MODOS_ATIVIDADE`, `DIAS_SEMANA`). Cada arquivo recebe uma cor da `_PALETA_CORES`. **Opções de exibição**: modo de atividade comum a todos os arquivos (`st.radio`, apenas modos presentes em todas as colunas) e checkboxes/sliders de atividade, luz e temperatura com **escala compartilhada** — faixas mín/máx calculadas sobre todos os arquivos selecionados, para comparação direta de amplitude. **Alinhamento de dias** (`st.radio` "Alinhar por"): "Número do dia do registro" — compara o Dia N de cada arquivo (posição relativa dentro do próprio registro, via `st.pills` 1..max_dias); ou "Dia da semana" — compara a primeira ocorrência de cada dia da semana selecionado (`st.pills` com `DIAS_SEMANA`) entre os arquivos (ex.: sábado de um com sábado de outro). Para cada grupo resultante, `_grafico_comparacao_dia` desenha uma linha de atividade por arquivo (mais luz/temperatura como eixos extras tracejados), com `_eixo_relativo` normalizando cada dia para a data de referência `2000-01-01` (00:00–24:00) para alinhar visualmente dias de datas calendário diferentes.
 
 **`view/pages/registro_de_pacientes.py`** — CRUD completo de pacientes com paginação (8/página) e busca por nome/e-mail. Cadastro e edição via `@st.dialog("Paciente", width="large")` com duas abas: **Dados** (campos do paciente) e **Arquivos vinculados** (multiselect dos arquivos disponíveis do usuário). Exclusão com confirmação inline. Regra de negócio: um arquivo só pode ser vinculado a um paciente — arquivos já ocupados ficam invisíveis no multiselect.
 
@@ -211,6 +217,18 @@ Qualquer código de UI reutilizável pertence aqui. Não duplicar em páginas in
 | `paginacao(pagina, n_paginas, chave)` | `→ None` | Renderiza controles Anterior/Próxima; `chave` é a chave de `session_state` que armazena a página atual |
 | `set_toast(msg, icon?)` | `→ None` | Agenda toast para o próximo render (via `st.session_state`) |
 | `render_toast()` | `→ None` | Consome e exibe o toast pendente; chamar no início de cada página |
+| `rotulo_genero(valor)` | `str \| None → str` | Normaliza `SUBJECT_GENDER` (`"M"`/`"F"`/...) para rótulo exibível |
+| `calcular_idade(data_nascimento)` | `→ str` | Calcula idade a partir de `SUBJECT_DATE_OF_BIRTH` |
+| `coluna_numerica_utilizavel(df, nome)` | `→ pd.Series \| None` | Retorna a coluna como série numérica, ou `None` se ausente/totalmente nula |
+| `carregar_actigrafia_cached(arquivo_id, usuario_id)` | `@st.cache_data(ttl=120)` | Wrapper cacheado de `ArquivoController.carregar_actigrafia` |
+| `construir_raw(nome, df, coluna)` / `construir_raw_cached(...)` | `→ BaseRaw` | Constrói o objeto `BaseRaw` do pyActigraphy a partir de `df`/coluna de atividade; versão cacheada via `@st.cache_data(ttl=120)` |
+| `grafico_combinado_dia(dia, numero_dia, serie_atividade, ...)` | `@st.cache_data(ttl=120) → go.Figure` | Gráfico Plotly combinado de um dia: atividade + eixos extras de luz/temperatura, sombreamento noturno e de eventos |
+| `sombrear_periodo_noturno(fig, inicio, row=, col=)` | `→ None` | Adiciona sombreamento do período noturno a um `go.Figure` |
+| `rotulo_dia(numero_dia, dia)` | `→ str` | Rótulo "Dia N (dd/mm/aaaa)" usado nos títulos dos gráficos |
+| `COR_LINHA`, `COR_LUZ`, `COR_TEMPERATURA`, `COR_LEGENDA`, `COR_SOMBRA_NOITE`, `COR_SOMBRA_EVENTO` | `str` | Cores padrão usadas nos gráficos de actigrafia |
+| `MODOS_ATIVIDADE` | `list[str]` | `["PIM", "TAT", "ZCM"]` |
+| `DIAS_SEMANA` | `list[str]` | `["Segunda", ..., "Domingo"]` |
+| `LARGURA_EIXO_EXTRA` | `float` | Largura (fração do domínio x) reservada a cada eixo y extra (luz/temperatura) |
 
 **Padrão de toast cross-rerun:**
 ```python
@@ -257,7 +275,7 @@ Login por e-mail; `app.py` detecta via `st.session_state["logado"] == True`.
 
 **Nível 1 — `app.py`**: `st.session_state["pagina"]` → `"login"` | `"cadastro"` | `"home"`.
 
-**Nível 2 — `home.py`**: `st.session_state["pagina_atual"]` → `"Análises"` | `"Conjunto de dados"` | `"Registro de pacientes"` | `"Exportar relatório"` | `"Configurações"`.
+**Nível 2 — `home.py`**: `st.session_state["pagina_atual"]` → `"Análises"` | `"Análise de temperatura"` | `"Comparação"` | `"Conjunto de dados"` | `"Registro de pacientes"` | `"Exportar relatório"` | `"Configurações"`.
 
 Para adicionar uma nova página autenticada:
 1. Criar `view/pages/minha_pagina.py` com `minha_pagina_page()`.
