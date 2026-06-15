@@ -12,6 +12,10 @@ Exporta:
   Auth    : get_usuario_id
   Navegação: paginacao
   Toast   : set_toast, render_toast
+  Actigrafia: COR_LINHA, COR_LUZ, COR_TEMPERATURA, COR_LEGENDA, COR_SOMBRA_NOITE,
+              COR_SOMBRA_EVENTO, MODOS_ATIVIDADE, DIAS_SEMANA, LARGURA_EIXO_EXTRA,
+              carregar_actigrafia_cached, construir_raw, construir_raw_cached,
+              sombrear_periodo_noturno, rotulo_dia, grafico_combinado_dia
 """
 
 from __future__ import annotations
@@ -22,7 +26,10 @@ from datetime import date, datetime
 from enum import Enum
 
 import pandas as pd
+import plotly.graph_objs as go
 import streamlit as st
+from pyActigraphy.io import BaseRaw
+from controller.arquivo_controller import ArquivoController
 
 
 # ── Enums de domínio ──────────────────────────────────────────────────────────
@@ -127,6 +134,190 @@ def coluna_numerica_utilizavel(df: pd.DataFrame, nome_coluna: str) -> pd.Series 
         return None
     valores = pd.to_numeric(df[nome_coluna], errors="coerce")
     return valores if valores.notna().any() else None
+
+
+# ── Gráficos de actigrafia ────────────────────────────────────────────────────
+# Compartilhado entre view/pages/analises.py e view/pages/comparacao.py.
+
+COR_LINHA = "#234cbe"
+COR_LUZ = "#ffb433"
+COR_TEMPERATURA = "#c43903"
+COR_LEGENDA = "black"
+COR_SOMBRA_NOITE = "rgba(25, 35, 90, 0.12)"
+COR_SOMBRA_EVENTO = "rgba(34, 139, 34, 0.18)"
+
+MODOS_ATIVIDADE = ["PIM", "TAT", "ZCM"]
+
+DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+
+LARGURA_EIXO_EXTRA = 0.08
+
+
+@st.cache_data(ttl=120)
+def carregar_actigrafia_cached(arquivo_id: int, usuario_id: int) -> tuple:
+    """Baixa e processa um arquivo Condor (cacheado). Retorna (metadata, DataFrame)."""
+    return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
+
+
+def construir_raw(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
+    serie = pd.Series(df[coluna].to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="Activity")
+    frequencia = pd.Timedelta(serie.index.to_series().diff().median())
+    serie = serie.asfreq(frequencia)
+    return BaseRaw(
+        name=nome, uuid=nome, format="CONDOR", axial_mode=None,
+        start_time=serie.index[0], period=serie.index[-1] - serie.index[0],
+        frequency=frequencia, data=serie, light=None,
+    )
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def construir_raw_cached(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
+    return construir_raw(nome, df, coluna)
+
+
+def _intervalos_marcados(mascara: pd.Series) -> list[tuple]:
+    intervalos: list[tuple] = []
+    em_intervalo = False
+    inicio = anterior = None
+    for ts, valor in mascara.items():
+        if valor and not em_intervalo:
+            inicio, em_intervalo = ts, True
+        elif not valor and em_intervalo:
+            intervalos.append((inicio, anterior))
+            em_intervalo = False
+        anterior = ts
+    if em_intervalo:
+        intervalos.append((inicio, anterior))
+    return intervalos
+
+
+def sombrear_periodo_noturno(
+    fig: go.Figure, inicio: pd.Timestamp,
+    row: int | str = "all", col: int | str = "all",
+) -> None:
+    for ini, fim in (
+        (inicio,                              inicio + pd.Timedelta(hours=6)),
+        (inicio + pd.Timedelta(hours=18),     inicio + pd.Timedelta(days=1)),
+    ):
+        fig.add_vrect(x0=ini, x1=fim, fillcolor=COR_SOMBRA_NOITE, line_width=0, layer="below", row=row, col=col)
+
+
+def _sombrear_eventos(
+    fig: go.Figure, serie_evento: pd.Series, dia: str,
+    row: int | str = "all", col: int | str = "all",
+) -> None:
+    try:
+        fatia = serie_evento.loc[dia]
+    except KeyError:
+        return
+    marcado = fatia.fillna(0) != 0
+    for ini, fim in _intervalos_marcados(marcado):
+        fig.add_vrect(x0=ini, x1=fim, fillcolor=COR_SOMBRA_EVENTO, line_width=0, layer="below", row=row, col=col)
+
+
+def rotulo_dia(numero_dia: int, dia: str) -> str:
+    ts = pd.Timestamp(dia)
+    idx = int(ts.weekday())
+    dia_semana = DIAS_SEMANA[idx] + ("-feira" if idx < 5 else "")
+    return f"Dia {numero_dia} — {ts.strftime('%d/%m/%Y')} · {dia_semana}"
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def grafico_combinado_dia(
+    dia: str,
+    numero_dia: int,
+    serie_atividade: pd.Series,
+    escala_atividade: tuple[float, float],
+    rotulo_atividade: str,
+    cor_atividade: str = COR_LINHA,
+    mostrar_atividade: bool = True,
+    serie_luz: pd.Series | None = None,
+    serie_temp: pd.Series | None = None,
+    serie_evento: pd.Series | None = None,
+    escala_luz: tuple[float, float] | None = None,
+    escala_temperatura: tuple[float, float] | None = None,
+    hora_inicio: int = 0,
+    hora_fim: int = 24,
+    serie_luz_filtro: pd.Series | None = None,
+    faixa_luz_filtro: tuple[float, float] | None = None,
+) -> go.Figure:
+    inicio_dia = pd.Timestamp(dia)
+    inicio = inicio_dia + pd.Timedelta(hours=hora_inicio)
+    fim    = inicio_dia + pd.Timedelta(hours=hora_fim) - pd.Timedelta(seconds=1)
+
+    serie_atividade = serie_atividade.loc[inicio:fim]
+
+    mascara_luz = None
+    if serie_luz_filtro is not None and faixa_luz_filtro is not None:
+        fatia_luz_filtro = serie_luz_filtro.loc[inicio:fim]
+        mascara_luz = fatia_luz_filtro.between(*faixa_luz_filtro)
+        serie_atividade = serie_atividade.where(mascara_luz)
+
+    extras = [
+        (rotulo, cor, serie, faixa)
+        for rotulo, cor, serie, faixa in (
+            ("Luz (Lux)",        COR_LUZ,         serie_luz,  escala_luz),
+            ("Temperatura (°C)", COR_TEMPERATURA, serie_temp, escala_temperatura),
+        )
+        if serie is not None
+    ]
+
+    fim_dominio_x = 1 - LARGURA_EIXO_EXTRA * len(extras)
+
+    fig = go.Figure()
+    if mostrar_atividade:
+        fig.add_trace(go.Scatter(
+            x=serie_atividade.index, y=serie_atividade.values, mode="lines",
+            name=rotulo_atividade, line=dict(color=cor_atividade),
+        ))
+
+    layout = dict(
+        title=dict(text=rotulo_dia(numero_dia, dia), x=0.01, xanchor="left", font=dict(size=14, color=COR_LEGENDA)),
+        xaxis=dict(
+            title="Hora", domain=[0, fim_dominio_x], range=[inicio, fim], tickformat="%H:%M",
+            dtick=3600000, showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)", griddash="dot",
+        ),
+        yaxis=dict(
+            title=dict(text=rotulo_atividade, font=dict(color=cor_atividade)),
+            tickfont=dict(color=cor_atividade),
+            range=escala_atividade,
+        ),
+        height=340,
+        margin=dict(l=0, r=0, t=60, b=0),
+        hovermode="x unified",
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+            bgcolor="rgba(255, 255, 255, 0.75)",
+            bordercolor="rgba(0, 0, 0, 0.15)", borderwidth=1,
+            font=dict(size=11, color=COR_LEGENDA),
+        ),
+    )
+
+    for i, (rotulo, cor, serie, faixa) in enumerate(extras):
+        indice_eixo = i + 2
+        eixo_id = f"y{indice_eixo}"
+        fatia = serie.loc[inicio:fim]
+        if mascara_luz is not None and rotulo == "Temperatura (°C)":
+            fatia = fatia.where(mascara_luz)
+        fig.add_trace(go.Scatter(
+            x=fatia.index, y=fatia.values, mode="lines",
+            name=rotulo, line=dict(color=cor, dash="dot"), yaxis=eixo_id,
+        ))
+        eixo: dict = dict(
+            title=dict(text=rotulo, font=dict(color=cor)),
+            tickfont=dict(color=cor),
+            range=faixa, overlaying="y", side="right",
+        )
+        if i > 0:
+            eixo["anchor"]   = "free"
+            eixo["position"] = fim_dominio_x + LARGURA_EIXO_EXTRA * i
+        layout[f"yaxis{indice_eixo}"] = eixo
+
+    fig.update_layout(**layout)
+    sombrear_periodo_noturno(fig, inicio_dia)
+    if serie_evento is not None:
+        _sombrear_eventos(fig, serie_evento, dia)
+    return fig
 
 
 # ── Avatar / imagem ───────────────────────────────────────────────────────────

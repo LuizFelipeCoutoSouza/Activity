@@ -10,24 +10,16 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.io as pio
 from PIL import Image
-from pyActigraphy.io import BaseRaw
 import streamlit as st
 import streamlit.components.v1 as components
 from controller.arquivo_controller import ArquivoController
 from controller.relatorio_controller import RelatorioController
-from view.ui import render_toast, set_toast, get_usuario_id, rotulo_genero, coluna_numerica_utilizavel
+from view.ui import (
+    render_toast, set_toast, get_usuario_id, rotulo_genero, coluna_numerica_utilizavel,
+    carregar_actigrafia_cached, construir_raw_cached, grafico_combinado_dia,
+    COR_LINHA, MODOS_ATIVIDADE, DIAS_SEMANA,
+)
 
-
-COR_LINHA = "#234cbe"
-COR_LUZ = "#ffb433"
-COR_TEMPERATURA = "#c43903"
-COR_LEGENDA = "black"
-COR_SOMBRA_NOITE = "rgba(25, 35, 90, 0.12)"
-COR_SOMBRA_EVENTO = "rgba(34, 139, 34, 0.18)"
-
-MODOS_ATIVIDADE = ["PIM", "TAT", "ZCM"]
-
-_DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
 
 _PERIODOS_DIA = {
     "Dia inteiro":      (0, 24),
@@ -46,7 +38,6 @@ _PERIODOS_FIXOS = [
     (30, "30 dias", "30D"),
 ]
 
-_LARGURA_EIXO_EXTRA = 0.08
 _LARGURA_COLAGEM = 1600
 _ALTURA_GRAFICO_COLAGEM = 340
 
@@ -59,35 +50,12 @@ _AVISO_DADOS_INSUFICIENTES = (
 
 # ── Cache de I/O ──────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=120)
-def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
-    return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
-
-
 @st.cache_data(ttl=120, show_spinner=False)
 def _gerar_export_zip(
     arquivo_id: int, usuario_id: int, df: pd.DataFrame,
     incluir_dados: bool, extras: tuple[tuple[str, bytes], ...],
 ) -> tuple:
     return ArquivoController.exportar_dados(arquivo_id, usuario_id, df, incluir_dados, dict(extras))
-
-
-# ── Construção do objeto BaseRaw ──────────────────────────────────────────────
-
-def _construir_raw(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
-    serie = pd.Series(df[coluna].to_numpy(), index=pd.DatetimeIndex(df["DATE/TIME"]), name="Activity")
-    frequencia = pd.Timedelta(serie.index.to_series().diff().median())
-    serie = serie.asfreq(frequencia)
-    return BaseRaw(
-        name=nome, uuid=nome, format="CONDOR", axial_mode=None,
-        start_time=serie.index[0], period=serie.index[-1] - serie.index[0],
-        frequency=frequencia, data=serie, light=None,
-    )
-
-
-@st.cache_data(ttl=120, show_spinner=False)
-def _construir_raw_cached(nome: str, df: pd.DataFrame, coluna: str) -> BaseRaw:
-    return _construir_raw(nome, df, coluna)
 
 
 # ── Cálculo cacheado de métricas (pesado) ─────────────────────────────────────
@@ -97,7 +65,7 @@ def _computar_metricas_globais(
     df: pd.DataFrame, nome: str, coluna: str,
     freq: str, limiar: int,
 ) -> dict | None:
-    raw = _construir_raw_cached(nome, df, coluna)
+    raw = construir_raw_cached(nome, df, coluna)
     try:
         return {
             "is":  float(raw.IS(freq=freq, threshold=limiar)),
@@ -114,7 +82,7 @@ def _computar_metricas_periodo(
     df: pd.DataFrame, nome: str, coluna: str,
     freq: str, limiar: int, periodo: str,
 ) -> pd.DataFrame | None:
-    raw = _construir_raw_cached(nome, df, coluna)
+    raw = construir_raw_cached(nome, df, coluna)
     try:
         vals_is  = raw.ISp(period=periodo, freq=freq, threshold=limiar)
         vals_iv  = raw.IVp(period=periodo, freq=freq, threshold=limiar)
@@ -127,57 +95,6 @@ def _computar_metricas_periodo(
         )
     except _ERROS_METRICA_RITMO:
         return None
-
-
-# ── Helpers de sombreamento ───────────────────────────────────────────────────
-
-def _sombrear_periodo_noturno(
-    fig: go.Figure, inicio: pd.Timestamp,
-    row: int | str = "all", col: int | str = "all",
-) -> None:
-    for ini, fim in (
-        (inicio,                              inicio + pd.Timedelta(hours=6)),
-        (inicio + pd.Timedelta(hours=18),     inicio + pd.Timedelta(days=1)),
-    ):
-        fig.add_vrect(x0=ini, x1=fim, fillcolor=COR_SOMBRA_NOITE, line_width=0, layer="below", row=row, col=col)
-
-
-def _intervalos_marcados(mascara: pd.Series) -> list[tuple]:
-    intervalos: list[tuple] = []
-    em_intervalo = False
-    inicio = anterior = None
-    for ts, valor in mascara.items():
-        if valor and not em_intervalo:
-            inicio, em_intervalo = ts, True
-        elif not valor and em_intervalo:
-            intervalos.append((inicio, anterior))
-            em_intervalo = False
-        anterior = ts
-    if em_intervalo:
-        intervalos.append((inicio, anterior))
-    return intervalos
-
-
-def _sombrear_eventos(
-    fig: go.Figure, serie_evento: pd.Series, dia: str,
-    row: int | str = "all", col: int | str = "all",
-) -> None:
-    try:
-        fatia = serie_evento.loc[dia]
-    except KeyError:
-        return
-    marcado = fatia.fillna(0) != 0
-    for ini, fim in _intervalos_marcados(marcado):
-        fig.add_vrect(x0=ini, x1=fim, fillcolor=COR_SOMBRA_EVENTO, line_width=0, layer="below", row=row, col=col)
-
-
-# ── Helpers de rótulo ─────────────────────────────────────────────────────────
-
-def _rotulo_dia(numero_dia: int, dia: str) -> str:
-    ts = pd.Timestamp(dia)
-    idx = int(ts.weekday())
-    dia_semana = _DIAS_SEMANA[idx] + ("-feira" if idx < 5 else "")
-    return f"Dia {numero_dia} — {ts.strftime('%d/%m/%Y')} · {dia_semana}"
 
 
 # ── Preparação dos dados para exportação ──────────────────────────────────────
@@ -253,106 +170,6 @@ def _preparar_df_exportacao(
     return df
 
 
-# ── Gráfico diário cacheado ───────────────────────────────────────────────────
-
-@st.cache_data(ttl=120, show_spinner=False)
-def _grafico_combinado_dia(
-    dia: str,
-    numero_dia: int,
-    serie_atividade: pd.Series,
-    escala_atividade: tuple[float, float],
-    rotulo_atividade: str,
-    cor_atividade: str = COR_LINHA,
-    mostrar_atividade: bool = True,
-    serie_luz: pd.Series | None = None,
-    serie_temp: pd.Series | None = None,
-    serie_evento: pd.Series | None = None,
-    escala_luz: tuple[float, float] | None = None,
-    escala_temperatura: tuple[float, float] | None = None,
-    hora_inicio: int = 0,
-    hora_fim: int = 24,
-    serie_luz_filtro: pd.Series | None = None,
-    faixa_luz_filtro: tuple[float, float] | None = None,
-) -> go.Figure:
-    inicio_dia = pd.Timestamp(dia)
-    inicio = inicio_dia + pd.Timedelta(hours=hora_inicio)
-    fim    = inicio_dia + pd.Timedelta(hours=hora_fim) - pd.Timedelta(seconds=1)
-
-    serie_atividade = serie_atividade.loc[inicio:fim]
-
-    mascara_luz = None
-    if serie_luz_filtro is not None and faixa_luz_filtro is not None:
-        fatia_luz_filtro = serie_luz_filtro.loc[inicio:fim]
-        mascara_luz = fatia_luz_filtro.between(*faixa_luz_filtro)
-        serie_atividade = serie_atividade.where(mascara_luz)
-
-    extras = [
-        (rotulo, cor, serie, faixa)
-        for rotulo, cor, serie, faixa in (
-            ("Luz (Lux)",        COR_LUZ,         serie_luz,  escala_luz),
-            ("Temperatura (°C)", COR_TEMPERATURA, serie_temp, escala_temperatura),
-        )
-        if serie is not None
-    ]
-
-    fim_dominio_x = 1 - _LARGURA_EIXO_EXTRA * len(extras)
-
-    fig = go.Figure()
-    if mostrar_atividade:
-        fig.add_trace(go.Scatter(
-            x=serie_atividade.index, y=serie_atividade.values, mode="lines",
-            name=rotulo_atividade, line=dict(color=cor_atividade),
-        ))
-
-    layout = dict(
-        title=dict(text=_rotulo_dia(numero_dia, dia), x=0.01, xanchor="left", font=dict(size=14, color=COR_LEGENDA)),
-        xaxis=dict(
-            title="Hora", domain=[0, fim_dominio_x], range=[inicio, fim], tickformat="%H:%M",
-            dtick=3600000, showgrid=True, gridcolor="rgba(0, 0, 0, 0.15)", griddash="dot",
-        ),
-        yaxis=dict(
-            title=dict(text=rotulo_atividade, font=dict(color=cor_atividade)),
-            tickfont=dict(color=cor_atividade),
-            range=escala_atividade,
-        ),
-        height=340,
-        margin=dict(l=0, r=0, t=60, b=0),
-        hovermode="x unified",
-        legend=dict(
-            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-            bgcolor="rgba(255, 255, 255, 0.75)",
-            bordercolor="rgba(0, 0, 0, 0.15)", borderwidth=1,
-            font=dict(size=11, color=COR_LEGENDA),
-        ),
-    )
-
-    for i, (rotulo, cor, serie, faixa) in enumerate(extras):
-        indice_eixo = i + 2
-        eixo_id = f"y{indice_eixo}"
-        fatia = serie.loc[inicio:fim]
-        if mascara_luz is not None and rotulo == "Temperatura (°C)":
-            fatia = fatia.where(mascara_luz)
-        fig.add_trace(go.Scatter(
-            x=fatia.index, y=fatia.values, mode="lines",
-            name=rotulo, line=dict(color=cor, dash="dot"), yaxis=eixo_id,
-        ))
-        eixo: dict = dict(
-            title=dict(text=rotulo, font=dict(color=cor)),
-            tickfont=dict(color=cor),
-            range=faixa, overlaying="y", side="right",
-        )
-        if i > 0:
-            eixo["anchor"]   = "free"
-            eixo["position"] = fim_dominio_x + _LARGURA_EIXO_EXTRA * i
-        layout[f"yaxis{indice_eixo}"] = eixo
-
-    fig.update_layout(**layout)
-    _sombrear_periodo_noturno(fig, inicio_dia)
-    if serie_evento is not None:
-        _sombrear_eventos(fig, serie_evento, dia)
-    return fig
-
-
 # ── Colagem dos gráficos diários ──────────────────────────────────────────────
 
 @st.cache_data(ttl=120, show_spinner=False)
@@ -377,7 +194,7 @@ def _gerar_colagem_graficos(
     """Renderiza o gráfico de cada dia como imagem e empilha verticalmente — uma linha por dia."""
     imagens = []
     for dia in dias_exibidos:
-        fig = _grafico_combinado_dia(
+        fig = grafico_combinado_dia(
             dia, numero_por_dia[dia], raw_data.loc[dia],
             escala_atividade, rotulo_atividade, cor_atividade=cor_atividade,
             mostrar_atividade=mostrar_atividade,
@@ -468,7 +285,7 @@ def analises_page():
     nome_escolhido = st.selectbox("Arquivo", list(opcoes_arquivo.keys()))
     arquivo_id = opcoes_arquivo[nome_escolhido]["id"]
 
-    metadata, df = _carregar_actigrafia(arquivo_id, usuario_id)
+    metadata, df = carregar_actigrafia_cached(arquivo_id, usuario_id)
     if df.empty:
         st.warning("Não foi possível processar este arquivo.")
         return
@@ -626,7 +443,7 @@ def analises_page():
         )
 
     # raw usado apenas para raw.data.loc[dia] nos gráficos
-    raw = _construir_raw_cached(nome_escolhido, df, modo_atividade)
+    raw = construir_raw_cached(nome_escolhido, df, modo_atividade)
 
     dias = ArquivoController.dias_disponiveis(df)
     # numeração "Dia N" preservada antes da filtragem de exibição
@@ -641,7 +458,7 @@ def analises_page():
         with col_semana:
             st.caption("Dia da semana")
             dias_semana_escolhidos = st.pills(
-                "Dia da semana", _DIAS_SEMANA, selection_mode="multi", default=_DIAS_SEMANA,
+                "Dia da semana", DIAS_SEMANA, selection_mode="multi", default=DIAS_SEMANA,
                 label_visibility="collapsed",
                 help="Mostra apenas os gráficos dos dias que caem nos dias da semana selecionados.",
             ) or []
@@ -679,7 +496,7 @@ def analises_page():
 
     dias_exibidos = [
         dia for dia in dias
-        if _DIAS_SEMANA[pd.Timestamp(dia).weekday()] in dias_semana_escolhidos
+        if DIAS_SEMANA[pd.Timestamp(dia).weekday()] in dias_semana_escolhidos
     ]
 
     # DatetimeIndex pré-computado uma única vez e reutilizado nas três séries
@@ -758,7 +575,7 @@ def analises_page():
     else:
         for dia in dias_exibidos:
             st.plotly_chart(
-                _grafico_combinado_dia(
+                grafico_combinado_dia(
                     dia, numero_por_dia[dia], raw.data.loc[dia],
                     escala_atividade, modo_atividade, cor_atividade=COR_LINHA,
                     mostrar_atividade=mostrar_atividade,

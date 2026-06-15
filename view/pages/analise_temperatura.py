@@ -10,7 +10,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 from controller.arquivo_controller import ArquivoController
 from controller.relatorio_controller import RelatorioController
-from view.ui import render_toast, set_toast, get_usuario_id, rotulo_genero, calcular_idade, coluna_numerica_utilizavel
+from view.ui import (
+    render_toast, set_toast, get_usuario_id, rotulo_genero, calcular_idade, coluna_numerica_utilizavel,
+    carregar_actigrafia_cached,
+)
 
 
 COR_TEMPERATURA     = "#c43903"
@@ -18,11 +21,6 @@ COR_TEMPERATURA_EXT = "#1f77b4"
 
 
 # ── Cache de I/O ──────────────────────────────────────────────────────────────
-
-@st.cache_data(ttl=120)
-def _carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
-    return ArquivoController.carregar_actigrafia(arquivo_id, usuario_id)
-
 
 @st.cache_data(ttl=120, show_spinner=False)
 def _gerar_export_zip(arquivo_id: int, usuario_id: int, extras: tuple[tuple[str, bytes], ...]) -> tuple:
@@ -223,7 +221,7 @@ def analise_temperatura_page():
     nome_escolhido = st.selectbox("Arquivo", list(opcoes_arquivo.keys()))
     arquivo_id = opcoes_arquivo[nome_escolhido]["id"]
 
-    metadata, df = _carregar_actigrafia(arquivo_id, usuario_id)
+    metadata, df = carregar_actigrafia_cached(arquivo_id, usuario_id)
     if df.empty:
         st.warning("Não foi possível processar este arquivo.")
         return

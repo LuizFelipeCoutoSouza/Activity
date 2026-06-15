@@ -11,6 +11,7 @@ from view.ui import avatar_html, AVATAR_NAV
 PAGINAS = [
     ("📊", "Análises"),
     ("🌡️", "Análise de temperatura"),
+    ("📈", "Comparação"),
     ("🗃️", "Conjunto de dados"),
     ("👥", "Registro de pacientes"),
     ("📄", "Exportar relatório"),
@@ -136,6 +137,9 @@ def _conteudo():
     elif pagina == "Análise de temperatura":
         from view.pages.analise_temperatura import analise_temperatura_page
         analise_temperatura_page()
+    elif pagina == "Comparação":
+        from view.pages.comparacao import comparacao_page
+        comparacao_page()
     elif pagina == "Conjunto de dados":
         from view.pages.conjunto_de_dados import conjunto_de_dados_page
         conjunto_de_dados_page()
