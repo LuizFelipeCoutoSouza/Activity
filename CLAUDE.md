@@ -33,7 +33,7 @@ Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
 | `pandas` | 2.1.4 | DataFrames/séries temporais — usado por `model/condor_parser.py` e pelas páginas de análise/comparação |
 | `plotly` | 6.7.0 | Gráficos interativos (`graph_objects`/`express`) — `grafico_combinado_dia` em `view/ui.py` (usado por `analises.py`), gráfico próprio em `comparacao.py` e `analise_temperatura.py` |
 | `kaleido` | 1.3.0 | Engine de renderização estática do plotly (`fig.to_image`) — exporta gráficos como PNG em `view/pages/analises.py` e `view/pages/analise_temperatura.py` |
-| `pillow` | 12.2.0 | Empilha os PNGs diários em uma colagem vertical (`_gerar_colagem_graficos`) em `view/pages/analises.py` |
+| `pillow` | 11.3.0 | Empilha os PNGs diários em uma colagem vertical (`_gerar_colagem_graficos`) em `view/pages/analises.py` |
 
 ## File Structure
 
