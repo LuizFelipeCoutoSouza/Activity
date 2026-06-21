@@ -10,32 +10,28 @@ As citações autor-data já presentes no texto seguem esse padrão e foram mant
 2.1  ACTIGRAFIA E RITMOS CIRCADIANOS
 ====================================================================================================
 
-Esta seção apresenta a base conceitual do processamento de dados realizado
-pelo sistema: o princípio metodológico da actigrafia, os sinais que um
-actígrafo registra ao longo de dias consecutivos de monitoramento e a relação
-desses sinais com os ritmos circadianos que se pretende observar. Essa
-fundamentação é o que distingue decisões arbitrárias de engenharia de
-escolhas ancoradas no domínio de aplicação — por exemplo, por que PIM, TAT e
-ZCM são tratados como modos alternativos e mutuamente exclusivos de um mesmo
-sinal, ou por que luz e temperatura figuram como eixos complementares, e não
-substitutos, da atividade.
+Esta seção apresenta a base conceitual do processamento realizado pelo sistema:
+o princípio metodológico da actigrafia, os sinais que um actígrafo registra e
+sua relação com os ritmos circadianos. Essa fundamentação distingue decisões
+arbitrárias de engenharia de escolhas ancoradas no domínio — por exemplo, por
+que PIM, TAT e ZCM são modos mutuamente exclusivos de um mesmo sinal, ou por que
+luz e temperatura figuram como eixos complementares, e não substitutos, da
+atividade.
 
 
 2.1.1  PRINCÍPIO DE MEDIÇÃO DA ACTIGRAFIA
 ----------------------------------------------------------------------------------------------------
-A actigrafia é um método objetivo e não invasivo de monitoramento do padrão
-de atividade motora humana ao longo do tempo, realizado por um dispositivo
-portátil — o actígrafo — em geral fixado ao pulso não dominante e mantido em
-uso contínuo por períodos que variam de poucos dias a algumas semanas
-(ANCOLI-ISRAEL et al., 2003; SADEH, 2011). Seu sensor central é um
-acelerômetro de estado sólido, capaz de detectar movimento nos três eixos
-espaciais; o dispositivo amostra a aceleração em alta frequência (tipicamente
-algumas dezenas de hertz [REFERÊNCIA NECESSÁRIA: especificação técnica de
-dispositivo ou artigo metodológico que documente a faixa de amostragem]) e
-condensa internamente essas amostras em épocas de duração fixa — um valor
-agregado por minuto, no caso dos arquivos aqui processados —, produzindo uma
-série temporal longa, porém tratável, em vez do sinal bruto de aceleração,
-inviável de armazenar e analisar para registros de várias semanas.
+A actigrafia é um método objetivo e não invasivo de monitoramento da atividade
+motora humana ao longo do tempo, por um dispositivo portátil — o actígrafo —
+em geral fixado ao pulso não dominante e usado de forma contínua por poucos dias
+a algumas semanas (ANCOLI-ISRAEL et al., 2003; SADEH, 2011). Seu sensor central
+é um acelerômetro de estado sólido, que detecta movimento nos três eixos; o
+dispositivo amostra a aceleração em alta frequência (tipicamente dezenas de
+hertz [REFERÊNCIA NECESSÁRIA: especificação técnica de dispositivo ou artigo
+metodológico que documente a faixa de amostragem]) e condensa essas amostras em
+épocas de duração fixa — um valor por minuto, nos arquivos aqui processados —,
+produzindo uma série temporal longa, porém tratável, em vez do sinal bruto de
+aceleração, inviável de armazenar para várias semanas.
 
 [INSERIR FIGURA 1: Diagrama do fluxo de transdução do sinal de actigrafia —
 do movimento físico do pulso à série temporal agregada por época. Conteúdo:
@@ -45,57 +41,47 @@ transdução (firmware) → contagem por época (1 min). Legenda provisória:
 atividade' analisado é o resultado de um algoritmo embutido no dispositivo,
 não uma medida física direta."]
 
-Essa agregação não é mera redução de volume: ela incorpora, na geração do
-dado, uma decisão metodológica sobre o que conta como "atividade" em cada
-intervalo. O sinal de atividade manipulado por qualquer sistema de análise de
-actigrafia já é, portanto, o resultado de um algoritmo de transdução embutido
-no firmware do dispositivo, e não uma medida física univocamente definida.
-Diferentes fabricantes adotam diferentes algoritmos de transdução, origem
-direta dos três modos de atividade tratados na subseção 2.1.2.
+Essa agregação não é mera redução de volume: incorpora uma decisão metodológica
+sobre o que conta como "atividade" em cada intervalo. O sinal de atividade
+manipulado por qualquer sistema de análise já é, portanto, o resultado de um
+algoritmo de transdução embutido no firmware, e não uma medida física unívoca.
+Fabricantes distintos adotam algoritmos distintos — origem dos três modos de
+atividade descritos a seguir.
 
-A literatura distingue a actigrafia de outras formas de mensuração
-comportamental. Frente ao diário de sono autorrelatado, a actigrafia não
-depende da memória nem da disposição do paciente em registrar seus horários,
-sendo especialmente útil em populações com comprometimento cognitivo, como
-pacientes geriátricos com suspeita de demência. Frente à polissonografia —
-exame de referência ("padrão de ouro") para o diagnóstico de distúrbios do
-sono, que registra simultaneamente eletroencefalograma, eletro-oculograma e
-eletromiograma em ambiente laboratorial —, a actigrafia tem menor acurácia
-para diferenciar estágios específicos de sono, mas a vantagem decisiva de
-poder ser realizada em ambiente domiciliar, de forma contínua, por dias ou
-semanas, a custo muito inferior (MORGENTHALER et al., 2007; SMITH et al.,
-2018). Essa relação custo-benefício explica por que a actigrafia se
-consolidou não como substituta da polissonografia, mas como ferramenta de
-triagem, acompanhamento longitudinal e pesquisa em larga escala.
+Frente ao diário de sono autorrelatado, a actigrafia não depende da memória nem
+da disposição do paciente, sendo especialmente útil em populações com
+comprometimento cognitivo, como pacientes geriátricos com suspeita de demência.
+Frente à polissonografia — exame de referência para distúrbios do sono, que
+registra eletroencefalograma, eletro-oculograma e eletromiograma em
+laboratório —, tem menor acurácia para diferenciar estágios de sono, mas a
+vantagem de monitoramento domiciliar contínuo, por dias ou semanas, a custo
+muito inferior (MORGENTHALER et al., 2007; SMITH et al., 2018). Por isso
+consolidou-se como ferramenta de triagem, acompanhamento longitudinal e pesquisa
+em larga escala.
 
 
 2.1.2  OS SINAIS DE ATIVIDADE: PIM, TAT E ZCM
 ----------------------------------------------------------------------------------------------------
-Os dispositivos da família Condor (modelo ActTrust, da Condor Instruments),
-cujos arquivos são processados pelo sistema, podem registrar a atividade
-motora segundo até três algoritmos de transdução, historicamente consolidados
-na literatura de actigrafia a partir dos monitores da Ambulatory Monitoring
-Inc. (AMI) e adotados, com variações de implementação, pela maioria dos
-fabricantes (WEBSTER et al., 1982; COLE et al., 1992):
+Os dispositivos Condor (modelo ActTrust) podem registrar a atividade motora
+segundo até três algoritmos de transdução, consolidados na literatura a partir
+dos monitores da Ambulatory Monitoring Inc. (AMI) e adotados, com variações,
+pela maioria dos fabricantes (WEBSTER et al., 1982; COLE et al., 1992):
 
-  - PIM (Proportional Integrating Measure): integra, ao longo da época, o
-    valor absoluto da aceleração acima de um limiar mínimo de ruído. Produz
-    uma medida contínua, proporcional à intensidade e à duração do movimento.
-    Por preservar a magnitude, é o modo mais sensível a diferenças de
-    intensidade e o mais usado como entrada para algoritmos de classificação
-    sono/vigília e para o cálculo das métricas de ritmo (seção 2.2).
+  - PIM (Proportional Integrating Measure): integra, na época, o valor absoluto
+    da aceleração acima de um limiar de ruído. Produz medida contínua,
+    proporcional à intensidade e à duração do movimento; por preservar a
+    magnitude, é o mais sensível a diferenças de intensidade e o mais usado em
+    classificação sono/vigília e no cálculo das métricas de ritmo.
 
-  - TAT (Time Above Threshold): conta, dentro de cada época, a fração de
-    tempo em que a aceleração permaneceu acima de um limiar fixo. Discrimina
-    movimento sustentado de inatividade com maior robustez a picos isolados
-    do que o PIM, ao custo de perder a informação de intensidade.
+  - TAT (Time Above Threshold): conta a fração de tempo, na época, em que a
+    aceleração permaneceu acima de um limiar fixo. Discrimina movimento
+    sustentado de inatividade com maior robustez a picos isolados que o PIM, ao
+    custo de perder a informação de intensidade.
 
   - ZCM (Zero Crossing Mode): conta quantas vezes o sinal cruza um valor de
-    referência (zero, após a remoção da componente gravitacional) dentro da
-    época — uma medida de frequência do movimento. Historicamente o mais
-    usado nos primeiros actígrafos comerciais, é também o mais sensível a
-    artefatos de vibração de baixa amplitude, por não distinguir um
-    cruzamento causado por movimento amplo de um causado por tremor leve.
+    referência (zero, após remover a componente gravitacional) na época — medida
+    de frequência do movimento. Historicamente o mais usado nos primeiros
+    actígrafos, é o mais sensível a artefatos de vibração de baixa amplitude.
 
 [INSERIR QUADRO 1: Comparação dos três modos de transdução de atividade.
 Colunas: Modo (PIM/TAT/ZCM); O que mede (intensidade×duração / fração de
@@ -105,170 +91,116 @@ transdução de atividade motora e suas propriedades. Os três descrevem o mesmo
 evento físico sob lentes algorítmicas distintas e não são comparáveis em
 escala numérica entre si."]
 
-Os três modos descrevem o mesmo evento físico — o movimento do pulso — sob
-três lentes algorítmicas distintas e não são comparáveis em escala numérica:
-PIM = 50 não equivale a "a mesma quantidade de atividade" que TAT = 50 ou
-ZCM = 50, ainda que todos tendam a crescer e decrescer em conjunto ao longo
-do dia, pois respondem ao mesmo movimento. Essa incomparabilidade fundamenta
-a decisão de tratar a escolha do modo de atividade como exclusiva e não
-combinável: o profissional de saúde seleciona um único modo por vez para
-conduzir toda a análise (gráficos e métricas), e o sistema restringe as
-opções às colunas de fato presentes no arquivo, já que nem todo dispositivo
-ou configuração de gravação produz os três sinais simultaneamente.
+Os três modos descrevem o mesmo movimento sob lentes algorítmicas distintas e
+não são comparáveis em escala numérica: PIM = 50 não equivale a TAT = 50 ou
+ZCM = 50, ainda que todos cresçam e decresçam em conjunto ao longo do dia. Essa
+incomparabilidade fundamenta tratar a escolha do modo como exclusiva: o usuário
+seleciona um único modo por análise, e o sistema restringe as opções às colunas
+presentes no arquivo, já que nem todo dispositivo produz os três sinais.
 
 
 2.1.3  LUZ E TEMPERATURA PERIFÉRICA COMO SINAIS COMPLEMENTARES
 ----------------------------------------------------------------------------------------------------
-Além do canal de atividade motora, os actígrafos modernos — incluindo o
-modelo ActTrust — costumam agregar sensores de luz ambiente e de temperatura
-periférica (cutânea), registrados na mesma cadência temporal e incorporados
-ao mesmo arquivo. Esses sinais não substituem a atividade como indicador de
-ritmo circadiano, mas cumprem papel complementar e, em certas situações
-clínicas, mais informativo do que a atividade isolada.
+Além da atividade motora, os actígrafos modernos — incluindo o ActTrust —
+agregam sensores de luz ambiente e de temperatura periférica (cutânea),
+registrados na mesma cadência e no mesmo arquivo. Esses sinais não substituem a
+atividade como indicador de ritmo, mas a complementam.
 
-A exposição à luz é o principal sincronizador externo (zeitgeber) do relógio
-biológico humano: células ganglionares fotossensíveis da retina, contendo o
-fotopigmento melanopsina, projetam diretamente para o núcleo supraquiasmático
-do hipotálamo — o marca-passo circadiano central — e ajustam a fase do ritmo
-endógeno conforme o padrão de claro e escuro a que o indivíduo é exposto
-(CZEISLER; GOOLEY, 2007; DUFFY; CZEISLER, 2009). Registrar a luz
-simultaneamente à atividade permite distinguir duas situações clinicamente
-diferentes que, isoladamente, produziriam padrões de atividade semelhantes:
-inatividade no escuro (compatível com sono) e inatividade sob luz (mais
-compatível com repouso em vigília, sedestação prolongada ou uso inadequado do
-dispositivo). Essa distinção motiva tanto a sobreposição da luz como eixo
-extra nos gráficos diários combinados quanto o filtro de faixa de
-luminosidade, que oculta — na exibição e na exportação — pontos de atividade
-e temperatura associados a níveis de luz fora de uma faixa de interesse.
+A luz é o principal sincronizador externo (zeitgeber) do relógio biológico:
+células ganglionares fotossensíveis da retina, contendo melanopsina, projetam
+para o núcleo supraquiasmático do hipotálamo — o marca-passo circadiano
+central — e ajustam a fase do ritmo conforme o padrão claro-escuro (CZEISLER;
+GOOLEY, 2007; DUFFY; CZEISLER, 2009). Registrar a luz junto à atividade permite
+distinguir situações clinicamente diferentes que isoladamente produziriam
+padrões de atividade semelhantes: inatividade no escuro (compatível com sono) e
+inatividade sob luz (compatível com repouso em vigília ou uso inadequado do
+dispositivo). Daí a sobreposição da luz como eixo extra nos gráficos e o filtro
+de faixa de luminosidade, que oculta atividade e temperatura associadas a níveis
+de luz fora da faixa de interesse.
 
-A temperatura periférica, registrada na pele do pulso, segue um ritmo
-circadiano robusto e, em condições normais, aproximadamente antifásico ao da
-temperatura corporal central: a temperatura distal tende a subir à noite, por
-vasodilatação periférica que facilita a perda de calor central e antecede o
-início do sono, e a cair durante a vigília diurna (REFINETTI, 2016; SARABIA
-et al., 2008). Por estar disponível no mesmo dispositivo de pulso, oferece um
-segundo marcador circadiano, fisiologicamente distinto da atividade motora,
-útil para corroborar a fase de sono inferida e para identificar dissociações
-entre os dois sinais — por exemplo, um paciente com ritmo de temperatura
-preservado, mas atividade fragmentada, sugere perturbação predominantemente
-comportamental (e não puramente circadiana) do sono. Essa relevância clínica
-específica justifica uma página de análise dedicada à temperatura, com matriz
-dia × hora, gráfico de médias horárias e estatísticas descritivas, em vez de
-tratá-la apenas como eixo acessório dos gráficos de atividade.
+A temperatura periférica, registrada na pele do pulso, segue um ritmo robusto e,
+em condições normais, aproximadamente antifásico ao da temperatura corporal
+central: tende a subir à noite, por vasodilatação que antecede o sono, e a cair
+na vigília diurna (REFINETTI, 2016; SARABIA et al., 2008). Oferece, no mesmo
+dispositivo, um segundo marcador circadiano, distinto da atividade, útil para
+corroborar a fase de sono e identificar dissociações — por exemplo, um ritmo de
+temperatura preservado com atividade fragmentada sugere perturbação
+predominantemente comportamental do sono. Essa relevância justifica uma página
+dedicada à temperatura, com matriz dia × hora, gráfico de médias horárias e
+estatísticas descritivas.
 
 
 2.1.4  RITMOS CIRCADIANOS: FUNDAMENTOS CRONOBIOLÓGICOS
 ----------------------------------------------------------------------------------------------------
-Um ritmo circadiano (do latim circa diem, "em torno de um dia") é uma
-oscilação biológica endógena, de período aproximado de 24 horas, gerada
-internamente e capaz de persistir — ainda que com leve deriva de fase — mesmo
+Um ritmo circadiano (do latim circa diem, "em torno de um dia") é uma oscilação
+biológica endógena, de período aproximado de 24 horas, capaz de persistir mesmo
 sem sincronizadores externos (CZEISLER; GOOLEY, 2007). Em mamíferos, o núcleo
-supraquiasmático do hipotálamo atua como marca-passo central, sincronizando,
-por vias neurais e humorais, osciladores periféricos presentes em
-praticamente todos os tecidos. O ciclo claro-escuro é o sincronizador mais
-potente (subseção 2.1.3), mas horário de alimentação, atividade física,
-temperatura ambiente e interação social atuam como sincronizadores
-secundários.
+supraquiasmático atua como marca-passo central, sincronizando osciladores
+periféricos. O ciclo claro-escuro é o sincronizador mais potente, mas horário de
+alimentação, atividade física, temperatura ambiente e interação social atuam
+como secundários.
 
-Em indivíduos sadios e com rotina regular, o resultado observável é um padrão
-diário consolidado de atividade e repouso: períodos prolongados de atividade
-de dia e de inatividade à noite, alternando-se com regularidade. É esse
-padrão — sua presença, robustez e eventual fragmentação — que a actigrafia
-registra de forma objetiva e prolongada, oferecendo o substrato sobre o qual
-se calculam as métricas não paramétricas da seção 2.2.
-
-A perturbação desse ritmo — por envelhecimento, doença neurodegenerativa,
-privação de luz natural (ambientes hospitalares ou instituições de longa
-permanência), trabalho em turnos ou transtornos primários do ritmo circadiano
-— manifesta-se tipicamente como fragmentação do padrão (alternâncias mais
-frequentes e menos previsíveis entre os dois estados) e/ou instabilidade do
-horário em que esses períodos ocorrem de um dia para o outro. Esses dois
-aspectos — fragmentação intradiária e instabilidade interdiária — são
-exatamente o que as métricas IV e IS, respectivamente, foram desenhadas para
-quantificar.
+Em indivíduos sadios e com rotina regular, observa-se um padrão diário
+consolidado: atividade de dia e inatividade à noite, alternando-se com
+regularidade. É esse padrão — sua presença, robustez e eventual fragmentação —
+que a actigrafia registra objetivamente, oferecendo o substrato das métricas não
+paramétricas. Sua perturbação — por envelhecimento, doença neurodegenerativa,
+privação de luz, trabalho em turnos ou transtornos do ritmo — manifesta-se como
+fragmentação do padrão (alternâncias mais frequentes e imprevisíveis) e/ou
+instabilidade do horário entre dias. Esses dois aspectos — fragmentação
+intradiária e instabilidade interdiária — são o que as métricas IV e IS,
+respectivamente, quantificam.
 
 
 2.1.5  APLICAÇÕES CLÍNICAS E DE PESQUISA DA ACTIGRAFIA
 ----------------------------------------------------------------------------------------------------
-A literatura aponta um conjunto consolidado de aplicações da actigrafia, das
-quais se destacam quatro, por sua aderência ao público-alvo do sistema:
+Quatro aplicações consolidadas destacam-se por sua aderência ao público-alvo:
 
   - Avaliação de distúrbios do sono em populações para as quais a
-    polissonografia é pouco viável ou tolerada — em especial pacientes
-    geriátricos e com demência, nos quais o exame laboratorial pode ser mal
-    tolerado e pouco representativo do sono habitual no próprio ambiente
-    (ANCOLI-ISRAEL et al., 2003) — caso de uso do médico geriatra.
+    polissonografia é pouco viável — em especial pacientes geriátricos e com
+    demência (ANCOLI-ISRAEL et al., 2003) — caso do médico geriatra.
 
-  - Monitoramento longitudinal da resposta a intervenções terapêuticas,
-    farmacológicas ou não, ao longo de semanas ou meses, aproveitando o baixo
-    custo e a baixa intrusividade para repetir a coleta em diferentes etapas
-    de um tratamento — caso de uso do fisioterapeuta em programa de
-    reabilitação, associado à funcionalidade de comparação entre registros.
+  - Monitoramento longitudinal da resposta a intervenções terapêuticas ao longo
+    de semanas ou meses, aproveitando o baixo custo para repetir a coleta — caso
+    do fisioterapeuta, associado à comparação entre registros.
 
-  - Pesquisa em cronobiologia básica e aplicada, com coortes de voluntários
-    monitorados simultaneamente, exigindo padronização metodológica dos
-    parâmetros de processamento para garantir comparabilidade — caso de uso
-    da pesquisadora cronobiologista, associado aos parâmetros configuráveis de
-    reamostragem e binarização (seção 2.2).
+  - Pesquisa em cronobiologia com coortes de voluntários, exigindo padronização
+    dos parâmetros de processamento para garantir comparabilidade — caso da
+    pesquisadora, associado aos parâmetros configuráveis de reamostragem e
+    binarização.
 
-  - Triagem e acompanhamento assistencial em instituições de longa
-    permanência ou em ambiente hospitalar, em que a equipe de enfermagem é,
-    na prática, responsável por instalar e retirar o equipamento e organizar
-    os arquivos antes da avaliação médica — caso de uso da enfermeira,
-    associado às funcionalidades de gestão de arquivos e de vínculo entre
-    arquivo e paciente.
+  - Triagem e acompanhamento em instituições de longa permanência ou hospitais,
+    em que a enfermagem instala e retira o equipamento e organiza os arquivos —
+    caso da enfermeira, associado à gestão de arquivos e ao vínculo
+    arquivo-paciente.
 
-Em todas elas, o valor da actigrafia não está no dado bruto — uma longa série
-de números de atividade, luz e temperatura amostrados minuto a minuto, de
-leitura inviável a olho nu — mas na capacidade de transformá-lo em
-visualizações interpretáveis (seção 2.4) e em métricas-resumo clinicamente
-significativas (seção 2.2). É essa transformação, e não a captura do dado —
-já realizada pelo dispositivo —, que constitui o problema central a ser
-resolvido.
-
-
-2.1.6  SÍNTESE: DA TEORIA AO DADO BRUTO PROCESSADO
-----------------------------------------------------------------------------------------------------
-Os conceitos desta seção correspondem, ponto a ponto, a elementos concretos
-do arquivo de actigrafia e da arquitetura do sistema: o princípio de
-agregação por época (2.1.1) explica por que se trabalha sobre uma série já
-amostrada por minuto, e não sobre aceleração bruta; a existência de três
-modos incomparáveis (2.1.2) fundamenta tratá-los como alternativas mutuamente
-exclusivas; o papel da luz como zeitgeber e da temperatura como marcador
-circadiano periférico (2.1.3) fundamenta tanto a sobreposição desses sinais
-aos gráficos de atividade quanto a página dedicada à temperatura; e a própria
-noção de ritmo circadiano como padrão estável ou fragmentado, regular ou
-instável (2.1.4), é o que confere significado clínico — e não apenas
-estatístico — às métricas não paramétricas detalhadas a seguir.
+Em todas, o valor não está no dado bruto — uma série de números amostrados
+minuto a minuto, de leitura inviável a olho nu — mas na capacidade de
+transformá-lo em visualizações interpretáveis e métricas-resumo clinicamente
+significativas. É essa transformação, e não a captura do dado, que constitui o
+problema central.
 
 
 ====================================================================================================
 2.2  MÉTRICAS NÃO PARAMÉTRICAS DE ATIVIDADE-REPOUSO
 ====================================================================================================
 
-Esta seção é o núcleo teórico que confere autoridade científica à análise:
-as quatro métricas aqui descritas — IS, IV, L5 e M10 — são o resultado
-quantitativo mais diretamente associado à interpretação clínica do registro
-de actigrafia e a principal razão pela qual o projeto optou por herdar a
-implementação da biblioteca pyActigraphy, em vez de programar os cálculos do
-zero. Por isso, apresenta-se a definição formal de cada índice, deriva-se sua
-interpretação a partir dessa definição — e não apenas se a enuncia — e
-discutem-se os parâmetros metodológicos (reamostragem e binarização)
-configuráveis pelo usuário.
+As quatro métricas descritas — IS, IV, L5 e M10 — são o resultado quantitativo
+mais associado à interpretação clínica do registro e a principal razão de o
+projeto herdar a implementação do pyActigraphy, em vez de programar os cálculos
+do zero. Apresentam-se a definição formal de cada índice, sua interpretação e os
+parâmetros metodológicos (reamostragem e binarização) configuráveis.
 
 
 2.2.1  DA ANÁLISE COSINOR À ABORDAGEM NÃO PARAMÉTRICA
 ----------------------------------------------------------------------------------------------------
-Antes da popularização dessas métricas, a análise quantitativa de ritmos
-biológicos apoiava-se predominantemente na análise cosinor — método
-paramétrico que ajusta, por mínimos quadrados, uma função senoidal de período
-fixo (24 horas, no caso circadiano) à série observada, estimando mesor (nível
-médio), amplitude e acrofase (horário do pico). A cosinor funciona bem quando
-o ritmo subjacente é aproximadamente sinusoidal — razoável para variáveis
-como a temperatura corporal central, mas pouco realista para o padrão humano
-de atividade e repouso, que se aproxima mais de uma onda quadrada (longos
-platôs de atividade e de repouso separados por transições abruptas) do que de
-uma senoide suave (WITTING et al., 1990; VAN SOMEREN et al., 1999).
+Antes dessas métricas, a análise quantitativa de ritmos apoiava-se na análise
+cosinor — método paramétrico que ajusta, por mínimos quadrados, uma senoide de
+período fixo à série, estimando mesor, amplitude e acrofase. Funciona bem quando
+o ritmo é aproximadamente sinusoidal — razoável para a temperatura corporal
+central, mas pouco realista para o padrão de atividade e repouso, mais próximo
+de uma onda quadrada do que de uma senoide (WITTING et al., 1990; VAN SOMEREN et
+al., 1999).
 
 [INSERIR FIGURA 2: Sobreposição de um perfil real de atividade-repouso
 (forma de onda quadrada) e do ajuste cosinor senoidal correspondente.
@@ -278,142 +210,94 @@ provisória: "Figura 2 — Limitação da análise cosinor: o ajuste senoidal
 explica mal a forma de onda quadrada típica do padrão de atividade-repouso
 humano, sobretudo em populações clínicas."]
 
-Ajustar uma senoide a um sinal que se comporta como onda quadrada produz dois
-problemas. Primeiro, o ajuste explica mal a variância observada (baixo
-coeficiente de determinação), tornando os parâmetros pouco confiáveis.
-Segundo — e clinicamente mais grave —, a cosinor mostrou-se, em estudos com
-idosos e pacientes com doença de Alzheimer, pouco sensível para detectar
-diferenças conhecidas entre grupos clínicos ou condições experimentais (por
-exemplo, antes e depois de fototerapia), justamente porque a forma de onda
-real desses indivíduos se afasta ainda mais da senoide ideal (WITTING et al.,
-1990; VAN SOMEREN et al., 1999).
-
-A resposta proposta por Witting et al. (1990) e consolidada por Van Someren
-et al. (1999) foi abandonar a premissa de uma forma de onda específica: as
-métricas não paramétricas são calculadas diretamente dos dados observados —
-por razões de variância e somas de diferenças sucessivas —, sem suposição
-sobre o formato do ritmo. É essa independência de forma — e não a ausência de
-fundamento estatístico, como o nome poderia sugerir — que torna IS, IV, L5 e
-M10 mais sensíveis que a cosinor para detectar o tipo de alteração
-(fragmentação, instabilidade, achatamento de amplitude) característico das
-populações clínicas relevantes (GONÇALVES et al., 2014).
+Ajustar uma senoide a um sinal de onda quadrada explica mal a variância (baixo
+coeficiente de determinação) e, em estudos com idosos e pacientes com Alzheimer,
+mostrou-se pouco sensível para detectar diferenças entre grupos ou condições (por
+exemplo, antes e depois de fototerapia), pois a forma real se afasta da senoide
+ideal (WITTING et al., 1990; VAN SOMEREN et al., 1999). A resposta proposta por
+Witting et al. (1990) e consolidada por Van Someren et al. (1999) foi abandonar a
+premissa de uma forma de onda específica: as métricas não paramétricas são
+calculadas diretamente dos dados observados, sem suposição sobre o formato do
+ritmo. É essa independência de forma — e não a ausência de fundamento
+estatístico — que torna IS, IV, L5 e M10 mais sensíveis que a cosinor para
+detectar fragmentação, instabilidade e achatamento de amplitude em populações
+clínicas (GONÇALVES et al., 2014).
 
 
 2.2.2  ESTABILIDADE INTERDIÁRIA (IS)
 ----------------------------------------------------------------------------------------------------
 A Estabilidade Interdiária (Interdaily Stability, IS) quantifica o quanto o
-padrão de atividade observado em um dado horário se repete consistentemente
-ao longo dos dias do registro — ou seja, o grau de acoplamento do ritmo a um
-sincronizador externo de período fixo de 24 horas (ciclo claro-escuro, rotina
-social, horários de refeição), em oposição a um ritmo endógeno livre, que
-"passearia" de fase de um dia para o outro.
-
-Dividindo o registro em N amostras totais e p amostras por dia (por exemplo,
-p = 24 para série agregada em intervalos de uma hora), a IS é definida como:
+padrão observado em um dado horário se repete ao longo dos dias — ou seja, o
+acoplamento do ritmo a um sincronizador externo de 24 horas, em oposição a um
+ritmo endógeno livre. Dividindo o registro em N amostras totais e p amostras por
+dia (p = 24 para série horária):
 
     IS = [ N · Σ(h=1 até p) (x̄h − x̄)² ] / [ p · Σ(i=1 até N) (xi − x̄)² ]
 
-onde xi é o valor de atividade da i-ésima amostra, x̄ é a média geral do
-registro e x̄h é a média das amostras correspondentes ao mesmo horário h
-(por exemplo, a média de todos os valores entre 14h e 15h, em todos os dias).
-O numerador mede a variância do "perfil médio de 24 horas"; o denominador, a
-variância total da série. A IS é, portanto, a proporção da variância total
-explicada pelo perfil diário médio: um índice de quão bem um único "dia
-típico" resume todos os dias do registro.
+onde xi é o valor da i-ésima amostra, x̄ a média geral e x̄h a média das
+amostras do mesmo horário h. O numerador mede a variância do "perfil médio de
+24 horas"; o denominador, a variância total. A IS é a proporção da variância
+total explicada pelo perfil diário médio — quão bem um "dia típico" resume todos
+os dias.
 
-A IS varia, na prática, entre 0 e 1 (pode exceder ligeiramente 1 em séries
-com poucos pontos, caso incomum em registros de duração clínica usual). Um
-valor próximo de 0 corresponde a um ritmo estatisticamente indistinguível de
-ruído aleatório em relação ao período de 24 horas — nenhum horário se destaca
-consistentemente —, achado compatível com ausência de sincronização
-circadiana eficaz: arritmicidade observada, por exemplo, em pacientes em
-cuidados intensivos sem exposição regular à luz natural, em indivíduos com
-cegueira total e perda da via de sincronização não visual, ou em demência
-avançada. Um valor próximo de 1 corresponde a um padrão praticamente idêntico,
-horário a horário, em todos os dias — ritmo fortemente acoplado a um
-sincronizador de 24 horas, típico de rotinas regulares de sono, trabalho e
-exposição à luz. Clinicamente, a IS baixa é um dos achados mais
-consistentemente associados a transtornos do ritmo circadiano do tipo
-irregular e a quadros demenciais, frequentemente reportada junto à IV
-(subseção 2.2.3) como par complementar de indicadores de um mesmo distúrbio
-(VAN SOMEREN et al., 1999; GONÇALVES et al., 2014).
+A IS varia, na prática, entre 0 e 1. Próximo de 0, o ritmo é indistinguível de
+ruído em relação ao período de 24 horas — ausência de sincronização eficaz,
+como em pacientes em cuidados intensivos sem luz natural, cegueira total ou
+demência avançada. Próximo de 1, o padrão é quase idêntico, horário a horário,
+em todos os dias — ritmo fortemente acoplado, típico de rotinas regulares.
+Clinicamente, a IS baixa é dos achados mais associados a transtornos do ritmo do
+tipo irregular e a quadros demenciais, frequentemente reportada junto à IV como
+par complementar (VAN SOMEREN et al., 1999; GONÇALVES et al., 2014).
 
 
 2.2.3  VARIABILIDADE INTRADIÁRIA (IV)
 ----------------------------------------------------------------------------------------------------
-Enquanto a IS compara dias diferentes, a Variabilidade Intradiária
-(Intradaily Variability, IV) mede a fragmentação do ritmo dentro de um mesmo
-dia — a frequência e a magnitude das transições entre atividade e repouso ao
-longo das 24 horas, independentemente de o padrão se repetir ou não entre
-dias.
-
-Para uma série de N amostras consecutivas, a IV é definida como:
+Enquanto a IS compara dias, a Variabilidade Intradiária (Intradaily Variability,
+IV) mede a fragmentação dentro de um mesmo dia — a frequência e a magnitude das
+transições entre atividade e repouso. Para N amostras consecutivas:
 
     IV = [ N · Σ(i=2 até N) (xi − xi−1)² ] / [ (N−1) · Σ(i=1 até N) (xi − x̄)² ]
 
-onde xi e xi−1 são valores de atividade de duas amostras consecutivas. O
-numerador é a soma dos quadrados das diferenças sucessivas — medida de quão
-abruptamente o sinal varia de um intervalo para o próximo, análoga ao teste
-da diferença média quadrática sucessiva (mean square successive difference) —
-e o denominador é, novamente, a variância total. A IV é, portanto, a razão
-entre a "rugosidade" do sinal e sua variância total.
+O numerador é a soma dos quadrados das diferenças sucessivas — quão abruptamente
+o sinal varia entre intervalos — e o denominador, a variância total. A IV é a
+razão entre a "rugosidade" do sinal e sua variância.
 
-A interpretação dos valores limites decorre da definição. No limite inferior,
-um sinal perfeitamente suave — por exemplo, uma senoide ideal de 24 horas
-amostrada em pontos próximos — apresenta diferenças sucessivas pequenas em
-relação à variância total, levando a IV a se aproximar de 0: baixa
-fragmentação, transições graduais e previsíveis. No limite superior,
-demonstra-se que, para um sinal puramente aleatório e não correlacionado no
-tempo (ruído branco gaussiano), o valor esperado da IV se aproxima de 2:
-máxima fragmentação possível para uma dada variância. Entre 0 e 2, valores
-mais elevados — tipicamente acima da faixa observada em adultos jovens
-saudáveis, em torno de 0,5 a 1,0 a depender da frequência de amostragem
-[REFERÊNCIA NECESSÁRIA: estudo normativo que reporte faixas de IV por faixa
-etária e frequência de amostragem] — indicam padrão de sono e vigília mais
-fragmentado, com despertares noturnos frequentes ou cochilos diurnos
-dispersos. Clinicamente, a IV elevada é um dos achados mais replicados em
-doença de Alzheimer (associada ao sundowning e a distúrbios do sono noturno),
-em apneia obstrutiva do sono não tratada e em quadros depressivos com sono
-fragmentado (WITTING et al., 1990; VAN SOMEREN et al., 1999; GONÇALVES et
-al., 2014).
+Um sinal perfeitamente suave (uma senoide ideal) tem IV próxima de 0: baixa
+fragmentação, transições graduais. Para ruído branco gaussiano, demonstra-se que
+o valor esperado da IV se aproxima de 2: máxima fragmentação. Entre 0 e 2,
+valores mais elevados — tipicamente acima da faixa de adultos jovens saudáveis,
+em torno de 0,5 a 1,0 conforme a frequência de amostragem [REFERÊNCIA
+NECESSÁRIA: estudo normativo que reporte faixas de IV por faixa etária e
+frequência de amostragem] — indicam sono e vigília mais fragmentados.
+Clinicamente, a IV elevada é dos achados mais replicados em doença de Alzheimer,
+apneia obstrutiva não tratada e quadros depressivos com sono fragmentado
+(WITTING et al., 1990; VAN SOMEREN et al., 1999; GONÇALVES et al., 2014).
 
-A IV depende fortemente da frequência de amostragem da série usada em seu
-cálculo: uma série de intervalos muito curtos captura transições de
-curtíssimo prazo (por exemplo, um único movimento breve durante o sono) que
-uma série reamostrada em intervalos mais longos absorve dentro de uma mesma
-época, suavizando-as antes do cálculo. Essa dependência é a razão pela qual a
-frequência de reamostragem é tratada, na subseção 2.2.5, como parâmetro
-metodológico de primeira importância, e não como detalhe de implementação.
+A IV depende fortemente da frequência de amostragem: séries de intervalos curtos
+captam transições de curtíssimo prazo que séries reamostradas em intervalos
+maiores absorvem e suavizam. Por isso a frequência de reamostragem é tratada
+como parâmetro metodológico de primeira importância, e não como detalhe de
+implementação.
 
 
 2.2.4  L5 E M10: OS EXTREMOS DE REPOUSO E DE ATIVIDADE
 ----------------------------------------------------------------------------------------------------
-Diferentemente de IS e IV — que descrevem propriedades estatísticas agregadas
-(estabilidade e fragmentação) sem localizá-las em um horário específico —,
-L5 e M10 são métricas de localização: identificam, no perfil médio de 24
-horas calculado sobre todos os dias, os intervalos mais extremos de
-inatividade e de atividade, respectivamente.
+Diferentemente de IS e IV, que descrevem propriedades agregadas sem localizá-las
+em um horário, L5 e M10 são métricas de localização: identificam, no perfil
+médio de 24 horas, os intervalos mais extremos de inatividade e de atividade.
 
-L5 (Lowest 5 hours) é o valor médio de atividade durante as cinco horas
-consecutivas de menor atividade do perfil diário médio — operacionalmente,
-calcula-se a média móvel de cinco horas sobre o perfil de 24 horas e
-identifica-se a janela de menor valor. Esse intervalo tende a coincidir, em
-ritmo bem estabelecido, com o período central do sono noturno, e o próprio
-valor de L5 — não apenas seu horário — é informativo: quanto menor o L5, mais
-consolidado e profundamente repousado o período; um L5 elevado indica que
-mesmo o período mais quieto do dia contém atividade motora residual
-significativa — indício de sono fragmentado, agitação noturna ou, em casos
-extremos, inversão parcial do ciclo sono-vigília.
+L5 (Lowest 5 hours) é a média de atividade nas cinco horas consecutivas de menor
+atividade do perfil diário médio (média móvel de 5 h, janela de menor valor).
+Tende a coincidir com o sono noturno, e o próprio valor é informativo: quanto
+menor o L5, mais consolidado o repouso; um L5 elevado indica atividade residual
+mesmo no período mais quieto — indício de sono fragmentado ou agitação noturna.
 
-M10 (Most active 10 hours), simetricamente, é o valor médio de atividade
-durante as dez horas consecutivas de maior atividade do perfil diário médio,
-identificado pela mesma lógica de média móvel, com janela de dez horas e
-busca do valor máximo. Tende a coincidir com o período diurno principal de
-vigília e indica a intensidade e a regularidade da atividade diurna: um M10
-baixo, sobretudo associado a pequena diferença entre M10 e L5, sugere
-atividade diurna pouco vigorosa ou pouco diferenciada do repouso — achado
-associado, na literatura geriátrica, a fragilidade física e maior risco de
-desfechos adversos em idosos (GONÇALVES et al., 2014).
+M10 (Most active 10 hours) é, simetricamente, a média nas dez horas consecutivas
+de maior atividade (janela de maior valor). Tende a coincidir com a vigília
+diurna e indica sua intensidade e regularidade: um M10 baixo, sobretudo com
+pequena diferença para o L5, sugere atividade diurna pouco vigorosa ou pouco
+diferenciada do repouso — associado, na literatura geriátrica, a fragilidade
+física e maior risco de desfechos adversos (GONÇALVES et al., 2014).
 
 [INSERIR FIGURA 3: Perfil médio de 24 horas com as janelas L5 e M10
 destacadas. Conteúdo: curva do perfil diário médio; faixa sombreada das 5 h
@@ -422,100 +306,71 @@ amplitude relativa RA. Legenda provisória: "Figura 3 — Localização de L5 e
 M10 sobre o perfil diário médio de atividade e a amplitude relativa
 RA = (M10 − L5)/(M10 + L5)."]
 
-A diferença entre M10 e L5 — e, mais especificamente, sua versão normalizada,
-a amplitude relativa RA = (M10 − L5) / (M10 + L5), variando de 0 a 1 — é uma
-métrica derivada frequentemente reportada junto a L5 e M10, por resumir em um
-único número o contraste entre os períodos de maior e menor atividade do dia:
-RA próximo de 1 indica ritmo de amplitude robusta, com clara diferenciação
-dia-noite; RA próximo de 0 indica ritmo "achatado", com atividade diurna e
-noturna pouco distinguíveis — padrão associado, em estudos longitudinais com
-idosos, a maior risco de mortalidade e declínio funcional (GONÇALVES et al.,
-2014). A versão atual do sistema calcula e exibe L5 e M10 diretamente, mas não
-deriva explicitamente a RA — extensão simples e de baixo custo, já que ambos
-os insumos estão disponíveis, passível de incorporação em trabalho futuro sem
-nova infraestrutura de cálculo.
+A amplitude relativa RA = (M10 − L5) / (M10 + L5), de 0 a 1, é uma métrica
+derivada frequentemente reportada: próximo de 1 indica ritmo robusto, com clara
+diferenciação dia-noite; próximo de 0, ritmo "achatado", associado em estudos
+longitudinais com idosos a maior risco de mortalidade e declínio funcional
+(GONÇALVES et al., 2014). O sistema calcula L5 e M10 diretamente, mas não deriva
+a RA — extensão simples, passível de incorporação futura sem nova
+infraestrutura de cálculo.
 
 
 2.2.5  PARÂMETROS METODOLÓGICOS: REAMOSTRAGEM E BINARIZAÇÃO
 ----------------------------------------------------------------------------------------------------
-As quatro métricas não são funções apenas dos dados brutos, mas dos dados
-combinados a decisões de pré-processamento, das quais duas são expostas como
-parâmetros configuráveis: a frequência de reamostragem e o limiar de
-binarização.
+As métricas dependem dos dados combinados a decisões de pré-processamento, das
+quais duas são expostas como parâmetros: a frequência de reamostragem e o limiar
+de binarização.
 
-A frequência de reamostragem determina o tamanho da época (bin temporal)
-sobre a qual os valores são agregados antes do cálculo — um intervalo
-selecionável entre 10 minutos e 2 horas, com padrão de 1 hora. A escolha não
-é neutra: como visto na subseção 2.2.3, épocas mais longas suavizam
-transições de curto prazo e tendem a reduzir a IV, ao mesmo tempo em que
-podem tornar a IS mais estável, por reduzir o ruído de alta frequência que
-contaminaria a estimativa do perfil horário médio. Não há, na literatura, um
-valor de referência único e universalmente aceito para esse parâmetro —
-estudos publicados usam desde a frequência original do dispositivo até
-agregações horárias [REFERÊNCIA NECESSÁRIA: revisão metodológica que compare
-o efeito da frequência de reamostragem sobre IS/IV] —, o que torna importante,
-para a validade científica, que o próprio usuário controle explicitamente o
-parâmetro e o reporte de forma transparente, em vez de depender de um valor
-fixo e oculto, sem possibilidade de auditoria.
+A frequência de reamostragem determina o tamanho da época sobre a qual os
+valores são agregados — selecionável entre 10 minutos e 2 horas, padrão de 1
+hora. A escolha não é neutra: épocas mais longas suavizam transições de curto
+prazo, reduzindo a IV, e podem estabilizar a IS por reduzir ruído de alta
+frequência. Não há valor de referência único na literatura — estudos usam desde
+a frequência original do dispositivo até agregações horárias [REFERÊNCIA
+NECESSÁRIA: revisão metodológica que compare o efeito da frequência de
+reamostragem sobre IS/IV] —, o que torna importante que o usuário controle e
+reporte o parâmetro de forma transparente, em vez de depender de um valor fixo e
+oculto.
 
 O limiar de binarização converte a série contínua em estados discretos
-(ativo/inativo) antes do cálculo de determinadas métricas, classificando como
-"inativa" qualquer época abaixo do limiar configurado (padrão de 4) e como
-"ativa" qualquer época igual ou acima dele. Essa dicotomização aproxima o
-cálculo da premissa teórica de repouso-atividade como sistema de dois estados
-(subseção 2.2.1), mas introduz nova decisão sensível: um limiar muito baixo
-classifica como "atividade" pequenas oscilações de ruído do sensor (por
-exemplo, vibração ambiental captada mesmo sem movimento voluntário),
-inflando a fragmentação aparente; um limiar muito alto reclassifica como
-"inatividade" movimentos reais de baixa intensidade, mascarando fragmentação
-relevante. Por não existir um valor universalmente correto — a magnitude
-adequada depende do modo selecionado (PIM, TAT ou ZCM; subseção 2.1.2) e das
-características do dispositivo —, o sistema trata também esse parâmetro como
-escolha explícita e visível do usuário, e não como constante embutida no
-código.
+(ativo/inativo) antes do cálculo, classificando como "inativa" qualquer época
+abaixo do limiar (padrão 4). A dicotomização aproxima o cálculo da premissa de
+repouso-atividade como sistema de dois estados, mas é sensível: um limiar baixo
+classifica ruído do sensor como atividade, inflando a fragmentação aparente; um
+limiar alto reclassifica movimentos reais de baixa intensidade como inatividade,
+mascarando fragmentação relevante. Como a magnitude adequada depende do modo
+(PIM, TAT ou ZCM) e do dispositivo, o sistema também trata esse parâmetro como
+escolha explícita do usuário.
 
 
 2.2.6  MÉTRICAS SEGMENTADAS POR PERÍODO (ISp, IVp, L5p, M10p)
 ----------------------------------------------------------------------------------------------------
-As definições das subseções 2.2.2 a 2.2.4 descrevem o cálculo sobre a
-totalidade do registro — um único valor de IS, IV, L5 e M10 por arquivo.
-Esse cálculo global caracteriza o ritmo como uma fotografia única do período
-monitorado, mas é, por construção, incapaz de revelar como o ritmo evolui
-dentro do próprio período — limitação relevante para o acompanhamento de uma
-intervenção terapêutica ao longo do tempo, caso de uso do fisioterapeuta.
+O cálculo global produz um único valor de IS, IV, L5 e M10 por arquivo — uma
+fotografia do período monitorado, incapaz de revelar como o ritmo evolui dentro
+dele, limitação relevante para o acompanhamento de uma intervenção ao longo do
+tempo. Para suprir isso, oferece-se um cálculo segmentado: as quatro métricas
+são recalculadas para janelas de 1, 3, 7, 14 ou 30 dias, produzindo séries de
+ISp, IVp, L5p e M10p — permitindo observar, por exemplo, se a estabilidade
+melhora ao longo de uma reabilitação ou se a fragmentação se reduz após uma
+intervenção para insônia. O sistema restringe as janelas àquelas que cabem ao
+menos duas vezes no registro.
 
-Para suprir isso, oferece-se também um cálculo segmentado por período: em vez
-de uma única janela igual a todo o registro, as quatro métricas são
-recalculadas separadamente para janelas de 1, 3, 7, 14 ou 30 dias,
-produzindo uma série de valores de ISp, IVp, L5p e M10p ao longo do tempo —
-permitindo observar, por exemplo, se a estabilidade interdiária melhora
-progressivamente ao longo de um programa de reabilitação, ou se a
-fragmentação intradiária se reduz após o início de uma intervenção
-farmacológica para insônia. O sistema restringe as janelas oferecidas
-àquelas que cabem ao menos duas vezes na duração efetiva do registro —
-salvaguarda direta contra o problema a seguir.
-
-Essa segmentação tem custo estatístico inerente: quanto menor a janela, menor
-o número de dias disponíveis para estimar cada métrica, e tanto IS quanto IV
-são mais sensíveis a flutuações amostrais quando calculadas sobre poucos dias
-— um único dia atípico (evento social fora da rotina, falha momentânea do
-dispositivo) pesa proporcionalmente mais sobre uma janela de 1 ou 3 dias do
-que sobre o registro completo de duas semanas. A literatura não estabelece um
-número mínimo de dias universalmente aceito para a confiabilidade dessas
-métricas [REFERÊNCIA NECESSÁRIA: estudo de confiabilidade/estabilidade
-amostral de IS e IV em função do número de dias de registro], e a biblioteca
-utilizada tampouco impõe ou alerta sobre esse mínimo, de modo que a
-responsabilidade de interpretar com cautela métricas calculadas sobre janelas
-curtas permanece do profissional ou pesquisador.
+Essa segmentação tem custo estatístico: quanto menor a janela, menos dias para
+estimar cada métrica, e tanto IS quanto IV são mais sensíveis a flutuações
+amostrais sobre poucos dias — um único dia atípico pesa mais sobre uma janela de
+1 ou 3 dias do que sobre o registro completo. A literatura não estabelece um
+número mínimo de dias universalmente aceito [REFERÊNCIA NECESSÁRIA: estudo de
+confiabilidade/estabilidade amostral de IS e IV em função do número de dias de
+registro], e a biblioteca tampouco o impõe, de modo que a cautela na
+interpretação de janelas curtas permanece do profissional.
 
 
 2.2.7  SÍNTESE E LIMITAÇÕES INTERPRETATIVAS
 ----------------------------------------------------------------------------------------------------
-As quatro métricas compartilham a mesma motivação teórica (a inadequação da
-cosinor paramétrica ao padrão real de atividade e repouso; subseção 2.2.1),
-mas descrevem dimensões distintas e complementares: a IS mede a consistência
-entre dias; a IV, a fragmentação dentro de um dia; e L5/M10 localizam e
-quantificam os extremos de repouso e atividade do perfil diário médio.
+As quatro métricas compartilham a mesma motivação — a inadequação da cosinor ao
+padrão real de atividade-repouso — mas descrevem dimensões complementares: a IS
+mede a consistência entre dias; a IV, a fragmentação dentro de um dia; e L5/M10
+localizam e quantificam os extremos do perfil diário médio.
 
 [INSERIR QUADRO 2: Síntese das quatro métricas não paramétricas. Colunas:
 Métrica (IS/IV/L5/M10); O que mede; Interpretação dos valores extremos;
@@ -524,244 +379,171 @@ Associação clínica típica; Sensibilidade a parâmetros. Legenda provisória:
 atividade-repouso. Nenhuma delas, isoladamente, fornece diagnóstico: todas
 são medidas descritivas dependentes do julgamento clínico."]
 
-Nenhuma das quatro, isoladamente, oferece diagnóstico — todas são medidas
-descritivas do padrão observado, cuja interpretação depende do julgamento do
-profissional, do contexto do paciente e, frequentemente, da comparação com
-valores de referência publicados para populações semelhantes, e não de um
-limiar de normalidade universal embutido na métrica. Justamente por não
-fornecerem interpretação automática, essas métricas dependem fortemente dos
-parâmetros metodológicos (reamostragem e binarização; subseção 2.2.5) e da
-quantidade de dias (subseção 2.2.6): duas análises do mesmo registro, com
-parâmetros diferentes, podem produzir valores numericamente distintos de IS
-ou IV sem que isso represente mudança real no ritmo — apenas mudança na lente
-metodológica. Reconhecer essa sensibilidade, e oferecer ao usuário controle
-explícito sobre ela, é o que distingue uma ferramenta cientificamente
-responsável de uma "caixa-preta" que apenas devolve um número.
+Nenhuma delas, isoladamente, oferece diagnóstico — são medidas descritivas cuja
+interpretação depende do julgamento do profissional, do contexto do paciente e
+da comparação com valores de referência para populações semelhantes, e não de um
+limiar de normalidade embutido na métrica. Por dependerem fortemente dos
+parâmetros e da quantidade de dias, duas análises do mesmo registro com
+parâmetros diferentes podem produzir valores distintos de IS ou IV sem mudança
+real no ritmo — apenas mudança na lente metodológica. Reconhecer essa
+sensibilidade e oferecer controle explícito sobre ela distingue uma ferramenta
+cientificamente responsável de uma "caixa-preta" que apenas devolve um número.
 
 
 ====================================================================================================
 2.3  FERRAMENTAS E BIBLIOTECAS DE ANÁLISE DE ACTIGRAFIA
 ====================================================================================================
 
-A seção 2.2 descreveu o que as métricas não paramétricas significam e como
-são calculadas; esta seção descreve com o quê elas costumam ser calculadas na
-prática — o panorama de ferramentas e bibliotecas disponíveis, incluindo a
-biblioteca pyActigraphy adotada — e, sobretudo, onde cada uma atende ou deixa
-de atender ao perfil de usuário do sistema: um profissional de saúde sem
-formação em programação, que precisa de interface acessível, em português,
-sem custo de licença e integrada à gestão de pacientes e arquivos — e não
-apenas de um pesquisador proficiente em linguagem de script.
+Esta seção descreve o panorama de ferramentas e bibliotecas disponíveis,
+incluindo a pyActigraphy adotada, e onde cada uma atende ou não ao perfil de
+usuário do sistema: um profissional de saúde sem formação em programação, que
+precisa de interface acessível, em português, gratuita e integrada à gestão de
+pacientes — e não apenas de um pesquisador proficiente em script.
 
 
 2.3.1  PANORAMA DAS FERRAMENTAS DE ANÁLISE DE ACTIGRAFIA
 ----------------------------------------------------------------------------------------------------
-As ferramentas de processamento de actigrafia podem ser agrupadas, segundo
-origem e modelo de distribuição, em três categorias: (i) softwares
-proprietários fornecidos pelos fabricantes de dispositivos, acoplados ao
-equipamento; (ii) pacotes de código aberto para computação científica de uso
-geral, predominantemente em R ou Python, distribuídos independentemente do
-fabricante; e (iii) softwares acadêmicos de nicho, desenvolvidos por grupos
-de pesquisa em cronobiologia, geralmente gratuitos, mas de manutenção e
-escopo limitados ao propósito original de seus autores. O sistema aqui
-descrito, embora reutilize uma ferramenta da segunda categoria como motor de
-cálculo (pyActigraphy; subseção 2.3.2), não se encaixa em nenhuma das três —
-distinção retomada na subseção 2.3.7.
+As ferramentas agrupam-se em três categorias: (i) softwares proprietários dos
+fabricantes, acoplados ao equipamento; (ii) pacotes de código aberto para
+computação científica de uso geral, em R ou Python, independentes do fabricante;
+e (iii) softwares acadêmicos de nicho, gratuitos mas de manutenção e escopo
+limitados. O sistema reutiliza uma ferramenta da segunda categoria como motor de
+cálculo (pyActigraphy), mas não se encaixa em nenhuma das três.
 
 
 2.3.2  PYACTIGRAPHY: ARQUITETURA, ESCOPO E ADOÇÃO
 ----------------------------------------------------------------------------------------------------
 O pyActigraphy é um pacote de código aberto em Python, desenvolvido por
-pesquisadores do Centre de Recherches du Cyclotron (Universidade de Liège,
-Bélgica), com o objetivo de oferecer alternativa gratuita, programável e
-transparente aos softwares proprietários de análise de actigrafia (HAMMAD et
-al., 2021). Sua arquitetura organiza-se em torno da classe BaseRaw, abstração
-comum para os dados de um registro independentemente do fabricante de origem,
-sobre a qual se implementam leitores para os formatos proprietários dos
-principais fabricantes (entre eles AMI, CamNtech, Temec, Mesa e Respironics)
-e os métodos de cálculo das métricas não paramétricas (IS, IV, L5, M10), além
-de funcionalidades não exploradas neste trabalho, como detecção automática de
-períodos de sono, integração com dados de luz nativos e análise espectral do
-ritmo.
+pesquisadores do Centre de Recherches du Cyclotron (Universidade de Liège), como
+alternativa gratuita, programável e transparente aos softwares proprietários
+(HAMMAD et al., 2021). Sua arquitetura organiza-se na classe BaseRaw, abstração
+comum aos dados de um registro independentemente do fabricante, sobre a qual se
+implementam leitores para formatos proprietários (AMI, CamNtech, Temec, Mesa,
+Respironics) e os métodos de IS, IV, L5 e M10, além de funcionalidades não
+exploradas aqui (detecção de sono, integração com luz nativa, análise
+espectral).
 
-A adoção do pyActigraphy, em vez de uma reimplementação própria dos
-algoritmos, foi decisão deliberada de apoiar-se em implementação já validada
-pela comunidade de cronobiologia, evitando o risco de erros silenciosos em
-fórmulas estatísticas sensíveis a detalhes de implementação (por exemplo, a
-ordem de operações em uma soma de diferenças sucessivas, ou o tratamento de
-valores ausentes em série reamostrada). Há, contudo, limitações concretas no
-uso da biblioteca: exigência de Python 3.9, fragilidade da cadeia de
-dependências nativas, ausência de leitor nativo para o formato Condor (que
-exigiu a construção de um parser próprio) e ausência de qualquer componente
-de interface gráfica ou web. É essa última limitação — o pyActigraphy ser,
-por concepção, uma biblioteca para scripts e notebooks, e não uma aplicação
-completa — que estrutura o restante desta seção: tratar a biblioteca como
-motor de cálculo, e a interface, a persistência e a gestão de dados como
-problemas de engenharia de software resolvidos pelo restante da arquitetura.
+A adoção do pyActigraphy, em vez de uma reimplementação própria, apoia-se em
+implementação já validada pela comunidade de cronobiologia, evitando erros
+silenciosos em fórmulas sensíveis a detalhes (a ordem de operações em uma soma
+de diferenças sucessivas, o tratamento de valores ausentes em série
+reamostrada). Há limitações concretas: exigência de Python 3.9, fragilidade da
+cadeia de dependências nativas, ausência de leitor para o formato Condor (que
+exigiu um parser próprio) e ausência de qualquer interface gráfica ou web. É
+essa última que estrutura o sistema: tratar a biblioteca como motor de cálculo e
+a interface, a persistência e a gestão de dados como problemas de engenharia
+resolvidos pelo restante da arquitetura.
 
 
 2.3.3  SOFTWARES PROPRIETÁRIOS DOS FABRICANTES DE DISPOSITIVOS
 ----------------------------------------------------------------------------------------------------
-A maioria dos fabricantes comerciais distribui, junto ao equipamento, um
-software proprietário de descarregamento e análise — por exemplo, o ActiLife,
-da ActiGraph, e o Actiware, da Philips Respironics [REFERÊNCIA NECESSÁRIA:
-documentação oficial ou artigo que descreva ActiLife e Actiware]. Esses
-softwares oferecem, tipicamente, interface gráfica acessível a profissionais
-sem conhecimento de programação, pontuação (scoring) automática de sono
-calibrada para o respectivo hardware e exportação de relatórios prontos para
-uso clínico.
+A maioria dos fabricantes distribui, junto ao equipamento, um software
+proprietário de descarregamento e análise — por exemplo, o ActiLife, da
+ActiGraph, e o Actiware, da Philips Respironics [REFERÊNCIA NECESSÁRIA:
+documentação oficial ou artigo que descreva ActiLife e Actiware]. Oferecem
+interface acessível, scoring automático de sono calibrado para o hardware e
+relatórios prontos.
 
-Essa origem é também a fonte de suas principais limitações frente ao
-público-alvo deste trabalho. Primeiro, são softwares de licença comercial,
-vinculados à compra do equipamento do próprio fabricante — custo recorrente
-incompatível com o critério de gratuidade do projeto, e barreira de
-interoperabilidade: um profissional que recebesse um arquivo de outro
-fabricante (como o Condor ActTrust) não conseguiria abri-lo no software de um
-concorrente, ainda que ambos meçam o mesmo fenômeno físico (seção 2.1).
-Segundo, são aplicações de desktop, tipicamente restritas a Windows, exigindo
-instalação local em cada máquina — em contraste com o requisito de acesso via
-navegador, sem instalação adicional. Terceiro — e mais relevante para a
-pesquisadora —, expõem um conjunto fixo e limitado de parâmetros das métricas,
-muitas vezes sem documentação pública e auditável da fórmula interna,
-dificultando a reprodutibilidade exigida em publicações. Por fim, nenhum
-oferece gestão de múltiplos pacientes ao longo do tempo, vínculo entre
-paciente e arquivo ou histórico de exportações — tratam cada arquivo de forma
-isolada, e não como parte de um fluxo clínico contínuo.
+Essa origem é também a fonte de suas limitações. São de licença comercial,
+vinculados à compra do equipamento — custo incompatível com a gratuidade do
+projeto, e barreira de interoperabilidade: um arquivo de outro fabricante (como o
+Condor ActTrust) não abre no software de um concorrente. São aplicações de
+desktop, em geral restritas a Windows. Expõem um conjunto fixo de parâmetros,
+muitas vezes sem documentação pública da fórmula interna, dificultando a
+reprodutibilidade. E nenhum oferece gestão de múltiplos pacientes, vínculo
+paciente-arquivo ou histórico de exportações — tratam cada arquivo de forma
+isolada.
 
 
 2.3.4  PACOTES DE CÓDIGO ABERTO PARA CRONOBIOLOGIA EM R
 ----------------------------------------------------------------------------------------------------
-Paralelamente ao ecossistema Python, a comunidade de cronobiologia mantém
-pacotes equivalentes em R. O nparACT (BLUME; SANTHI; SCHABUS, 2016) é
-dedicado especificamente ao cálculo das métricas não paramétricas — IS, IV,
-L5, M10 e amplitude relativa —, com interface de linha de comando simples e
-documentação focada nesse escopo. O GGIR (VAN HEES et al., 2014) é de escopo
-muito mais amplo, originalmente voltado à pesquisa em atividade física e
-epidemiologia a partir de dados brutos de acelerômetro (e não de contagens já
-processadas pelo firmware, como PIM/TAT/ZCM; seção 2.1), e incorporou, em
-versões recentes, um módulo de análise de ritmo circadiano que inclui IS e
-IV, entre outras métricas.
+A comunidade de cronobiologia mantém pacotes equivalentes em R. O nparACT
+(BLUME; SANTHI; SCHABUS, 2016) é dedicado às métricas não paramétricas (IS, IV,
+L5, M10 e RA), com interface de linha de comando simples. O GGIR (VAN HEES et
+al., 2014) é de escopo muito mais amplo, voltado à pesquisa em atividade física
+a partir de dados brutos de acelerômetro (não de contagens já processadas como
+PIM/TAT/ZCM), e incorporou em versões recentes um módulo de ritmo circadiano com
+IS e IV.
 
-Esses pacotes têm a vantagem, sobre os proprietários (subseção 2.3.3), de
-serem gratuitos, de código auditável e não vinculados a um fabricante. Sua
-barreira é de outra natureza: exigem escrever e executar código R — instalar
-o ambiente R e, no caso do GGIR, compreender um extenso conjunto de
-parâmetros e convenções de organização de arquivos —, competência fora do
-perfil de formação esperado dos profissionais de saúde alvo (médico,
-enfermeiro, fisioterapeuta). Tampouco oferecem interface gráfica web, gestão
-de pacientes ou exportação de relatórios em lote — são, por concepção e
-público, ferramentas de pesquisa quantitativa para quem já programa, não
-ferramentas assistenciais de uso direto na rotina clínica.
+São gratuitos, de código auditável e não vinculados a fabricante, mas exigem
+escrever e executar código R — instalar o ambiente e, no GGIR, dominar um
+extenso conjunto de parâmetros —, competência fora do perfil dos profissionais
+de saúde alvo. Tampouco oferecem interface web, gestão de pacientes ou
+exportação em lote — são ferramentas de pesquisa para quem já programa, não
+ferramentas assistenciais.
 
 
 2.3.5  SOFTWARES ACADÊMICOS DE NICHO
 ----------------------------------------------------------------------------------------------------
-Uma terceira categoria, mais antiga e de manutenção mais incerta, reúne
-softwares desenvolvidos por grupos de pesquisa para suas próprias
-necessidades e depois disponibilizados gratuitamente — por exemplo, o
-ActogramJ, plugin do ImageJ voltado à geração de actogramas e a análises
-clássicas de periodograma (SCHMID; HELFRICH-FÖRSTER; YOSHII, 2011), ou o
-El Temps, software de domínio público para análise de ritmos biológicos
-desenvolvido na Universidade de Barcelona, de uso difundido em laboratórios
-de cronobiologia de língua espanhola e portuguesa [REFERÊNCIA NECESSÁRIA:
-fonte que documente o El Temps e sua adoção].
-
-Essas ferramentas compartilham, com as proprietárias, a vantagem de uma
-interface gráfica acessível sem conhecimento de programação, mas herdam
-limitações distintas: interfaces de desktop datadas, em geral restritas a
-Windows; documentação escassa ou descontinuada; manutenção dependente da
-disponibilidade contínua do grupo de pesquisa original, sem garantia de
-compatibilidade com sistemas operacionais ou formatos mais recentes; e,
-novamente, nenhuma funcionalidade de gestão de pacientes, de múltiplos
-usuários com isolamento de dados ou de exportação estruturada de relatórios —
-o foco permanece na análise estatística do ritmo, não no fluxo assistencial
-em torno dela.
+Uma terceira categoria reúne softwares desenvolvidos por grupos de pesquisa e
+depois disponibilizados gratuitamente — por exemplo, o ActogramJ, plugin do
+ImageJ voltado a actogramas e periodogramas (SCHMID; HELFRICH-FÖRSTER; YOSHII,
+2011), ou o El Temps, software de domínio público para análise de ritmos da
+Universidade de Barcelona [REFERÊNCIA NECESSÁRIA: fonte que documente o El Temps
+e sua adoção]. Compartilham com as proprietárias a interface gráfica acessível,
+mas herdam interfaces de desktop datadas (em geral Windows), documentação
+escassa, manutenção dependente do grupo original e, novamente, nenhuma gestão de
+pacientes, múltiplos usuários ou exportação estruturada.
 
 
 2.3.6  LACUNA COMUM: ANÁLISE ESTATÍSTICA VERSUS GESTÃO CLÍNICA DE DADOS
 ----------------------------------------------------------------------------------------------------
-O percurso pelas três categorias revela um padrão consistente,
-independentemente do modelo de distribuição: todas concentram o
-desenvolvimento na qualidade do cálculo estatístico e, quando há interface,
-na visualização de um único registro por vez — e nenhuma resolve o problema
-adjacente, igualmente real para o público-alvo, de organizar dezenas ou
-centenas de arquivos acumulados ao longo do tempo, vinculá-los a pacientes
-específicos, controlar o acesso de múltiplos profissionais aos próprios dados
-e manter um histórico auditável de exportações. Esse problema — de gestão de
-dados clínicos, não de cálculo estatístico — não tem, até onde alcança este
-levantamento, solução de código aberto e gratuita equivalente para o domínio
-específico da actigrafia.
+Independentemente do modelo de distribuição, todas as categorias concentram-se na
+qualidade do cálculo e, quando há interface, na visualização de um único registro
+— e nenhuma resolve o problema adjacente de organizar dezenas ou centenas de
+arquivos, vinculá-los a pacientes, controlar o acesso de múltiplos profissionais
+e manter histórico auditável de exportações. Esse problema, de gestão de dados
+clínicos e não de cálculo, não tem, até onde alcança este levantamento, solução
+de código aberto e gratuita equivalente para a actigrafia.
 
 
 2.3.7  SÍNTESE: POSICIONAMENTO FRENTE ÀS FERRAMENTAS EXISTENTES
 ----------------------------------------------------------------------------------------------------
-O sistema não compete com o pyActigraphy, o nparACT ou o GGIR no terreno em
-que essas ferramentas são fortes — a profundidade e a flexibilidade do
-cálculo científico —, e por isso as reaproveita, em vez de reimplementá-las
-(subseção 2.3.2). Tampouco compete com o ActiLife ou o Actiware no terreno em
-que softwares de fabricante são fortes — a integração nativa e calibrada com
-o respectivo hardware. Seu posicionamento é o de uma camada de aplicação web
-que combina o rigor científico de uma biblioteca de cronobiologia validada
-(pyActigraphy) com uma interface acessível a profissionais sem formação em
-programação e com uma gestão de dados clínicos — pacientes, arquivos,
-histórico de exportações, isolamento por usuário — ausente de todas as
-alternativas analisadas. É esse posicionamento, e a lacuna que ele preenche,
-que a seção 2.8 retomará sistematicamente, após as seções 2.4 a 2.7
-estabelecerem o restante do referencial necessário.
+O sistema não compete com pyActigraphy, nparACT ou GGIR na profundidade do
+cálculo científico — por isso os reaproveita —, nem com ActiLife ou Actiware na
+integração calibrada com o hardware. Posiciona-se como uma camada de aplicação
+web que combina o rigor de uma biblioteca de cronobiologia validada
+(pyActigraphy) com uma interface acessível a quem não programa e com uma gestão
+de dados clínicos — pacientes, arquivos, histórico, isolamento por usuário —
+ausente de todas as alternativas analisadas.
 
 
 ====================================================================================================
 2.4  VISUALIZAÇÃO DE DADOS EM SAÚDE
 ====================================================================================================
 
-As métricas não paramétricas (seção 2.2) resumem o ritmo em poucos números,
-mas um profissional de saúde raramente forma sua impressão clínica a partir
-de números isolados — ele a forma observando a forma do registro: os horários
-em que a atividade se concentra, a regularidade dos picos e vales dia após
-dia, a coincidência ou não entre inatividade e escuridão. Esta seção apresenta
-os princípios de visualização de dados — gerais e específicos a séries
-temporais de saúde — que fundamentam a forma de apresentar esses dados ao
-usuário e justificam por que a escolha de uma representação gráfica não é
-estética, mas afeta diretamente a capacidade de interpretar corretamente o
-que se mostra.
+As métricas resumem o ritmo em poucos números, mas o profissional forma sua
+impressão clínica observando a forma do registro: onde a atividade se concentra,
+a regularidade dos picos dia após dia, a coincidência entre inatividade e
+escuridão. Esta seção apresenta os princípios de visualização — gerais e
+específicos a séries temporais de saúde — que fundamentam a apresentação gráfica
+e justificam por que a escolha de uma representação não é estética, mas afeta a
+capacidade de interpretar corretamente o que se mostra.
 
 
 2.4.1  DO NÚMERO À FORMA: POR QUE VISUALIZAR DADOS DE ACTIGRAFIA
 ----------------------------------------------------------------------------------------------------
-Um registro de actigrafia de duas semanas, amostrado minuto a minuto, contém
-milhares de pontos por sinal (atividade, luz, temperatura). Nenhum
-profissional inspeciona essa quantidade de valores diretamente — a
-interpretação clínica depende de traduzir esses valores em uma representação
-visual que explore a capacidade humana de reconhecer padrões, tendências e
-anomalias muito mais rápida e confiavelmente do que a partir de uma tabela de
-números (TUFTE, 2001; FEW, 2012). Essa é a justificativa central, e não
-apenas estética, de qualquer gráfico no sistema: o gráfico é o que transforma
-um vetor de medições em um julgamento clínico possível.
-
-Essa tradução, porém, não é automaticamente fiel: uma representação mal
-escolhida pode obscurecer o padrão que se buscava evidenciar ou, pior,
-sugerir um padrão ausente dos dados — o problema que Tufte (2001) descreve
-como a necessidade de maximizar a integridade gráfica (graphical integrity),
-de modo que a impressão visual corresponda, com a maior fidelidade possível,
-à estrutura real dos dados. As subseções seguintes detalham os princípios que
-orientam essa tradução no contexto de séries temporais de actigrafia.
+Um registro de duas semanas, amostrado minuto a minuto, contém milhares de
+pontos por sinal. A interpretação clínica depende de traduzir esses valores em
+uma representação visual que explore a capacidade humana de reconhecer padrões,
+tendências e anomalias muito mais rápida e confiavelmente do que em uma tabela
+(TUFTE, 2001; FEW, 2012). Essa tradução, porém, não é automaticamente fiel: uma
+representação mal escolhida pode obscurecer o padrão buscado ou sugerir um padrão
+ausente — o problema que Tufte (2001) descreve como a necessidade de maximizar a
+integridade gráfica (graphical integrity), de modo que a impressão visual
+corresponda à estrutura real dos dados.
 
 
 2.4.2  PRINCÍPIOS CLÁSSICOS DE VISUALIZAÇÃO EFICAZ
 ----------------------------------------------------------------------------------------------------
-Dois princípios clássicos são particularmente relevantes para gráficos de
-séries temporais clínicas.
-
-O primeiro é a máxima razão dados-tinta (data-ink ratio), proposta por Tufte
-(2001): cada elemento gráfico desenhado deve representar informação, e
-elementos puramente decorativos — grades excessivas, sombras tridimensionais,
-molduras redundantes — devem ser eliminados, pois competem pela atenção sem
-acrescentar conteúdo. Esse princípio justifica escolhas deliberadamente
-econômicas: o sombreamento do período noturno usa uma única cor sólida de
-baixa opacidade, sem gradientes ou padrões decorativos, e os gráficos
-combinados sobrepõem atividade, luz e temperatura no mesmo plano cartesiano,
-em vez de espalhá-los em subgráficos separados — preservando, em um único
-campo visual, a correlação temporal entre os três sinais, justamente a
-informação clinicamente relevante (seção 2.1).
+Dois princípios clássicos são relevantes para gráficos de séries temporais
+clínicas. O primeiro é a máxima razão dados-tinta (data-ink ratio) de Tufte
+(2001): cada elemento gráfico deve representar informação, e elementos
+decorativos — grades excessivas, sombras 3D, molduras — devem ser eliminados.
+Isso justifica o sombreamento noturno em cor sólida de baixa opacidade, sem
+gradientes, e os gráficos combinados que sobrepõem atividade, luz e temperatura
+no mesmo plano cartesiano, preservando, em um único campo visual, a correlação
+temporal entre os sinais.
 
 [INSERIR FIGURA 4: Gráfico diário combinado do sistema. Conteúdo: eixo X de
 24 h; linha de atividade no eixo principal; luz e temperatura em eixos
@@ -771,37 +553,24 @@ temperatura sobrepostos no mesmo plano cartesiano (alta razão dados-tinta),
 preservando a correlação temporal entre os sinais."]
 
 O segundo é a hierarquia de acurácia perceptual de Cleveland e McGill (1984):
-nem todos os atributos visuais são igualmente fáceis de decodificar com
-precisão. Posição ao longo de um eixo comum e comprimento são decodificados
-com maior acurácia; em seguida, inclinação e ângulo; por fim, área e,
-sobretudo, cor (saturação ou matiz), os mais sujeitos a distorção perceptual.
-Essa hierarquia justifica representar atividade, luz e temperatura como linhas
-posicionadas ao longo de eixos numéricos explícitos (codificação por posição),
-em vez de usar apenas intensidade de cor para indicar magnitude — reservando
-a cor (menos precisa, mas mais compacta) para o papel secundário de
-diferenciar sinais entre si e arquivos entre si (na comparação), e não para
-codificar a magnitude principal que se deseja comparar com precisão.
+posição ao longo de um eixo comum e comprimento são decodificados com maior
+acurácia; depois, inclinação e ângulo; por fim, área e cor. Isso justifica
+representar atividade, luz e temperatura como linhas posicionadas em eixos
+numéricos explícitos, em vez de codificar magnitude por intensidade de cor —
+reservando a cor ao papel secundário de diferenciar sinais e arquivos entre si.
 
 
 2.4.3  VISUALIZAÇÃO DE SÉRIES TEMPORAIS CIRCADIANAS
 ----------------------------------------------------------------------------------------------------
-Dados de actigrafia são, por natureza, dados orientados ao tempo
-(time-oriented data), categoria com desafios próprios, distintos dos de dados
-tabulares estáticos: a necessidade de representar simultaneamente a magnitude
-de uma variável e sua posição em uma estrutura temporal cíclica (a hora do
-dia, que se repete a cada 24 horas) e linear (a sucessão de dias do registro)
-(AIGNER et al., 2011).
-
-A cronobiologia consolidou historicamente uma forma específica de
-visualização para esse problema: o actograma e, em particular, o actograma de
+Dados de actigrafia são dados orientados ao tempo (time-oriented data), com o
+desafio de representar simultaneamente a magnitude de uma variável e sua posição
+em uma estrutura temporal cíclica (a hora do dia) e linear (a sucessão de dias)
+(AIGNER et al., 2011). A cronobiologia consolidou para isso o actograma de
 plotagem dupla (double-plotted actogram), no qual cada dia é desenhado em uma
-linha horizontal e, para facilitar a percepção de um padrão que atravessa a
-meia-noite (por exemplo, um sono que começa às 23h e termina às 7h), o mesmo
-dia é repetido, deslocado, ao lado do dia seguinte (PITTENDRIGH; DAAN, 1976).
-Essa convenção resolve o problema de um padrão "cortado" pela borda do eixo
-de 24 horas, mas tem leitura inicialmente pouco intuitiva para um observador
-não treinado em cronobiologia — exatamente o público de profissionais de
-saúde sem formação especializada.
+linha e repetido, deslocado, ao lado do dia seguinte, para facilitar a percepção
+de um padrão que atravessa a meia-noite (PITTENDRIGH; DAAN, 1976). A convenção
+resolve o padrão "cortado" pela borda das 24 horas, mas tem leitura pouco
+intuitiva para quem não é treinado em cronobiologia — exatamente o público alvo.
 
 [INSERIR FIGURA 5: Comparação entre o actograma de plotagem dupla tradicional
 e a abordagem de um gráfico combinado por dia. Conteúdo: à esquerda, actograma
@@ -811,73 +580,47 @@ visualização de registros circadianos: o actograma de plotagem dupla (visão
 compacta de todos os dias) e o gráfico diário combinado adotado pelo sistema
 (leitura mais direta para profissionais sem treinamento em cronobiologia)."]
 
-O sistema adota uma solução alternativa ao actograma clássico: em vez de um
-único gráfico compacto com todos os dias, gera um gráfico combinado
-independente para cada dia, exibido em sequência, com o eixo X representando
-as 24 horas daquele dia e o eixo Y a magnitude da atividade (e, em eixos
-sobrepostos, luz e temperatura). Essa escolha sacrifica a visão simultânea de
-todos os dias em uma imagem compacta — vantagem do actograma tradicional —,
-mas oferece leitura mais direta e familiar para um profissional sem
-treinamento prévio, sem exigir o aprendizado da convenção de plotagem dupla,
-e viabiliza a interatividade detalhada na subseção 2.4.4 de forma
-independente para cada dia.
+O sistema adota solução alternativa: em vez de um único gráfico compacto, gera um
+gráfico combinado independente por dia, com o eixo X nas 24 horas daquele dia e o
+eixo Y na magnitude. Sacrifica a visão simultânea de todos os dias, mas oferece
+leitura mais direta, sem exigir o aprendizado da plotagem dupla, e viabiliza a
+interatividade de forma independente por dia.
 
 
 2.4.4  INTERATIVIDADE: O MANTRA DE SHNEIDERMAN
 ----------------------------------------------------------------------------------------------------
-Shneiderman (1996) propõe um princípio amplamente adotado no projeto de
-interfaces de visualização interativa, resumido no mantra "visão geral
-primeiro, zoom e filtro, detalhes a partir de solicitação" (overview first,
-zoom and filter, then details-on-demand): o usuário deve primeiro obter uma
-visão panorâmica, depois poder restringi-la a um subconjunto de interesse e
-só então acessar o detalhe granular de um item específico — em vez de ser
-confrontado, desde o início, com a totalidade do detalhe disponível.
-
-Esse princípio está presente em múltiplas camadas da experiência de análise:
-a sequência de seções recolhíveis independentes na página de análises
-(descartar início/fim, opções de exibição, parâmetros das métricas, filtrar
-dias exibidos) é, em si, uma aplicação direta de zoom e filtro progressivos —
-o profissional começa com o registro completo e, em cada etapa, aplica um
-recorte ou realce adicional, sem que os filtros de uma etapa comprometam o
-ajuste das anteriores. A interatividade nativa do Plotly (zoom, pan, hover com
-tooltip exibindo o valor exato de um ponto) é a camada final de
-"detalhes a partir de solicitação": o profissional enxerga primeiro o padrão
-geral da curva e só busca o valor numérico exato quando posiciona o cursor
-sobre um ponto — detalhe que seria visualmente poluído se estivesse sempre
-visível. Essa mesma lógica é a razão prática pela qual o Plotly foi escolhido
-sobre uma biblioteca de gráficos estáticos: a interatividade não é acréscimo
-cosmético, mas a realização concreta de um princípio estabelecido de
-visualização eficaz para exploração de dados.
+Shneiderman (1996) resume no mantra "visão geral primeiro, zoom e filtro,
+detalhes a partir de solicitação" (overview first, zoom and filter, then
+details-on-demand) um princípio amplamente adotado: o usuário deve obter primeiro
+uma visão panorâmica, depois restringi-la e só então acessar o detalhe granular,
+em vez de ser confrontado com toda a informação de uma vez. O princípio aparece
+em duas camadas: a sequência de seções recolhíveis na página de análises
+(descartar início/fim, opções de exibição, parâmetros, filtrar dias) é uma
+aplicação de zoom e filtro progressivos; e a interatividade nativa do Plotly
+(zoom, pan, hover com o valor exato) é a camada de "detalhes a partir de
+solicitação". Essa é a razão prática da escolha do Plotly sobre uma biblioteca de
+gráficos estáticos: a interatividade não é acréscimo cosmético, mas a realização
+de um princípio estabelecido de visualização para exploração de dados.
 
 
 2.4.5  COR, ESCALA E COMPARABILIDADE ENTRE REGISTROS
 ----------------------------------------------------------------------------------------------------
-Quando o objetivo deixa de ser a leitura de um único registro e passa a ser a
-comparação entre registros — caso da página de comparação e da matriz de
-temperatura por hora —, dois cuidados adicionais se tornam centrais: a escolha
-de uma paleta perceptualmente distinguível e a manutenção de uma escala
-numérica comum entre os elementos comparados.
+Quando o objetivo é comparar registros, dois cuidados se tornam centrais: uma
+paleta perceptualmente distinguível e uma escala numérica comum. Para distinguir
+múltiplas séries categóricas — vários arquivos —, recomendam-se paletas
+qualitativas, que maximizam a distinguibilidade sem sugerir ordem ou magnitude
+(BREWER, 2003). É o que fundamenta a paleta fixa da comparação e explica por que
+mais de seis arquivos simultâneos levam ao reaproveitamento cíclico das cores —
+compromisso inerente a qualquer paleta qualitativa finita, não falha de
+implementação.
 
-Para distinguir múltiplas séries categóricas — vários arquivos selecionados
-simultaneamente —, a literatura recomenda paletas de cores qualitativas,
-desenhadas para maximizar a distinguibilidade entre um número limitado de
-categorias, sem sugerir ordem ou magnitude relativa entre elas (BREWER, 2003).
-É esse princípio que fundamenta a paleta de cores fixas usada na comparação e
-que também explica por que a limitação prática observada (mais de seis
-arquivos comparados simultaneamente levam ao reaproveitamento cíclico das
-cores) é um compromisso inerente a qualquer paleta qualitativa de tamanho
-finito, e não uma falha de implementação isolada.
-
-Já para representar uma grandeza contínua — caso da matriz dia × hora de
-temperatura —, recomendam-se paletas sequenciais ou divergentes, que preservem
-uma ordem perceptual monotônica correspondente à ordem numérica da variável
-(BREWER, 2003). A escala azul-vermelho usada na matriz de temperatura segue
-essa lógica — extremos visualmente opostos (frio/quente) mapeados a extremos
-numéricos opostos —, e a decisão de calcular a escala apenas sobre os valores
-reais da matriz, excluindo a linha e a coluna de síntese ("Média"), evita o
-problema, descrito por Tufte (2001) como distorção da integridade gráfica, de
-uma célula de resumo (cuja variação é naturalmente menor que a dos dados que
-ela resume) comprimir e distorcer a escala de cores dos dados detalhados.
+Para uma grandeza contínua — a matriz dia × hora de temperatura —, recomendam-se
+paletas sequenciais ou divergentes, com ordem perceptual monotônica (BREWER,
+2003). A escala azul-vermelho da matriz segue essa lógica, e a decisão de
+calcular a escala apenas sobre os valores reais, excluindo a linha e a coluna de
+síntese ("Média"), evita o problema, descrito por Tufte (2001) como distorção da
+integridade gráfica, de uma célula de resumo comprimir a escala dos dados
+detalhados.
 
 [INSERIR FIGURA 6: Matriz dia × hora de temperatura periférica com escala de
 cor azul-vermelho. Conteúdo: linhas = dias, colunas = horas; células coloridas
@@ -886,71 +629,38 @@ do cálculo da escala. Legenda provisória: "Figura 6 — Matriz dia × hora de
 temperatura periférica: escala sequencial azul-vermelho calculada apenas
 sobre os valores reais, preservando a integridade gráfica."]
 
-Por fim, manter uma escala numérica compartilhada entre múltiplos elementos
-comparados — e não uma escala recalculada independentemente para cada um — é o
-que torna uma comparação visual diretamente interpretável sem cálculo mental
-adicional: dois gráficos de amplitude visual semelhante, mas com escalas
-numéricas diferentes nos eixos Y, podem induzir a impressão equivocada de
-magnitudes comparáveis quando, na realidade, representam intensidades muito
-distintas. É esse risco que motiva o cálculo de faixas de escala
-compartilhadas entre todos os arquivos selecionados na comparação, em vez de
-uma escala recalculada arquivo a arquivo — sem essa precaução, a própria
-interatividade discutida na subseção 2.4.4 poderia conduzir a uma leitura
-clinicamente incorreta da comparação entre dois registros.
-
-
-2.4.6  SÍNTESE: PRINCÍPIOS EM AÇÃO
-----------------------------------------------------------------------------------------------------
-Os princípios desta seção não são citados explicitamente no código do sistema
-— não há comentário que mencione Tufte, Cleveland e McGill ou Shneiderman —,
-mas estão materializados em decisões de projeto concretas: a economia visual
-do sombreamento noturno e dos gráficos combinados (data-ink ratio); a
-codificação de atividade, luz e temperatura por posição ao longo de eixos
-numéricos, e não apenas por cor (hierarquia de acurácia perceptual); a
-sequência progressiva de filtros e a interatividade nativa do Plotly (mantra
-de Shneiderman); e as paletas qualitativas e sequenciais, com escalas
-compartilhadas, usadas respectivamente na comparação entre arquivos e na
-matriz de temperatura (cor e comparabilidade). Reconhecer essa fundamentação,
-ainda que implícita na implementação, é o papel desta seção: mostrar que as
-escolhas de visualização não são arbitrárias, mas consistentes com princípios
-estabelecidos de visualização eficaz de dados em saúde.
+Por fim, manter uma escala numérica compartilhada entre elementos comparados — e
+não recalculada para cada um — torna a comparação diretamente interpretável: dois
+gráficos de amplitude visual semelhante, mas com escalas distintas nos eixos Y,
+podem sugerir magnitudes comparáveis quando representam intensidades muito
+diferentes. Esse risco motiva o cálculo de faixas de escala compartilhadas entre
+todos os arquivos selecionados na comparação.
 
 
 ====================================================================================================
 2.5  ARQUITETURA E ENGENHARIA DE SOFTWARE
 ====================================================================================================
 
-Esta seção apresenta o referencial de engenharia de software que fundamenta as
-decisões arquiteturais do sistema: o padrão MVC e o princípio mais geral de
-separação em camadas que o sustenta; o paradigma de execução reativa adotado
-por frameworks como o Streamlit, que dispensa uma API intermediária entre
-interface e lógica de negócio; o modelo relacional de dados e suas garantias
-de integridade; e os mecanismos básicos de segurança — hash de senha e sessão
-por token — esperados de qualquer aplicação web que armazene dados sensíveis,
-como é o caso de um sistema que processa, ainda que indiretamente, dados de
-saúde de pacientes.
+Esta seção apresenta o referencial de engenharia que fundamenta as decisões
+arquiteturais: o padrão MVC e a separação em camadas que o sustenta; o paradigma
+reativo de frameworks como o Streamlit, que dispensa uma API intermediária; o
+modelo relacional e suas garantias de integridade; e os mecanismos básicos de
+segurança — hash de senha e sessão por token — esperados de qualquer aplicação
+que armazene dados sensíveis, como dados de saúde de pacientes.
 
 
 2.5.1  O PADRÃO MVC: ORIGEM E SEPARAÇÃO DE RESPONSABILIDADES
 ----------------------------------------------------------------------------------------------------
-O padrão Model-View-Controller (MVC) foi descrito originalmente por Krasner e
-Pope (1988) no contexto do ambiente Smalltalk-80, como forma de organizar
-aplicações com interface gráfica em três responsabilidades distintas e
-desacopladas: o Model, responsável por representar o estado e as regras do
-domínio, independentemente de como esse estado é exibido; a View, responsável
-por apresentá-lo ao usuário, sem conter lógica de negócio própria; e o
-Controller, responsável por interpretar a entrada do usuário e traduzi-la em
-alterações sobre o Model, mediando a comunicação entre as outras duas camadas.
-
-O valor desse padrão decorre do princípio de separação de responsabilidades
-(separation of concerns), um dos pilares mais disseminados da engenharia de
-software: ao isolar a lógica de domínio (Model) da lógica de apresentação
-(View), torna-se possível modificar a forma como um dado é exibido sem alterar
-a forma como é calculado ou persistido, e vice-versa — reduzindo o acoplamento
-entre partes que mudam por razões e em ritmos diferentes (PRESSMAN; MAXIM,
-2016; SOMMERVILLE, 2019). É esse mesmo princípio que torna possível, por
-exemplo, que a lógica de validação de cadastro de usuário permaneça inalterada
-independentemente de quantas vezes o leiaute do formulário seja redesenhado.
+O padrão Model-View-Controller (MVC) foi descrito por Krasner e Pope (1988) no
+ambiente Smalltalk-80, organizando aplicações com interface gráfica em três
+responsabilidades desacopladas: o Model, que representa o estado e as regras do
+domínio; a View, que o apresenta sem conter lógica de negócio; e o Controller,
+que interpreta a entrada do usuário e a traduz em alterações sobre o Model. Seu
+valor decorre do princípio de separação de responsabilidades (separation of
+concerns): isolar a lógica de domínio (Model) da apresentação (View) permite
+modificar como um dado é exibido sem alterar como é calculado ou persistido,
+reduzindo o acoplamento entre partes que mudam por razões diferentes (PRESSMAN;
+MAXIM, 2016; SOMMERVILLE, 2019).
 
 [INSERIR FIGURA 7: Diagrama da arquitetura em camadas do sistema. Conteúdo:
 três blocos empilhados (View → Controller → Model) com setas unidirecionais
@@ -962,81 +672,52 @@ Arquitetura em camadas: a comunicação flui em sentido único (View → Control
 
 2.5.2  VARIAÇÕES DO MVC E A FORMA ESTRITA ADOTADA
 ----------------------------------------------------------------------------------------------------
-Na prática contemporânea, "MVC" descreve uma família de variações
-arquiteturais — não uma implementação canônica única —, que diferem entre si
-quanto à direção e à obrigatoriedade das chamadas entre camadas (FOWLER,
-2002). Em variações amplamente adotadas em frameworks web (por exemplo, Ruby
-on Rails ou ASP.NET MVC), é comum que a View tenha acesso de leitura facilitado
-ao Model — por meio de objetos de visualização que encapsulam diretamente
-entidades de domínio —, relaxando o isolamento estrito entre as duas camadas
-em favor de produtividade.
-
-O sistema adota deliberadamente a variação mais estrita dessa família: a View
-nunca acessa o Model diretamente, e toda comunicação flui em um único sentido
-— View chama Controller, e Controller chama Model —, sem exceções. Essa
-escolha é tratada como invariante de projeto, e não como recomendação
-flexível: qualquer página que executasse uma consulta ao banco diretamente
-seria considerada um defeito de arquitetura. Do ponto de vista teórico, essa
-rigidez deliberada justifica-se pelo ganho de testabilidade e
-manutenibilidade que a separação estrita proporciona — a camada Controller
-concentra a totalidade da lógica de validação e de regras de negócio,
-tornando-a, em princípio, testável de forma isolada da interface, ainda que o
-sistema não possua, na versão atual, uma suíte de testes automatizados que
-explore essa propriedade.
+"MVC" descreve uma família de variações, e não uma implementação canônica única,
+que diferem quanto à direção e à obrigatoriedade das chamadas entre camadas
+(FOWLER, 2002). Em frameworks web amplamente adotados (Ruby on Rails, ASP.NET
+MVC), é comum a View ter acesso de leitura facilitado ao Model, relaxando o
+isolamento em favor de produtividade. O sistema adota a variação mais estrita: a
+View nunca acessa o Model diretamente, e toda comunicação flui em sentido único
+— View chama Controller, Controller chama Model. Essa rigidez é tratada como
+invariante de projeto, justificada pelo ganho de testabilidade e
+manutenibilidade: o Controller concentra a totalidade da validação e das regras
+de negócio, tornando-as testáveis isoladamente da interface, ainda que o sistema
+não possua, na versão atual, uma suíte de testes automatizados.
 
 
 2.5.3  ARQUITETURA EM CAMADAS E MANUTENIBILIDADE
 ----------------------------------------------------------------------------------------------------
-O MVC é uma instância de um princípio arquitetural mais geral — a arquitetura
-em camadas (layered architecture) —, em que um sistema se organiza em níveis
-hierárquicos de abstração, cada um dependendo apenas do nível imediatamente
-inferior e oferecendo serviços ao imediatamente superior (FOWLER, 2002;
-SOMMERVILLE, 2019). A principal vantagem é permitir que uma camada seja
-modificada, ou mesmo substituída, sem alterar as camadas que dependem dela,
-desde que a interface (o contrato) entre elas seja preservada.
-
-Esse princípio manifesta-se concretamente na separação, dentro da própria
-camada Model, entre os componentes de acesso a dados (que dependem do banco)
-e o módulo de parsing de domínio (o parser do formato Condor), que não depende
-do banco em nenhum momento. Essa separação interna — não exigida pelo MVC em
-si, que trata "Model" como camada única — é uma aplicação adicional do mesmo
-princípio de baixo acoplamento: o parser poderia, em tese, ser reaproveitado
-ou testado isoladamente, sem exigir uma conexão de banco ativa, por depender
-apenas de bytes, texto e estruturas de dados tabulares. A arquitetura em
-camadas, portanto, não se limita à fronteira entre View, Controller e Model:
-repete-se, em escala menor, dentro da própria camada Model.
+O MVC é uma instância da arquitetura em camadas (layered architecture), em que
+um sistema se organiza em níveis hierárquicos, cada um dependendo apenas do nível
+inferior e oferecendo serviços ao superior (FOWLER, 2002; SOMMERVILLE, 2019),
+permitindo modificar ou substituir uma camada sem alterar as demais, desde que o
+contrato entre elas seja preservado. Isso se manifesta na separação, dentro do
+próprio Model, entre os componentes de acesso a dados (que dependem do banco) e o
+parser do formato Condor (que não depende). Essa separação interna — não exigida
+pelo MVC — aplica o mesmo princípio de baixo acoplamento: o parser poderia ser
+reaproveitado ou testado isoladamente, por depender apenas de bytes, texto e
+estruturas tabulares.
 
 
 2.5.4  APLICAÇÕES WEB REATIVAS EM PYTHON: O PARADIGMA DO STREAMLIT
 ----------------------------------------------------------------------------------------------------
-A arquitetura de uma aplicação web tradicional, no modelo request-response
-consolidado por frameworks como Flask ou Django, exige que o desenvolvedor
-defina explicitamente rotas HTTP, manipule requisições e respostas e
-frequentemente combine essa camada de back-end com uma camada de front-end
-separada — em HTML/CSS/JavaScript ou em uma biblioteca como React ou Vue —,
-comunicando-se por meio de uma API (em geral REST ou GraphQL). Esse modelo de
-duas camadas é poderoso e amplamente adotado, mas implica um custo de
-desenvolvimento e manutenção proporcional ao número de camadas e linguagens
-envolvidas.
+Uma aplicação web tradicional, no modelo request-response de frameworks como
+Flask ou Django, exige definir rotas HTTP, manipular requisições e respostas e
+frequentemente combinar o back-end com uma camada de front-end separada
+(HTML/CSS/JavaScript ou React/Vue), comunicando-se por uma API (REST ou GraphQL)
+— modelo poderoso, mas de custo proporcional ao número de camadas e linguagens.
 
-O Streamlit representa um paradigma alternativo, por vezes descrito como
-"reativo" ou de execução por reexecução completa (rerun-based): a cada
-interação do usuário com um widget, o script Python completo da página é
-executado novamente, de cima a baixo, e o framework reconcilia o estado da
-interface resultante com o anterior — preservando, por meio de um mecanismo de
-estado de sessão (session_state), os valores que não devem ser recalculados a
-cada execução [REFERÊNCIA NECESSÁRIA: documentação oficial do Streamlit que
-descreva o modelo de execução rerun-based e o session_state]. Esse modelo
-dispensa a distinção entre back-end e front-end: o mesmo script define a
-lógica de obtenção de dados e a interface que os exibe, eliminando a
-necessidade de uma API HTTP intermediária. A contrapartida é a ausência de
-atualização parcial da interface: como todo o script é reexecutado a cada
-interação, operações custosas (processar um arquivo de actigrafia, renderizar
-um gráfico) precisam ser explicitamente protegidas por mecanismos de cache,
-sob risco de reprocessamento redundante a cada clique — preocupação de
-desempenho que, em um framework request-response tradicional, seria delegada
-a uma camada de cache HTTP ou de banco, e que aqui se torna responsabilidade
-direta do código da aplicação.
+O Streamlit representa um paradigma "reativo" ou de reexecução completa
+(rerun-based): a cada interação com um widget, o script Python completo da página
+é reexecutado de cima a baixo, e o framework reconcilia a interface, preservando
+por um mecanismo de estado de sessão (session_state) os valores que não devem ser
+recalculados [REFERÊNCIA NECESSÁRIA: documentação oficial do Streamlit que
+descreva o modelo rerun-based e o session_state]. Esse modelo dispensa a
+distinção entre back-end e front-end e a API intermediária. A contrapartida é a
+ausência de atualização parcial: como todo o script é reexecutado, operações
+custosas (processar um arquivo, renderizar um gráfico) precisam ser protegidas
+por cache, sob risco de reprocessamento a cada clique — preocupação que, em um
+framework tradicional, seria delegada a uma camada de cache HTTP ou de banco.
 
 [INSERIR FIGURA 8: Comparação entre o modelo request-response tradicional e o
 modelo rerun-based do Streamlit. Conteúdo: à esquerda, back-end e front-end
@@ -1048,210 +729,129 @@ interação, com session_state preservando estado. Legenda provisória:
 
 2.5.5  PERSISTÊNCIA RELACIONAL: MODELO RELACIONAL E INTEGRIDADE
 ----------------------------------------------------------------------------------------------------
-O modelo relacional de dados, formalizado por Codd (1970) e consolidado como
-paradigma dominante de persistência estruturada (DATE, 2003; ELMASRI;
-NAVATHE, 2015), organiza os dados em relações (tabelas) compostas por tuplas
-(linhas) e atributos (colunas), com integridade garantida por restrições
-declarativas — chaves primárias, chaves estrangeiras, restrições de unicidade
-e de não nulidade — impostas pelo próprio sistema gerenciador de banco de
-dados, independentemente da disciplina do código de aplicação que o utiliza.
-
-Essa garantia de integridade declarativa permite impor, no próprio banco,
-regras de negócio que, de outra forma, dependeriam inteiramente da correção do
-código: a restrição de unicidade sobre o vínculo paciente-arquivo impõe a
-regra "um arquivo pertence a, no máximo, um paciente" mesmo que uma futura
-alteração no código de validação contivesse um defeito; e as chaves
-estrangeiras com remoção em cascata (ON DELETE CASCADE) garantem a ausência de
-registros órfãos — um arquivo apontando para um usuário inexistente, por
-exemplo — independentemente de qualquer rotina de limpeza manual. Esse é o
-argumento central, fundamentado na literatura de banco de dados, por trás da
-escolha de um banco relacional (PostgreSQL) sobre alternativas não
-relacionais para este domínio: usuários, arquivos, pacientes e relatórios são,
-por natureza, entidades fortemente inter-relacionadas, para as quais a
-integridade referencial declarativa é propriedade estruturalmente desejável,
-e não incidental.
-
-Complementarmente, a garantia transacional ACID (Atomicidade, Consistência,
-Isolamento e Durabilidade), oferecida por sistemas relacionais maduros como o
-PostgreSQL, assegura que cada operação de escrita — por meio de um gerenciador
-de contexto que comita em caso de sucesso e desfaz (rollback) em caso de
-exceção — seja aplicada de forma tudo-ou-nada, evitando estados intermediários
-inconsistentes mesmo em caso de falha durante uma operação composta por
-múltiplos comandos (ELMASRI; NAVATHE, 2015).
+O modelo relacional, formalizado por Codd (1970) e consolidado como paradigma
+dominante de persistência estruturada (DATE, 2003; ELMASRI; NAVATHE, 2015),
+organiza os dados em tabelas com integridade garantida por restrições
+declarativas — chaves primárias, chaves estrangeiras, unicidade, não nulidade —
+impostas pelo próprio SGBD, independentemente da disciplina do código. Isso
+permite impor no banco regras de negócio que de outra forma dependeriam da
+correção do código: a unicidade sobre o vínculo paciente-arquivo impõe "um
+arquivo pertence a, no máximo, um paciente" mesmo diante de um defeito de
+validação; e as chaves estrangeiras com ON DELETE CASCADE evitam registros
+órfãos. É o argumento por trás da escolha de um banco relacional (PostgreSQL)
+para este domínio: usuários, arquivos, pacientes e relatórios são entidades
+fortemente inter-relacionadas, para as quais a integridade referencial
+declarativa é estruturalmente desejável. Complementarmente, a garantia
+transacional ACID do PostgreSQL assegura que cada escrita — via um gerenciador de
+contexto que comita em sucesso e desfaz (rollback) em exceção — seja aplicada de
+forma tudo-ou-nada, evitando estados inconsistentes (ELMASRI; NAVATHE, 2015).
 
 
 2.5.6  SEGURANÇA BÁSICA: HASH DE SENHA E SESSÃO POR TOKEN
 ----------------------------------------------------------------------------------------------------
-Duas práticas de segurança básica de aplicações web são particularmente
-relevantes, por lidar com credenciais de profissionais de saúde e,
-indiretamente, com dados de pacientes: o armazenamento de senhas por função de
-hash criptográfico e a persistência de sessão autenticada por token, em vez de
-credenciais reenviadas a cada requisição.
+Por lidar com credenciais de profissionais de saúde e, indiretamente, com dados
+de pacientes, duas práticas são relevantes: o hash criptográfico de senhas e a
+sessão autenticada por token.
 
-O armazenamento de senhas em texto plano é reconhecido como inadequado pela
-literatura de segurança — qualquer comprometimento do banco exporia
-diretamente as credenciais de todos os usuários —, e a alternativa
-estabelecida é armazenar não a senha, mas o resultado de uma função de hash
-criptográfico de via única aplicada a ela. Funções de hash genéricas (como
-MD5 ou SHA-256, otimizadas para velocidade) são inadequadas para senhas: sua
-velocidade facilita ataques de força bruta e de tabelas pré-computadas
-(rainbow tables) contra hashes vazados. O algoritmo bcrypt, adotado pelo
-sistema, foi projetado para mitigar esse risco: incorpora um salt aleatório
-único por senha (eliminando a viabilidade de tabelas pré-computadas genéricas)
-e um fator de custo computacional ajustável, que torna o cálculo de cada hash
-deliberadamente lento — propriedade desejável para hash de senha, ainda que
-indesejável para hash de propósito geral (PROVOS; MAZIÈRES, 1999). Esse é o
-fundamento teórico, e não apenas a popularidade da biblioteca, por trás da
-escolha do bcrypt.
+Armazenar senhas em texto plano é inadequado — qualquer comprometimento do banco
+exporia todas as credenciais. A alternativa é armazenar o resultado de uma função
+de hash de via única. Funções genéricas (MD5, SHA-256), otimizadas para
+velocidade, são inadequadas para senhas, pois facilitam força bruta e tabelas
+pré-computadas (rainbow tables). O bcrypt, adotado pelo sistema, incorpora um
+salt aleatório único por senha e um fator de custo ajustável que torna o cálculo
+deliberadamente lento — propriedade desejável para hash de senha (PROVOS;
+MAZIÈRES, 1999).
 
-Quanto à sessão, o protocolo HTTP é, por natureza, sem estado (stateless):
-cada requisição é, a princípio, independente das anteriores, sem memória de
-que um usuário já se autenticou. A solução estabelecida é a sessão autenticada
-por token: após a validação inicial das credenciais, o servidor gera um
-identificador opaco e imprevisível (o token), associa-o ao usuário em uma
-tabela de sessões (com prazo de expiração) e o devolve ao navegador —
-tipicamente em um cookie HTTP —, que o reenvia automaticamente nas
-requisições subsequentes; o servidor valida o token recebido contra a tabela
-de sessões antes de considerar a requisição autenticada. É esse o mecanismo
-implementado: um token UUID v4 — escolhido por sua imprevisibilidade
-estatística, tornando impraticável adivinhar um token válido por tentativa e
-erro — gravado com prazo de expiração calculado conforme a opção "manter
-conectado" selecionada pelo usuário. O atributo SameSite=Strict do cookie de
-sessão é uma camada adicional de proteção recomendada pelas diretrizes atuais
-de segurança (OWASP, 2023) contra ataques de falsificação de requisição entre
-sites (Cross-Site Request Forgery, CSRF), ao impedir que o navegador envie o
-cookie em requisições originadas de um domínio diferente do próprio sistema.
-
-Vale registrar, como contraponto de completude, que essas práticas mitigam
-riscos específicos (senha exposta em repouso, sessão falsificada), mas não
-substituem a criptografia em trânsito (HTTPS/TLS): mesmo uma senha corretamente
-hasheada com bcrypt trafega em texto plano da tela de login até o servidor, no
-momento da autenticação, caso a conexão entre navegador e servidor não seja
-criptografada — camada de segurança distinta e complementar às duas discutidas
-nesta subseção, ausente na implantação atual.
-
-
-2.5.7  SÍNTESE: O REFERENCIAL POR TRÁS DA ARQUITETURA
-----------------------------------------------------------------------------------------------------
-Os princípios desta seção — separação de responsabilidades sob a forma estrita
-de MVC, arquitetura em camadas aplicada também dentro da camada Model, o
-paradigma reativo do Streamlit como alternativa legítima ao modelo
-request-response, a integridade declarativa e as garantias transacionais do
-modelo relacional, e as práticas estabelecidas de hash de senha e sessão por
-token — formam, em conjunto, o referencial de engenharia de software que
-justifica, e não apenas descreve, as decisões de arquitetura do sistema. A
-seção 2.6 complementa esse referencial com a base teórica do processo pelo
-qual essa arquitetura foi construída ao longo do tempo — as metodologias ágeis
-de desenvolvimento iterativo e incremental.
+Quanto à sessão, o HTTP é sem estado (stateless): cada requisição é independente,
+sem memória da autenticação. A solução é a sessão por token: após validar as
+credenciais, o servidor gera um identificador opaco e imprevisível, associa-o ao
+usuário em uma tabela de sessões com prazo de expiração e o devolve ao navegador
+em um cookie, validando-o a cada requisição. O sistema usa um token UUID v4 —
+escolhido por sua imprevisibilidade — gravado com prazo conforme a opção "manter
+conectado". O atributo SameSite=Strict do cookie é proteção adicional
+recomendada (OWASP, 2023) contra Cross-Site Request Forgery (CSRF), ao impedir o
+envio do cookie em requisições de outro domínio. Vale registrar que essas
+práticas mitigam riscos específicos (senha exposta em repouso, sessão
+falsificada), mas não substituem a criptografia em trânsito (HTTPS/TLS): uma
+senha corretamente hasheada ainda trafega em texto plano da tela de login ao
+servidor se a conexão não for criptografada — camada ausente na implantação
+atual.
 
 
 ====================================================================================================
 2.6  METODOLOGIAS ÁGEIS E PROTOTIPAÇÃO
 ====================================================================================================
 
-O desenvolvimento do sistema deu-se em seis sprints sucessivas, reconstituídas
-a partir do histórico de versionamento do repositório e entrelaçadas com os
-ciclos da Design Science Research. Esta seção apresenta o referencial teórico
-que fundamenta essa organização: os princípios de desenvolvimento iterativo e
-incremental e do Manifesto Ágil, que justificam organizar a construção de um
-sistema em entregas curtas e sucessivas, e os princípios de prototipação
-evolutiva, que explicam por que um protótipo inicial, mesmo limitado, pode
-legitimamente evoluir até se tornar o próprio sistema em produção — como de
-fato ocorreu com o protótipo de análise com dados fictícios, posteriormente
-convertido na página de análises da versão final.
+O desenvolvimento ocorreu em seis sprints sucessivas, reconstituídas do histórico
+de versionamento e entrelaçadas com os ciclos da Design Science Research. Esta
+seção apresenta o referencial que fundamenta essa organização: o desenvolvimento
+iterativo e incremental e o Manifesto Ágil, que justificam organizar a construção
+em entregas curtas e sucessivas, e a prototipação evolutiva, que explica por que
+um protótipo inicial pode evoluir até se tornar o sistema em produção — como
+ocorreu com o protótipo de análise com dados fictícios, convertido na página de
+análises final.
 
 
 2.6.1  DO MODELO CASCATA AO DESENVOLVIMENTO ITERATIVO E INCREMENTAL
 ----------------------------------------------------------------------------------------------------
-O modelo cascata (waterfall), historicamente associado à descrição de Royce
-(1970) — ainda que o próprio Royce já apontasse, em seu texto original,
-limitações do modelo puramente sequencial que depois levaria seu nome —,
-organiza o desenvolvimento em fases discretas e sequenciais (requisitos,
-projeto, implementação, testes, implantação), cada uma concluída integralmente
-antes do início da seguinte. Esse modelo pressupõe que os requisitos possam
-ser completamente especificados antes de qualquer linha de código — premissa
-frequentemente irrealista em projetos de domínio complexo ou pouco familiar
-ao próprio desenvolvedor, nos quais o entendimento do problema evolui à medida
-que partes da solução são construídas e confrontadas com o uso real (BOEHM,
-1988; LARMAN; BASILI, 2003).
-
-Em contraposição, o desenvolvimento iterativo e incremental — cuja origem
-precede o Manifesto Ágil em décadas, remontando a práticas documentadas já
-nos anos 1950 e formalizadas por modelos como o espiral de Boehm (1988) —
-propõe dividir o desenvolvimento em ciclos curtos e repetidos (iterações),
-cada um produzindo um incremento funcional e utilizável, e não apenas um
-artefato intermediário de documentação. A cada iteração, o entendimento do
-problema e da solução é revisado à luz do que foi efetivamente construído e
-avaliado (LARMAN; BASILI, 2003). É esse princípio — entendimento revisado a
-cada ciclo de construção e avaliação — que corresponde ao próprio Ciclo de
-Projeto (Design Cycle) da Design Science Research, evidenciando a convergência
-teórica, detalhada na seção 2.7, entre desenvolvimento iterativo e DSR.
+O modelo cascata (waterfall), associado a Royce (1970) — que já apontava, no
+texto original, limitações do modelo puramente sequencial —, organiza o
+desenvolvimento em fases discretas (requisitos, projeto, implementação, testes,
+implantação), cada uma concluída antes da seguinte. Pressupõe requisitos
+completamente especificáveis antes de qualquer código — premissa irrealista em
+domínios complexos, nos quais o entendimento do problema evolui à medida que a
+solução é construída e confrontada com o uso (BOEHM, 1988; LARMAN; BASILI, 2003).
+Em contraposição, o desenvolvimento iterativo e incremental — que precede o
+Manifesto Ágil em décadas e foi formalizado por modelos como o espiral de Boehm
+(1988) — divide o desenvolvimento em ciclos curtos, cada um produzindo um
+incremento funcional, com o entendimento revisado a cada ciclo (LARMAN; BASILI,
+2003). É esse princípio que corresponde ao Ciclo de Projeto (Design Cycle) da
+Design Science Research.
 
 
 2.6.2  O MANIFESTO ÁGIL E SEUS PRINCÍPIOS CENTRAIS
 ----------------------------------------------------------------------------------------------------
-O Manifesto para Desenvolvimento Ágil de Software (BECK et al., 2001)
-formalizou, a partir da experiência prática de desenvolvedores com métodos
-leves já em uso na década anterior, quatro valores centrais: indivíduos e
-interações mais do que processos e ferramentas; software em funcionamento mais
-do que documentação extensa; colaboração com o cliente mais do que negociação
-de contratos; e responder a mudanças mais do que seguir um plano rígido.
-Esses valores desdobram-se em doze princípios, dos quais dois são
-particularmente relevantes: a entrega frequente de software funcionando, em
-intervalos curtos, como medida primária de progresso; e a manutenção de um
-ritmo constante e sustentável de trabalho ao longo de todo o projeto.
+O Manifesto para Desenvolvimento Ágil de Software (BECK et al., 2001) formalizou
+quatro valores: indivíduos e interações mais que processos e ferramentas;
+software em funcionamento mais que documentação extensa; colaboração com o
+cliente mais que negociação de contratos; e responder a mudanças mais que seguir
+um plano rígido. Deles, dois princípios são particularmente relevantes: a entrega
+frequente de software funcionando como medida primária de progresso; e um ritmo
+constante e sustentável de trabalho.
 
-O Manifesto Ágil não prescreve uma metodologia única e formal — Scrum, Kanban
-e Extreme Programming (XP) são exemplos de metodologias concretas que
-operacionalizam esses valores de formas distintas, cada uma com seus próprios
-artefatos e cerimônias (reuniões diárias, planejamento de sprint,
-retrospectivas, papéis formais como Scrum Master e Product Owner). O
-desenvolvimento conduzido por um único autor ao longo de um trabalho de
-graduação não adota nenhuma dessas metodologias em sua forma integral e
-institucional — não há, por exemplo, reuniões diárias de equipe, pois não há
-equipe além do próprio autor —, mas adere diretamente aos valores e princípios
-subjacentes: entregas curtas e funcionais, sucessivas, e um ritmo de trabalho
-sustentado e relativamente constante ao longo do semestre, evidenciado pela
-cadência aproximadamente semanal das seis sprints.
+O Manifesto não prescreve uma metodologia única — Scrum, Kanban e Extreme
+Programming (XP) operacionalizam esses valores de formas distintas, com seus
+artefatos e cerimônias. O desenvolvimento por um único autor não adota nenhuma em
+sua forma integral — não há reuniões diárias, pois não há equipe —, mas adere aos
+valores subjacentes: entregas curtas, funcionais e sucessivas, e um ritmo
+sustentado ao longo do semestre, evidenciado pela cadência aproximadamente
+semanal das seis sprints.
 
 
 2.6.3  SPRINTS, ENTREGAS INCREMENTAIS E O PAPEL DO FEEDBACK
 ----------------------------------------------------------------------------------------------------
-O termo sprint, popularizado pelo framework Scrum (SCHWABER; SUTHERLAND,
-2020), designa um intervalo de tempo fixo (timebox) dentro do qual uma equipe
-— ou, neste caso, um único desenvolvedor — se compromete a produzir um
-incremento de software potencialmente utilizável. O valor central dessa
-prática não está na duração específica do intervalo — que varia, na prática,
-de uma a quatro semanas —, mas na disciplina de produzir, ao final de cada
-sprint, algo verificável: uma funcionalidade que pode ser de fato executada e
-avaliada, e não apenas um conjunto de decisões registradas em documentação.
-
-Essa verificabilidade viabiliza o segundo elemento central das metodologias
-ágeis: o feedback incorporado ao próprio ritmo de desenvolvimento, e não
-relegado a um único momento de validação ao final do projeto. Esse papel é
-cumprido pelo acompanhamento do orientador em reuniões periódicas ao longo do
-semestre — mecanismo de avaliação formativa e contínua, no sentido empregado
-pela Design Science Research (seção 2.7), e estruturalmente equivalente, em
-sua função, à revisão de sprint (sprint review) do Scrum institucional: a
-oportunidade regular de confrontar o incremento construído com a expectativa
-de quem avalia o projeto e de redirecionar o esforço da iteração seguinte a
-partir desse confronto — exatamente o que motivou a remoção da máscara de
-inatividade na sprint 6, após sua incorporação na sprint 4.
+O termo sprint, popularizado pelo Scrum (SCHWABER; SUTHERLAND, 2020), designa um
+intervalo de tempo fixo (timebox) dentro do qual se produz um incremento
+potencialmente utilizável. Seu valor não está na duração — que varia de uma a
+quatro semanas —, mas na disciplina de produzir, ao final, algo verificável, e
+não apenas decisões documentadas. Essa verificabilidade viabiliza o feedback
+incorporado ao próprio ritmo, e não relegado a um único momento final — papel
+cumprido pelo acompanhamento do orientador em reuniões periódicas, mecanismo de
+avaliação formativa e contínua estruturalmente equivalente à revisão de sprint
+(sprint review) do Scrum: a oportunidade regular de confrontar o incremento com a
+expectativa de quem avalia e redirecionar o esforço seguinte — como motivou a
+remoção da máscara de inatividade na sprint 6, após sua incorporação na sprint 4.
 
 
 2.6.4  PROTOTIPAÇÃO EVOLUTIVA
 ----------------------------------------------------------------------------------------------------
-A literatura de engenharia de software distingue, classicamente, dois tipos de
-prototipação segundo o destino do protótipo construído (FLOYD, 1984;
-SOMMERVILLE, 2019). A prototipação descartável (throwaway prototyping) produz
-um artefato de exploração — frequentemente incompleto, de baixa qualidade de
-implementação, voltado apenas a validar um conceito de interface ou de
-interação — que é deliberadamente abandonado e reescrito do zero antes da
-construção do sistema final. A prototipação evolutiva (evolutionary
-prototyping), por outro lado, parte da premissa de que o protótipo inicial,
-ainda que limitado em escopo e robustez, pode ser incrementalmente refinado,
-refatorado e expandido até se tornar, ele próprio, o sistema em produção — sem
-um ponto de descontinuidade entre "protótipo" e "produto final".
+A engenharia de software distingue dois tipos de prototipação segundo o destino
+do protótipo (FLOYD, 1984; SOMMERVILLE, 2019). A prototipação descartável
+(throwaway prototyping) produz um artefato de exploração, deliberadamente
+abandonado e reescrito antes do sistema final. A prototipação evolutiva
+(evolutionary prototyping) parte da premissa de que o protótipo inicial, ainda
+que limitado, pode ser refinado e expandido até se tornar o próprio sistema em
+produção, sem descontinuidade entre "protótipo" e "produto".
 
 [INSERIR QUADRO 3: Comparação entre prototipação descartável e evolutiva.
 Colunas: Aspecto; Prototipação descartável; Prototipação evolutiva (com
@@ -1261,63 +861,34 @@ projeto. Legenda provisória: "Quadro 3 — Tipos de prototipação: o
 desenvolvimento do sistema exemplifica a prototipação evolutiva, não a
 descartável."]
 
-O desenvolvimento do sistema exemplifica diretamente a prototipação evolutiva,
-não a descartável. A terceira sprint construiu um protótipo de análise com
-dados fictícios como primeira aproximação à funcionalidade central — antes
-mesmo da refatoração para o padrão MVC estrito (seção 2.5) e da integração com
-arquivos Condor reais, ambas também realizadas na mesma sprint. Esse protótipo
-não foi descartado nas sprints seguintes: foi progressivamente refatorado
-(adoção do MVC), reconectado a dados reais (substituição dos dados fictícios)
-e enriquecido (métricas não paramétricas; depois, exportação de gráficos e
-novas páginas de análise), até se tornar a página de análises da versão final.
-A prototipação evolutiva é, portanto, a categoria teórica que explica
-metodologicamente por que foi possível — e legítimo, e não apenas pragmático —
-que um protótipo simplificado, construído sob incerteza inicial sobre a
-própria viabilidade de processar arquivos Condor reais, evoluísse diretamente
-para a funcionalidade final, sem uma reescrita completa entre as duas etapas.
+O desenvolvimento exemplifica a prototipação evolutiva. A terceira sprint
+construiu um protótipo de análise com dados fictícios, antes da refatoração para
+o MVC estrito e da integração com arquivos Condor reais. Esse protótipo não foi
+descartado: foi refatorado (adoção do MVC), reconectado a dados reais e
+enriquecido (métricas não paramétricas; depois exportação de gráficos e novas
+páginas de análise), até se tornar a página de análises final. A prototipação
+evolutiva é a categoria que explica por que foi legítimo um protótipo
+simplificado, construído sob incerteza inicial sobre processar arquivos Condor
+reais, evoluir diretamente para a funcionalidade final, sem reescrita completa.
 
 
 2.6.5  PARTICULARIDADES DA ADOÇÃO ÁGIL EM UM TCC INDIVIDUAL
 ----------------------------------------------------------------------------------------------------
-A adoção de práticas ágeis em um Trabalho de Conclusão de Curso desenvolvido
-por um único autor difere, em aspectos relevantes, da adoção institucional
-dessas práticas em equipes profissionais — diferença que deve ser reconhecida
-explicitamente para que a caracterização metodológica do trabalho não seja
-lida como alegação de conformidade integral com um framework como o Scrum, o
-que não corresponde à realidade do projeto.
-
-Primeiro, a ausência de uma equipe elimina, por definição, qualquer cerimônia
-cujo propósito seja a coordenação entre múltiplos desenvolvedores — reuniões
-diárias de sincronização (daily stand-up), planejamento colaborativo de sprint
-ou retrospectivas de equipe. Segundo, a ausência de um Product Owner
-institucional é parcialmente substituída pelo papel do orientador como
-interlocutor periódico de validação — papel mais próximo de um avaliador
-formativo externo, no sentido da Design Science Research (seção 2.7), do que
-de um Product Owner que participa ativamente do planejamento de cada sprint.
-Terceiro, a ausência de medição formal de velocidade (velocity) ou de outras
-métricas quantitativas de processo significa que as seis sprints são uma
-reconstrução analítica post-hoc do histórico de commits do repositório, e não
-um artefato de planejamento produzido prospectivamente durante o
-desenvolvimento. Essas diferenças não invalidam a caracterização do
-desenvolvimento como ágil — os valores centrais do Manifesto (entregas
-frequentes e funcionais, ritmo sustentável, capacidade de responder a mudanças
-de entendimento, como a remoção da máscara de inatividade) estão de fato
-presentes —, mas delimitam com precisão o que, nessa caracterização, é
-fidelidade a um framework institucional específico e o que é adesão aos
-princípios mais gerais que esses frameworks operacionalizam.
-
-
-2.6.6  SÍNTESE: BASE TEÓRICA PARA A CARACTERIZAÇÃO DA PESQUISA
-----------------------------------------------------------------------------------------------------
-Os conceitos desta seção — desenvolvimento iterativo e incremental como
-alternativa ao modelo cascata, os valores e princípios do Manifesto Ágil, o
-papel do feedback regular incorporado ao ritmo de sprints, e a prototipação
-evolutiva como categoria que legitima a evolução direta de um protótipo
-inicial até o sistema final — constituem o referencial sob o qual se descreve
-e justifica a cadência de seis sprints identificadas no histórico de
-desenvolvimento. A seção 2.7 completa esse referencial mostrando como esse
-mesmo ritmo iterativo de construção e avaliação se articula, em um plano
-metodológico distinto, com os ciclos formais da Design Science Research.
+A adoção de práticas ágeis em um TCC de um único autor difere da adoção
+institucional em equipes, diferença que deve ser reconhecida para que a
+caracterização não seja lida como conformidade integral com um framework como o
+Scrum. Primeiro, a ausência de equipe elimina cerimônias de coordenação entre
+desenvolvedores (daily stand-up, planejamento colaborativo, retrospectivas).
+Segundo, a ausência de um Product Owner institucional é parcialmente substituída
+pelo orientador como interlocutor periódico de validação — mais próximo de um
+avaliador formativo externo do que de um Product Owner que participa do
+planejamento. Terceiro, a ausência de medição formal de velocidade significa que
+as seis sprints são uma reconstrução analítica post-hoc do histórico de commits,
+e não um artefato de planejamento prospectivo. Essas diferenças não invalidam a
+caracterização como ágil — os valores centrais (entregas frequentes, ritmo
+sustentável, capacidade de responder a mudanças, como a remoção da máscara de
+inatividade) estão presentes —, mas delimitam o que é fidelidade a um framework
+específico e o que é adesão aos princípios mais gerais.
 
 
 ====================================================================================================
@@ -1325,58 +896,39 @@ metodológico distinto, com os ciclos formais da Design Science Research.
 ====================================================================================================
 
 Este trabalho classifica-se como pesquisa aplicada e de natureza construtiva,
-conduzida sob o paradigma da Design Science Research (DSR), posicionando os
-três ciclos de Hevner et al. (2004) e as seis sprints de desenvolvimento em
-relação a esse paradigma. Esta seção apresenta o referencial mais detalhado
-sobre o qual essa classificação se apoia — a distinção epistemológica entre
-ciência natural e ciência do artificial, a taxonomia de artefatos de design,
-o processo de pesquisa formal da DSR e as estratégias de avaliação de um
-artefato —, de modo que a ancoragem metodológica seja justificada em
-profundidade, e não apenas enunciada por citação.
+conduzida sob o paradigma da Design Science Research (DSR). Esta seção apresenta
+o referencial sobre o qual essa classificação se apoia — a distinção entre
+ciência natural e ciência do artificial, a taxonomia de artefatos, o processo de
+pesquisa da DSR e as estratégias de avaliação —, de modo que a ancoragem
+metodológica seja justificada em profundidade, e não apenas enunciada.
 
 
 2.7.1  A CIÊNCIA DO ARTIFICIAL: FUNDAMENTO EPISTEMOLÓGICO DA DSR
 ----------------------------------------------------------------------------------------------------
-A justificativa epistemológica mais profunda da DSR remonta à distinção
-proposta por Simon (1996 [1969]) entre as ciências naturais — voltadas a
-descrever, explicar e prever fenômenos que existem independentemente da ação
-humana (a física, a biologia e, por extensão, as ciências sociais em sua
-vertente puramente descritiva) — e o que o autor denomina "ciências do
-artificial": disciplinas voltadas a artefatos que não existiriam sem a
-intervenção deliberada de um agente humano que os projeta para atender a um
-propósito específico. Para Simon, um artefato de design (e o conhecimento
-produzido ao concebê-lo) tem estrutura epistemológica distinta de uma lei
-natural: não descreve "o que é", mas prescreve, em alguma medida, "o que
-poderia ser" — uma solução possível, entre outras, para um problema com
-requisitos e restrições específicos.
-
-A engenharia de software e, mais amplamente, os Sistemas de Informação
-encontram-se na fronteira entre essas duas tradições: por um lado, dependem de
-conhecimento científico já estabelecido (algoritmos, estruturas de dados,
-modelos estatísticos validados, como as métricas não paramétricas da seção
-2.2); por outro, seu objeto central de produção — o software, o sistema, a
-solução projetada — é um artefato no sentido exato de Simon, concebido
-deliberadamente para resolver um problema prático, e não um fenômeno observado
-independentemente da intervenção do pesquisador. É essa posição de fronteira
-que justifica a existência da DSR como paradigma próprio da área, distinto
-tanto das ciências naturais quanto das ciências comportamentais puramente
-descritivas (MARCH; SMITH, 1995; HEVNER et al., 2004) — distinção empregada
-ao posicionar o sistema como artefato, e não como objeto de estudo observado a
-posteriori.
+A justificativa epistemológica da DSR remonta à distinção de Simon (1996 [1969])
+entre as ciências naturais — voltadas a descrever, explicar e prever fenômenos
+que existem independentemente da ação humana — e as "ciências do artificial":
+disciplinas voltadas a artefatos que não existiriam sem a intervenção deliberada
+de um agente humano que os projeta para um propósito. Para Simon, um artefato de
+design tem estrutura epistemológica distinta de uma lei natural: não descreve "o
+que é", mas prescreve "o que poderia ser" — uma solução possível para um problema
+com requisitos e restrições específicos. A engenharia de software e os Sistemas
+de Informação situam-se na fronteira entre as duas tradições: dependem de
+conhecimento científico estabelecido (algoritmos, modelos estatísticos
+validados), mas seu objeto central — o software projetado — é um artefato no
+sentido de Simon. É essa posição que justifica a DSR como paradigma próprio,
+distinto das ciências naturais e das comportamentais puramente descritivas
+(MARCH; SMITH, 1995; HEVNER et al., 2004).
 
 
 2.7.2  OS ARTEFATOS DE DESIGN: TAXONOMIA DE MARCH E SMITH (1995)
 ----------------------------------------------------------------------------------------------------
-March e Smith (1995) propõem uma taxonomia de quatro tipos de artefatos que
-uma pesquisa em DSR pode produzir, frequentemente combinados em um mesmo
-projeto: constructs (construtos), o vocabulário conceitual e a terminologia
-usados para descrever o problema e a solução em um domínio; models (modelos),
-representações que descrevem as relações entre construtos — por exemplo, um
-diagrama de arquitetura ou um esquema entidade-relacionamento; methods
-(métodos), algoritmos, técnicas ou processos passo a passo para realizar uma
-tarefa; e instantiations (instanciações), a implementação efetiva e operante
-de construtos, modelos e métodos em um sistema funcional, capaz de demonstrar
-sua viabilidade no ambiente real para o qual foi projetado.
+March e Smith (1995) propõem quatro tipos de artefatos, frequentemente combinados
+em um projeto: constructs (o vocabulário conceitual para descrever problema e
+solução); models (representações das relações entre construtos — um diagrama de
+arquitetura ou um esquema entidade-relacionamento); methods (algoritmos, técnicas
+ou processos); e instantiations (a implementação efetiva e operante de
+construtos, modelos e métodos em um sistema funcional).
 
 [INSERIR QUADRO 4: Taxonomia de artefatos de design de March e Smith (1995)
 aplicada ao sistema. Colunas: Tipo de artefato (constructs/models/methods/
@@ -1385,39 +937,27 @@ instantiations); Definição; Materialização no trabalho. Legenda provisória:
 materialização no sistema, que é primariamente uma instanciação, mas
 incorpora construtos, modelos e métodos."]
 
-O sistema, como artefato central deste trabalho, é primariamente uma
-instanciação: um software em funcionamento e efetivamente implantado em
-produção, e não apenas uma proposta teórica. Essa instanciação, contudo, não
-existe isoladamente — incorpora e materializa construtos do domínio da
-actigrafia e da cronobiologia (o vocabulário de IS, IV, L5, M10, PIM/TAT/ZCM
-das seções 2.1 e 2.2), modelos explícitos de arquitetura e de dados (o
-diagrama de camadas e o esquema relacional, equivalentes a um diagrama de
-componentes e a um diagrama entidade-relacionamento) e métodos de
-processamento de domínio (o algoritmo de parsing do formato Condor e os
-próprios algoritmos de cálculo de IS/IV/L5/M10 herdados do pyActigraphy). A
-contribuição de pesquisa, portanto, não se reduz ao código-fonte da
-instanciação: estende-se aos construtos e modelos documentados, reaproveitáveis,
-em princípio, por outros projetos de sistemas de apoio à decisão clínica
-baseados em actigrafia.
+O sistema é primariamente uma instanciação: um software em funcionamento e
+implantado em produção. Mas não existe isoladamente: incorpora construtos do
+domínio (o vocabulário de IS, IV, L5, M10, PIM/TAT/ZCM), modelos de arquitetura e
+de dados (o diagrama de camadas e o esquema relacional) e métodos de
+processamento (o parser do formato Condor e os próprios algoritmos de IS/IV/L5/M10
+herdados do pyActigraphy). A contribuição de pesquisa não se reduz ao código:
+estende-se aos construtos e modelos documentados, reaproveitáveis por outros
+projetos de apoio à decisão clínica baseados em actigrafia.
 
 
 2.7.3  OS TRÊS CICLOS DA DSR (HEVNER ET AL., 2004)
 ----------------------------------------------------------------------------------------------------
-Hevner et al. (2004) sistematizam a condução de uma pesquisa em DSR em torno
-de três ciclos interdependentes: o Ciclo de Relevância, que conecta o
-artefato ao ambiente do problema — os usuários, a organização, as
-oportunidades e restrições que motivam a pesquisa — e devolve a esse ambiente
-o artefato avaliado; o Ciclo de Rigor, que conecta o projeto à base de
-conhecimento científico e técnico já estabelecida — teorias, métodos,
-artefatos anteriores —, fundamentando as decisões em conhecimento existente em
-vez de intuição não verificável, e devolvendo a essa base o conhecimento de
-projeto produzido; e o Ciclo de Projeto (Design Cycle), o núcleo iterativo de
-construir e avaliar o artefato repetidamente, que medeia a troca entre os
-outros dois. O próprio referencial teórico deste capítulo — as seções 2.1 a
-2.6, que fundamentam cientificamente as decisões de projeto — é, em si, uma
-materialização documental do Ciclo de Rigor: o corpo de conhecimento
-científico e técnico estabelecido ao qual o projeto se conecta e do qual
-extrai legitimidade.
+Hevner et al. (2004) sistematizam a DSR em três ciclos interdependentes: o Ciclo
+de Relevância, que conecta o artefato ao ambiente do problema (usuários,
+oportunidades e restrições) e a ele devolve o artefato avaliado; o Ciclo de
+Rigor, que conecta o projeto à base de conhecimento científico e técnico
+estabelecida, fundamentando as decisões em conhecimento existente e a ela
+devolvendo o conhecimento de projeto produzido; e o Ciclo de Projeto (Design
+Cycle), o núcleo iterativo de construir e avaliar o artefato, que medeia os
+outros dois. O próprio referencial teórico deste capítulo é uma materialização do
+Ciclo de Rigor: o corpo de conhecimento ao qual o projeto se conecta.
 
 [INSERIR FIGURA 9: Diagrama dos três ciclos da DSR de Hevner et al. (2004).
 Conteúdo: à esquerda, o Ambiente (pessoas, organizações, tecnologia); ao
@@ -1427,44 +967,32 @@ Relevância, Ciclo de Projeto e Ciclo de Rigor. Legenda provisória: "Figura 9 �
 Os três ciclos da Design Science Research (HEVNER et al., 2004) e sua
 correspondência com o desenvolvimento do sistema."]
 
-Os três ciclos não competem entre si por ênfase de forma mutuamente exclusiva:
-um mesmo incremento de software pode, simultaneamente, responder a uma
-necessidade concreta do ambiente (Relevância) e incorporar uma técnica
-estabelecida na literatura (Rigor) — a adoção do pyActigraphy, por exemplo, é,
-ao mesmo tempo, resposta à necessidade de calcular métricas clinicamente
-confiáveis (Relevância) e aplicação deliberada de conhecimento já validado
-(Rigor). A separação dos três ciclos é, portanto, uma ferramenta analítica
-para compreender as diferentes forças que atuam sobre cada decisão, e não uma
-classificação estanque de cada sprint individual.
+Os três ciclos não competem por ênfase de forma mutuamente exclusiva: um mesmo
+incremento pode responder a uma necessidade do ambiente (Relevância) e incorporar
+uma técnica estabelecida (Rigor) — a adoção do pyActigraphy é, ao mesmo tempo,
+resposta à necessidade de métricas confiáveis e aplicação de conhecimento
+validado. A separação dos ciclos é uma ferramenta analítica, não uma
+classificação estanque de cada sprint.
 
 
 2.7.4  O PROCESSO DE PESQUISA: A DSRM DE PEFFERS ET AL. (2007)
 ----------------------------------------------------------------------------------------------------
-Enquanto Hevner et al. (2004) descrevem os ciclos que caracterizam a natureza
-da DSR, Peffers et al. (2007) propõem uma metodologia de processo mais
-operacional — a Design Science Research Methodology (DSRM) —, organizada em
-seis atividades nominalmente sequenciais, mas que os próprios autores
-reconhecem como passíveis de iteração e de pontos de entrada alternativos, a
-depender da origem do projeto: (i) identificação do problema e motivação;
-(ii) definição dos objetivos de uma solução; (iii) projeto e desenvolvimento
-do artefato; (iv) demonstração do artefato em um contexto de uso; (v)
-avaliação do artefato frente aos objetivos definidos; e (vi) comunicação do
-problema, do artefato e dos resultados da avaliação à comunidade relevante.
+Enquanto Hevner et al. (2004) descrevem os ciclos, Peffers et al. (2007) propõem
+uma metodologia de processo — a Design Science Research Methodology (DSRM) —, em
+seis atividades nominalmente sequenciais, mas passíveis de iteração e de pontos de
+entrada alternativos: (i) identificação do problema e motivação; (ii) definição
+dos objetivos da solução; (iii) projeto e desenvolvimento do artefato; (iv)
+demonstração em um contexto de uso; (v) avaliação frente aos objetivos; e (vi)
+comunicação à comunidade relevante.
 
-Essas seis atividades correspondem diretamente à estrutura deste trabalho,
-ainda que executadas, na prática, de forma mais entrelaçada e iterativa do que
-a sequência linear sugeriria: a identificação do problema e a definição dos
-objetivos específicos estão registradas na especificação de requisitos; o
-projeto e o desenvolvimento, na documentação de arquitetura e de
-requisitos/especificações; a demonstração em contexto de uso real, na
-implantação em produção; a avaliação, na verificação de conformidade entre
-requisitos e implementação e no acompanhamento formativo do orientador; e a
-comunicação dos resultados, neste próprio Trabalho de Conclusão de Curso, que
-relata sistematicamente o problema, o artefato construído e sua avaliação à
-comunidade acadêmica de Sistemas de Informação. A correspondência não é
-coincidência: é evidência de que o próprio processo de elaboração do trabalho
-seguiu, ainda que sem nomeá-las explicitamente durante o desenvolvimento, as
-atividades que a DSRM formaliza como metodologia de pesquisa.
+Essas atividades correspondem à estrutura deste trabalho, ainda que executadas de
+forma mais entrelaçada do que a sequência linear sugeriria: a identificação do
+problema e a definição dos objetivos, na especificação de requisitos; o projeto e
+o desenvolvimento, na documentação de arquitetura e requisitos; a demonstração em
+uso real, na implantação em produção; a avaliação, na verificação de conformidade
+e no acompanhamento do orientador; e a comunicação, neste próprio Trabalho de
+Conclusão de Curso. A correspondência evidencia que o processo de elaboração
+seguiu, ainda que sem nomeá-las, as atividades que a DSRM formaliza.
 
 [INSERIR FIGURA 10: Mapa das seis atividades da DSRM de Peffers et al. (2007)
 e sua correspondência com as partes do trabalho. Conteúdo: as seis atividades
@@ -1475,46 +1003,31 @@ sua correspondência com a estrutura deste trabalho."]
 
 2.7.5  AVALIAÇÃO EM DSR: ESTRATÉGIAS FORMATIVAS E SOMATIVAS
 ----------------------------------------------------------------------------------------------------
-A literatura mais recente de DSR refina a quinta atividade da DSRM —
-avaliação do artefato — em uma tipologia mais explícita de estratégias, das
-quais a distinção entre avaliação formativa e somativa, adotada por Venable,
-Pries-Heje e Baskerville (2016) em seu framework FEDS (Framework for
-Evaluation in Design Science), é particularmente relevante. A avaliação
-formativa ocorre durante o próprio processo de construção do artefato, com o
-propósito explícito de gerar feedback que oriente iterações subsequentes — é,
-por definição, contínua e interna ao Ciclo de Projeto. A avaliação somativa
-ocorre após a conclusão de uma versão considerada estável, com o propósito de
-julgar se essa versão atende, de fato, aos objetivos estabelecidos — sendo,
-por isso, mais próxima de uma verificação de conformidade do que de um
-mecanismo de orientação iterativa.
-
-Essa tipologia estrutura a avaliação do trabalho: o acompanhamento periódico
-do orientador ao longo das sprints é, na terminologia do FEDS, uma avaliação
-formativa e contínua, sem instrumento formal de coleta de dados, mas com
-retorno direto sobre decisões de projeto em andamento; e a verificação de
-conformidade entre os requisitos especificados e a implementação efetivamente
-encontrada no código-fonte — incluindo a correção de divergências
-identificadas, como o ajuste do requisito de máscara de inatividade — é uma
-avaliação somativa e técnica, conduzida após a estabilização do artefato. A
-combinação das duas estratégias, e não a adoção exclusiva de uma delas, é o
-que o framework FEDS recomenda como abordagem mais robusta de avaliação para
-artefatos de software desenvolvidos iterativamente (VENABLE; PRIES-HEJE;
-BASKERVILLE, 2016).
+A literatura recente refina a avaliação em uma tipologia explícita, da qual a
+distinção entre avaliação formativa e somativa, do framework FEDS (Framework for
+Evaluation in Design Science) de Venable, Pries-Heje e Baskerville (2016), é
+particularmente relevante. A avaliação formativa ocorre durante a construção, para
+gerar feedback que oriente iterações — contínua e interna ao Ciclo de Projeto. A
+somativa ocorre após uma versão estável, para julgar se ela atende aos objetivos —
+mais próxima de uma verificação de conformidade. Essa tipologia estrutura a
+avaliação do trabalho: o acompanhamento do orientador é uma avaliação formativa e
+contínua, sem instrumento formal; e a verificação de conformidade entre requisitos
+e implementação — incluindo a correção de divergências, como o ajuste do requisito
+de máscara de inatividade — é uma avaliação somativa e técnica. A combinação das
+duas, e não a adoção exclusiva de uma, é o que o FEDS recomenda como mais robusta
+para artefatos desenvolvidos iterativamente (VENABLE; PRIES-HEJE; BASKERVILLE,
+2016).
 
 
 2.7.6  CONHECIMENTO DE PROJETO COMO CONTRIBUIÇÃO CIENTÍFICA
 ----------------------------------------------------------------------------------------------------
-Uma objeção frequente à legitimidade científica da DSR é a de que construir um
-sistema de software, por si só, não constituiria pesquisa, mas apenas
-engenharia aplicada. Gregor e Hevner (2013) respondem a essa objeção propondo
-uma matriz de posicionamento da contribuição de uma pesquisa em DSR segundo
-dois eixos — a maturidade da solução e a maturidade do problema/aplicação —,
-identificando quatro tipos possíveis de contribuição: invenção (solução nova
-para um problema novo); melhoria (solução nova para um problema conhecido);
-exaptação (solução conhecida aplicada a um novo contexto ou problema); e
-projeto de rotina (aplicação direta de conhecimento já maduro a um problema já
-maduro, sem inovação significativa em nenhum dos eixos — o único quadrante que
-os próprios autores não consideram, isoladamente, uma contribuição de pesquisa
+A uma objeção frequente — a de que construir software seria engenharia aplicada,
+não pesquisa —, Gregor e Hevner (2013) respondem com uma matriz de posicionamento
+segundo dois eixos, maturidade da solução e maturidade do problema, com quatro
+tipos de contribuição: invenção (solução nova para problema novo); melhoria
+(solução nova para problema conhecido); exaptação (solução conhecida aplicada a
+novo contexto); e projeto de rotina (conhecimento maduro aplicado a problema
+maduro — o único quadrante que os autores não consideram contribuição de pesquisa
 suficiente).
 
 [INSERIR FIGURA 11: Matriz de contribuição em DSR de Gregor e Hevner (2013).
@@ -1524,87 +1037,48 @@ rotina) e a posição do sistema destacada no quadrante da exaptação. Legenda
 provisória: "Figura 11 — Matriz de contribuição em DSR (GREGOR; HEVNER, 2013):
 o sistema posiciona-se predominantemente como exaptação."]
 
-O sistema posiciona-se, segundo essa matriz, predominantemente como
-contribuição do tipo exaptação: tanto o problema (a necessidade de
-profissionais de saúde organizarem e interpretarem dados de actigrafia) quanto
-parte da solução técnica (as métricas não paramétricas do pyActigraphy, seção
-2.2; os padrões arquiteturais, seção 2.5) já são, isoladamente, bem
-estabelecidos na literatura — não há, aqui, invenção de um novo algoritmo de
-cronobiologia nem de um novo padrão arquitetural —, mas a combinação
-específica desses elementos conhecidos em um artefato integrado, acessível a
-profissionais de saúde sem formação técnica e sem equivalente direto de código
-aberto identificado na seção 2.3, constitui uma aplicação nova desse
-conhecimento a um contexto e a uma combinação de requisitos ainda não
-atendida — a lacuna que a seção 2.8 detalhará. Esse posicionamento — uma
-contribuição legítima, ainda que mais modesta do que uma invenção original,
-conforme a própria tipologia de Gregor e Hevner (2013) reconhece como válida —
-é compatível com o escopo e o prazo esperados de um Trabalho de Conclusão de
-Curso de graduação, sem exagerar a originalidade científica do que foi
-efetivamente produzido.
-
-
-2.7.7  SÍNTESE: ANCORAGEM METODOLÓGICA COMO PESQUISA EM DSR
-----------------------------------------------------------------------------------------------------
-Em síntese, o referencial desta seção fundamenta, em profundidade teórica, a
-classificação metodológica do trabalho: a distinção de Simon (1996) entre
-ciência natural e ciência do artificial justifica epistemologicamente por que
-construir e avaliar o sistema é, em si, um método de pesquisa válido; a
-taxonomia de March e Smith (1995) o posiciona como instanciação, sem
-desconsiderar os construtos e modelos que a acompanham; os três ciclos de
-Hevner et al. (2004) estruturam a relação entre o artefato, o ambiente de
-profissionais de saúde que o demanda e a base de conhecimento que o sustenta;
-a DSRM de Peffers et al. (2007) corresponde, passo a passo, à própria
-estrutura deste trabalho; o framework FEDS de Venable et al. (2016) nomeia
-formalmente a combinação de avaliação formativa e somativa empregada; e a
-matriz de Gregor e Hevner (2013) posiciona com precisão o tipo de
-contribuição científica que um TCC de graduação pode, de forma realista e
-legítima, produzir. É sobre esse alicerce, somado ao referencial de domínio
-(seções 2.1 a 2.4) e de engenharia de software e processo (seções 2.5 e 2.6),
-que a seção 2.8 conclui o referencial teórico identificando, de forma
-sistemática e comparativa, a lacuna específica que o sistema preenche frente a
-trabalhos e ferramentas correlatas.
+O sistema posiciona-se predominantemente como exaptação: tanto o problema (a
+necessidade de profissionais de saúde organizarem e interpretarem dados de
+actigrafia) quanto parte da solução (as métricas do pyActigraphy, os padrões
+arquiteturais) já são bem estabelecidos — não há invenção de novo algoritmo nem
+de novo padrão —, mas a combinação desses elementos em um artefato integrado,
+acessível a quem não programa e sem equivalente direto de código aberto,
+constitui uma aplicação nova a um contexto ainda não atendido. Esse
+posicionamento — contribuição legítima, ainda que mais modesta que uma invenção,
+conforme a própria tipologia de Gregor e Hevner (2013) reconhece — é compatível
+com o escopo de um TCC de graduação, sem exagerar a originalidade do que foi
+produzido.
 
 
 ====================================================================================================
 2.8  TRABALHOS CORRELATOS E SÍNTESE COMPARATIVA
 ====================================================================================================
 
-As seções 2.1 a 2.7 estabeleceram, separadamente, o referencial científico de
-domínio (actigrafia, ritmos circadianos, métricas não paramétricas), o
-panorama de ferramentas existentes (seção 2.3), os princípios de visualização
-e de engenharia de software que orientam a implementação e o paradigma
-metodológico que ancora a pesquisa. Esta seção encerra o referencial teórico
-retomando, de forma sistemática e comparativa, os sistemas e ferramentas já
-mencionados — somados a uma categoria adicional, a de plataformas genéricas de
-gestão de dados clínicos de pesquisa — sob um quadro comparativo único, do
-qual nasce a contribuição que o sistema oferece.
+Esta seção encerra o referencial retomando, de forma sistemática e comparativa,
+os sistemas e ferramentas já mencionados — somados a uma categoria adicional, a
+de plataformas genéricas de gestão de dados clínicos de pesquisa — sob um quadro
+comparativo único, do qual nasce a contribuição do sistema.
 
 
 2.8.1  CRITÉRIOS DE COMPARAÇÃO
 ----------------------------------------------------------------------------------------------------
-O quadro comparativo avalia cada sistema correlato segundo seis critérios,
-escolhidos por corresponderem aos objetivos específicos do sistema e às
-lacunas apontadas, individualmente, na seção 2.3:
+O quadro avalia cada sistema segundo seis critérios, correspondentes aos
+objetivos específicos e às lacunas apontadas:
 
-  - Interface web: o sistema é acessível por navegador, sem exigir instalação
-    local de software ou conhecimento de linguagem de programação para sua
-    operação básica.
-  - Métricas não paramétricas: o sistema calcula nativamente, sem exigir
-    programação adicional pelo usuário final, as métricas de ritmo circadiano
-    discutidas na seção 2.2 (IS, IV, L5, M10).
-  - Gestão de pacientes: o sistema oferece cadastro de pacientes ou sujeitos
-    de pesquisa e vínculo explícito entre cada paciente e os arquivos
-    correspondentes, sustentando um fluxo de acompanhamento longitudinal e
-    multiusuário.
-  - Exportação: o sistema permite exportar dados processados e/ou
-    visualizações em formatos reutilizáveis fora do próprio sistema, sem
-    depender de captura de tela manual.
-  - Código aberto / gratuito: o sistema é gratuito e, quando aplicável, tem
-    código-fonte auditável publicamente, sem custo de licenciamento comercial
-    recorrente.
-  - Público-alvo: o perfil de usuário para o qual o sistema foi primariamente
-    concebido — profissional de saúde sem formação técnica, pesquisador
-    proficiente em programação, ou ambos.
+  - Interface web: acessível por navegador, sem instalação local nem
+    conhecimento de programação para a operação básica.
+  - Métricas não paramétricas: cálculo nativo, sem programação pelo usuário, de
+    IS, IV, L5 e M10.
+  - Gestão de pacientes: cadastro de pacientes ou sujeitos e vínculo explícito
+    entre cada paciente e seus arquivos, sustentando acompanhamento longitudinal
+    e multiusuário.
+  - Exportação: exportar dados processados e/ou visualizações em formatos
+    reutilizáveis, sem captura de tela manual.
+  - Código aberto / gratuito: gratuito e, quando aplicável, de código auditável,
+    sem custo de licenciamento recorrente.
+  - Público-alvo: o perfil de usuário para o qual o sistema foi concebido —
+    profissional de saúde sem formação técnica, pesquisador programador, ou
+    ambos.
 
 
 2.8.2  QUADRO COMPARATIVO
@@ -1625,120 +1099,92 @@ citado) e nparACT (BLUME; SANTHI; SCHABUS, 2016, já citado); ActogramJ
 (SCHMID; HELFRICH-FÖRSTER; YOSHII, 2011, já citado) e El Temps; e REDCap
 (artigo seminal de descrição da plataforma).]
 
-pyActigraphy — Interface web: não (biblioteca executada via script/notebook).
-  Métricas IS/IV/L5/M10 nativas: sim (implementadas na classe BaseRaw).
-  Gestão de pacientes: não. Exportação: sim, mas via código (sem botão para o
-  usuário final). Código aberto/gratuito: sim (licença GPL-3). Público-alvo:
-  pesquisadores/programadores proficientes em Python.
+pyActigraphy — Interface web: não (biblioteca via script/notebook). Métricas
+  IS/IV/L5/M10 nativas: sim (classe BaseRaw). Gestão de pacientes: não.
+  Exportação: sim, mas via código. Código aberto/gratuito: sim (GPL-3).
+  Público-alvo: pesquisadores/programadores em Python.
 
-ActiLife (ActiGraph) — Interface web: não (aplicação desktop, predominantemente
-  Windows). Métricas IS/IV/L5/M10 nativas: não (foco em contagens de atividade
-  física e scoring de sono). Gestão de pacientes: não. Exportação: sim
-  (relatórios próprios do software). Código aberto/gratuito: não (software
-  comercial vinculado à compra do dispositivo). Público-alvo: pesquisadores e
-  profissionais vinculados ao ecossistema ActiGraph.
+ActiLife (ActiGraph) — Interface web: não (desktop, Windows). Métricas nativas:
+  não (foco em contagens de atividade física e scoring de sono). Gestão de
+  pacientes: não. Exportação: sim (relatórios próprios). Código aberto/gratuito:
+  não (comercial, vinculado ao dispositivo). Público-alvo: ecossistema
+  ActiGraph.
 
-Actiware (Philips Respironics) — Interface web: não (aplicação desktop,
-  predominantemente Windows). Métricas IS/IV/L5/M10 nativas: não (foco em
-  scoring de sono: eficiência, latência, WASO). Gestão de pacientes: não.
-  Exportação: sim (relatórios próprios). Código aberto/gratuito: não (software
-  comercial vinculado à compra do dispositivo). Público-alvo: pesquisadores e
-  profissionais vinculados ao ecossistema Respironics.
+Actiware (Philips Respironics) — Interface web: não (desktop, Windows). Métricas
+  nativas: não (foco em scoring de sono: eficiência, latência, WASO). Gestão de
+  pacientes: não. Exportação: sim (relatórios próprios). Código aberto/gratuito:
+  não (comercial, vinculado ao dispositivo). Público-alvo: ecossistema
+  Respironics.
 
-GGIR / nparACT (R) — Interface web: não (pacotes de linha de comando em R).
-  Métricas IS/IV/L5/M10 nativas: sim (nparACT é dedicado a IS/IV/L5/M10/RA;
-  GGIR inclui módulo de ritmo circadiano). Gestão de pacientes: não.
-  Exportação: sim, em CSV, mas requer script para gerar. Código
+GGIR / nparACT (R) — Interface web: não (linha de comando em R). Métricas
+  nativas: sim (nparACT dedicado a IS/IV/L5/M10/RA; GGIR inclui módulo de ritmo).
+  Gestão de pacientes: não. Exportação: sim, em CSV, mas requer script. Código
   aberto/gratuito: sim (CRAN). Público-alvo: pesquisadores proficientes em R.
 
-ActogramJ / El Temps — Interface web: não (aplicações desktop, Java / Windows).
-  Métricas IS/IV/L5/M10 nativas: parcial (voltadas a periodograma e actogramas
-  clássicos, sem IS/IV/L5/M10 nativos). Gestão de pacientes: não. Exportação:
-  parcial (imagens estáticas do gráfico). Código aberto/gratuito: gratuito, mas
-  sem garantia de manutenção ativa nem auditoria de código. Público-alvo:
-  pesquisadores em cronobiologia acadêmica.
+ActogramJ / El Temps — Interface web: não (desktop, Java/Windows). Métricas
+  nativas: parcial (periodograma e actogramas clássicos, sem IS/IV/L5/M10
+  nativos). Gestão de pacientes: não. Exportação: parcial (imagens estáticas).
+  Código aberto/gratuito: gratuito, sem garantia de manutenção nem auditoria.
+  Público-alvo: cronobiologia acadêmica.
 
-REDCap — Interface web: sim. Métricas IS/IV/L5/M10 nativas: não (não é
-  especializado em actigrafia nem em cronobiologia). Gestão de pacientes: sim
-  (é o propósito central da ferramenta — registro de sujeitos de pesquisa).
-  Exportação: sim (exportação tabular de dados de pesquisa em geral). Código
-  aberto/gratuito: parcial (gratuito apenas para instituições associadas ao
-  consórcio; código não integralmente aberto). Público-alvo: pesquisadores
-  clínicos em geral, sem especialização em actigrafia.
+REDCap — Interface web: sim. Métricas nativas: não (não especializado em
+  actigrafia). Gestão de pacientes: sim (propósito central — registro de sujeitos
+  de pesquisa). Exportação: sim (tabular, dados de pesquisa em geral). Código
+  aberto/gratuito: parcial (gratuito apenas para instituições do consórcio;
+  código não integralmente aberto). Público-alvo: pesquisadores clínicos em
+  geral.
 
-Sistema (este trabalho) — Interface web: sim. Métricas IS/IV/L5/M10 nativas:
-  sim (globais e segmentadas por período, herdadas do pyActigraphy). Gestão de
-  pacientes: sim (cadastro de pacientes e vínculo com arquivos). Exportação:
-  sim (.txt/.csv/.png/.zip, com histórico de relatórios). Código
-  aberto/gratuito: construído integralmente sobre tecnologias gratuitas e de
-  código aberto (seção 2.5). Público-alvo: profissionais de saúde sem formação
-  em programação (médicos, enfermeiros, fisioterapeutas, pesquisadores).
+Sistema (este trabalho) — Interface web: sim. Métricas nativas: sim (globais e
+  por período, herdadas do pyActigraphy). Gestão de pacientes: sim (cadastro e
+  vínculo com arquivos). Exportação: sim (.txt/.csv/.png/.zip, com histórico).
+  Código aberto/gratuito: integralmente sobre tecnologias gratuitas e de código
+  aberto. Público-alvo: profissionais de saúde sem formação em programação
+  (médicos, enfermeiros, fisioterapeutas, pesquisadores).
 
 
 2.8.3  DISCUSSÃO DO QUADRO COMPARATIVO
 ----------------------------------------------------------------------------------------------------
-A leitura do quadro por coluna, e não apenas por linha, evidencia um padrão de
-mútua exclusão entre os critérios "interface web" e "métricas não paramétricas
-nativas": entre as ferramentas analisadas, apenas o REDCap oferece interface
-web, mas, por não ser especializado em actigrafia, não calcula nenhuma das
-métricas da seção 2.2; todas as ferramentas que efetivamente calculam
-IS/IV/L5/M10 de forma nativa e validada (pyActigraphy, nparACT e, com
-ressalvas, o GGIR) o fazem por meio de bibliotecas de script, sem camada de
-interface gráfica web. O sistema é o único do quadro que combina as duas
-colunas simultaneamente — interface web e cálculo nativo das métricas —
-herdando o rigor científico do pyActigraphy (subseção 2.3.2) sem repassar ao
-usuário final a exigência de escrever ou executar código.
+A leitura por coluna evidencia uma mútua exclusão entre "interface web" e
+"métricas não paramétricas nativas": apenas o REDCap oferece interface web, mas,
+por não ser especializado em actigrafia, não calcula as métricas; todas as
+ferramentas que efetivamente calculam IS/IV/L5/M10 de forma validada
+(pyActigraphy, nparACT e, com ressalvas, o GGIR) o fazem por bibliotecas de
+script, sem interface web. O sistema é o único que combina as duas colunas,
+herdando o rigor do pyActigraphy sem repassar ao usuário a exigência de
+programar.
 
-A coluna "gestão de pacientes" revela um segundo padrão de mútua exclusão, já
-antecipado na subseção 2.3.6: nenhuma das ferramentas especializadas em
-actigrafia — proprietárias ou de código aberto — oferece essa funcionalidade,
-tratando cada arquivo de forma isolada; a única que a oferece nativamente, o
-REDCap, não tem especialização no domínio. Tampouco há, entre as ferramentas
-analisadas, uma combinação de gestão de pacientes com interface web e métricas
-de ritmo circadiano — as três propriedades juntas aparecem apenas na última
-linha do quadro.
+A coluna "gestão de pacientes" revela um segundo padrão: nenhuma ferramenta
+especializada em actigrafia a oferece, tratando cada arquivo isoladamente; a
+única que a oferece, o REDCap, não tem especialização no domínio. As três
+propriedades juntas — gestão de pacientes, interface web e métricas de ritmo —
+aparecem apenas na última linha do quadro.
 
-Quanto à coluna "código aberto / gratuito", observa-se uma divisão clara entre
-as ferramentas de origem acadêmica (pyActigraphy, GGIR, nparACT, ActogramJ,
-El Temps), gratuitas e com código auditável, e as de origem comercial
-(ActiLife, Actiware), vinculadas à compra de hardware proprietário; o REDCap
-ocupa posição intermediária, gratuito apenas para instituições associadas ao
-seu consórcio internacional, sem ser plenamente aberto ao público. O sistema,
-construído integralmente sobre tecnologias gratuitas e de código aberto (seção
-2.5), alinha-se à tradição acadêmica desse critério, sem as restrições de
-licenciamento comercial de ActiLife e Actiware.
-
-Por fim, a coluna "público-alvo" sintetiza a consequência prática de todas as
-anteriores: cada ferramenta analisada pressupõe, implícita ou explicitamente,
-um usuário com proficiência técnica específica — programação em Python ou R,
-para as de código aberto; vínculo institucional com um fabricante de hardware,
-para as comerciais; ou conhecimento de gestão de dados de pesquisa em geral,
-sem especialização em actigrafia, para o REDCap. Nenhuma tem como público-alvo
-primário um profissional de saúde assistencial, sem formação em programação,
-que precise simplesmente enviar um arquivo de actigrafia, visualizar o
-resultado e arquivá-lo no prontuário de um paciente específico.
+Em "código aberto / gratuito", há divisão entre as ferramentas acadêmicas
+(pyActigraphy, GGIR, nparACT, ActogramJ, El Temps), gratuitas e auditáveis, e as
+comerciais (ActiLife, Actiware), vinculadas a hardware proprietário; o REDCap
+ocupa posição intermediária. O sistema alinha-se à tradição acadêmica, sem as
+restrições de licenciamento das comerciais. Por fim, "público-alvo" sintetiza a
+consequência das demais colunas: cada ferramenta pressupõe proficiência técnica
+específica — programação em Python ou R, vínculo com um fabricante, ou gestão de
+dados de pesquisa sem especialização em actigrafia. Nenhuma tem como público
+primário um profissional assistencial, sem formação em programação, que precise
+enviar um arquivo, visualizar o resultado e arquivá-lo no prontuário de um
+paciente.
 
 
 2.8.4  A LACUNA QUE O SISTEMA PREENCHE
 ----------------------------------------------------------------------------------------------------
-O quadro comparativo evidencia, de forma sistemática, uma lacuna que nenhuma
-ferramenta isoladamente analisada — nem as especializadas em cronobiologia
-(pyActigraphy, GGIR, nparACT), nem os softwares proprietários de fabricante
-(ActiLife, Actiware), nem as ferramentas acadêmicas de nicho (ActogramJ, El
-Temps), nem as plataformas genéricas de gestão de dados clínicos de pesquisa
-(REDCap) — preenche por si só: a ausência de um sistema com interface web
-acessível a profissionais de saúde sem formação em programação, que combine o
-rigor científico das métricas não paramétricas de ritmo circadiano (validadas
-e herdadas de uma biblioteca de cronobiologia estabelecida, e não
-reimplementadas de forma não auditada) com a gestão de dados clínicos
-longitudinal — cadastro de pacientes, vínculo entre paciente e arquivo,
-isolamento de dados entre usuários e histórico auditável de exportações — que
-o uso assistencial real e continuado dessa análise, ao longo de semanas, meses
-ou programas de tratamento inteiros, efetivamente requer. É exatamente essa
-combinação — análise de actigrafia cientificamente rigorosa, entregue por meio
-de uma interface acessível e integrada a um fluxo de gestão de pacientes que
-nenhuma das alternativas sustenta simultaneamente — que o sistema preenche, e
-é dessa lacuna, identificada de forma sistemática neste capítulo e não apenas
+O quadro evidencia, de forma sistemática, uma lacuna que nenhuma ferramenta
+isolada — nem as especializadas em cronobiologia (pyActigraphy, GGIR, nparACT),
+nem os softwares proprietários (ActiLife, Actiware), nem as acadêmicas de nicho
+(ActogramJ, El Temps), nem as plataformas genéricas de gestão de dados (REDCap) —
+preenche: a ausência de um sistema com interface web acessível a quem não
+programa, que combine o rigor das métricas não paramétricas (herdadas de uma
+biblioteca de cronobiologia estabelecida, e não reimplementadas) com a gestão de
+dados clínicos longitudinal — cadastro de pacientes, vínculo paciente-arquivo,
+isolamento entre usuários e histórico auditável de exportações — que o uso
+assistencial continuado, ao longo de semanas ou de programas de tratamento
+inteiros, requer. É dessa lacuna, identificada de forma sistemática e não apenas
 presumida, que nasce a contribuição deste trabalho.
 
 ====================================================================================================
