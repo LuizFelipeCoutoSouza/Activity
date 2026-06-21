@@ -1,0 +1,1716 @@
+====================================================================================================
+3  DESENVOLVIMENTO
+====================================================================================================
+
+[Norma de citação adotada: ABNT — NBR 10520 (citações) e NBR 6023 (referências).
+As citações autor-data já presentes no texto seguem esse padrão e foram mantidas.
+
+Observação de escopo: por se tratar do capítulo que descreve o próprio
+artefato (metodologia, requisitos, arquitetura, implementação e implantação),
+a maior parte das afirmações reporta o sistema desenvolvido pelo autor e, por
+isso, não demanda fonte externa. Os marcadores [REFERÊNCIA NECESSÁRIA] foram
+inseridos apenas onde há afirmação sobre tecnologia de terceiros, recomendação
+de boa prática ou especificação de produto que se beneficia de fonte
+verificável.]
+
+
+====================================================================================================
+3.1  CARACTERIZAÇÃO DA PESQUISA
+====================================================================================================
+
+Este trabalho caracteriza-se, quanto à natureza, como uma pesquisa aplicada e
+de caráter construtivo, conduzida sob o paradigma da Design Science Research
+(DSR) e acompanhada da avaliação do artefato produzido. O sistema descrito
+neste capítulo não é um objeto de estudo observado a posteriori, mas o próprio
+artefato cuja concepção, construção e avaliação constituem o método de
+pesquisa adotado. Esta seção justifica essa classificação, posiciona os três
+ciclos de DSR de Hevner et al. (2004) em relação ao projeto e descreve como
+esses ciclos se entrelaçaram, na prática, com as iterações ágeis de
+desenvolvimento.
+
+
+3.1.1  PESQUISA APLICADA E DE NATUREZA CONSTRUTIVA
+----------------------------------------------------------------------------------------------------
+Quanto à finalidade, a pesquisa classifica-se como aplicada: não visa gerar
+conhecimento teórico desvinculado de uma aplicação prática, mas produzir
+conhecimento dirigido à solução de um problema concreto e delimitado (GIL,
+2002; PRODANOV; FREITAS, 2013) — no caso, a dificuldade enfrentada por
+profissionais de saúde (médicos, enfermeiros, fisioterapeutas e pesquisadores)
+para organizar, filtrar e visualizar, de forma acessível, os dados brutos
+gerados por dispositivos de actigrafia. Esse problema, e não uma hipótese
+teórica a ser testada estatisticamente sobre uma amostra, orienta toda a
+investigação.
+
+Quanto à abordagem, o trabalho não se encaixa no par clássico
+quantitativo/qualitativo como categoria principal — ambos pressupõem a
+observação e a explicação de um fenômeno já existente. Adota-se, em vez disso,
+a Design Science Research, paradigma de pesquisa em Sistemas de Informação no
+qual a própria construção de um artefato — e o conhecimento de projeto (design
+knowledge) gerado ao construí-lo e avaliá-lo — constitui a contribuição
+científica central (MARCH; SMITH, 1995; HEVNER et al., 2004; PEFFERS et al.,
+2007). Sob esse paradigma, o sistema é o artefato de software cuja concepção,
+arquitetura (seção 3.6), implementação (seção 3.7) e implantação em produção
+(seção 3.8) constituem, em conjunto, o produto de pesquisa, e não apenas um
+produto de engenharia de software dissociado da investigação acadêmica que o
+originou.
+
+Por isso, a pesquisa é dita de natureza construtiva: o método de investigação
+é o próprio ciclo iterativo de construir uma solução, avaliá-la frente ao
+problema que a motivou e refinar tanto a solução quanto o entendimento do
+problema a partir dessa avaliação — em contraste com uma pesquisa puramente
+descritiva ou explicativa, que se limitaria a caracterizar o problema sem
+produzir, ela mesma, uma intervenção sobre ele.
+
+
+3.1.2  AVALIAÇÃO DO ARTEFATO
+----------------------------------------------------------------------------------------------------
+A avaliação do artefato — etapa que distingue a DSR de um simples exercício de
+desenvolvimento de software — ocorreu por dois meios complementares.
+
+O primeiro é uma avaliação formativa e contínua: por se tratar de um Projeto
+Supervisionado de Graduação, cada incremento relevante do sistema foi
+acompanhado e validado pelo orientador ao longo do semestre, em reuniões
+periódicas — sem instrumento formal de coleta de dados (questionário, roteiro
+de entrevista), mas com retorno direto sobre o andamento, as decisões de
+projeto e a aderência de cada entrega ao problema proposto. Essa forma de
+avaliação, embora informal, corresponde a um padrão reconhecido na literatura
+de DSR para artefatos avaliados ao longo das iterações de design, e não apenas
+em um único momento final (HEVNER et al., 2004).
+
+O segundo meio é uma avaliação técnica e somativa, registrada formalmente na
+especificação de requisitos (seções 3.3 e 3.7): o conjunto de requisitos
+funcionais e não funcionais especificado (RF01–RF58 e RNF01–RNF14) foi
+verificado, requisito a requisito, contra a implementação efetivamente
+encontrada no código-fonte — incluindo a identificação e a correção de
+divergências pontuais entre o especificado e o implementado (por exemplo, o
+ajuste do requisito relativo ao descarte do registro e a substituição da
+máscara de inatividade originalmente prevista pelo filtro de luminosidade
+efetivamente construído). Essa verificação de conformidade constitui uma
+avaliação técnica do artefato frente aos seus próprios critérios de projeto,
+complementar à avaliação formativa.
+
+
+3.1.3  OS TRÊS CICLOS DA DSR (HEVNER ET AL., 2004) NO SISTEMA
+----------------------------------------------------------------------------------------------------
+Hevner et al. (2004) descrevem a Design Science Research como a interação
+entre três ciclos: o Ciclo de Relevância, que conecta o ambiente do problema
+às atividades de projeto; o Ciclo de Rigor, que conecta essas atividades à
+base de conhecimento científico e técnico já estabelecida; e o Ciclo de
+Projeto (Design Cycle), o núcleo iterativo de construção e avaliação do
+artefato, que medeia os outros dois. Os três, embora descritos separadamente,
+não são sequenciais nem isolados — operam de forma concorrente e
+interdependente ao longo de todo o desenvolvimento, o que se evidencia na
+própria trajetória de construção do sistema.
+
+Ciclo de Relevância — o ambiente de origem do problema é o universo de
+profissionais de saúde e pesquisadores que lidam com dados de actigrafia, e a
+necessidade identificada nesse ambiente — organizar, filtrar e visualizar
+esses dados de forma acessível, sem manipulação manual de planilhas nem
+conhecimento de programação — é o que origina os requisitos catalogados na
+seção 3.3. O retorno ao ambiente ocorre em dois momentos: a cada incremento
+considerado suficientemente maduro pelo orientador (avaliação formativa,
+subseção 3.1.2) e, de forma mais ampla, na implantação do sistema em produção
+(seção 3.8), que devolve o artefato ao contexto de uso para o qual foi
+concebido.
+
+Ciclo de Rigor — a base de conhecimento sobre a qual o projeto se apoia
+combina, de um lado, conhecimento de engenharia de software amplamente
+estabelecido (o padrão arquitetural MVC estrito, seção 3.6; práticas de
+containerização e de persistência de sessão por token, seções 3.5 e 3.6) e,
+de outro, conhecimento científico do domínio — em particular, as métricas não
+paramétricas de ritmo circadiano (IS, IV, L5 e M10) e a própria estrutura do
+objeto BaseRaw, ambos herdados, sem reimplementação, da biblioteca
+pyActigraphy, validada pela comunidade de cronobiologia (ver subseções 3.5.2 e
+3.7.4). Ao adotar integralmente esses algoritmos, o projeto apoia-se
+deliberadamente no rigor científico já estabelecido na literatura, em vez de
+propor (e precisar validar) um método de cálculo próprio. A contribuição que
+retorna desse ciclo à base de conhecimento é o próprio conjunto de artefatos
+documentais produzidos — a especificação de requisitos, a arquitetura e o
+catálogo de decisões tecnológicas justificadas —, reaproveitável como
+referência para projetos semelhantes de sistemas de apoio à decisão clínica
+baseados em actigrafia.
+
+Ciclo de Projeto (Design Cycle) — é o ciclo central e mais visível na
+trajetória do sistema: a alternância rápida entre construir uma parte e
+avaliá-la (pelo autor e, periodicamente, pelo orientador) antes de prosseguir
+para o incremento seguinte. É esse ciclo que se entrelaça diretamente com as
+iterações ágeis de desenvolvimento, detalhadas a seguir.
+
+
+3.1.4  ENTRELAÇAMENTO ENTRE OS CICLOS DE DSR E AS SPRINTS DE DESENVOLVIMENTO
+----------------------------------------------------------------------------------------------------
+O desenvolvimento ocorreu em iterações curtas e incrementais, de cadência
+aproximadamente semanal, características de práticas ágeis — entregas pequenas
+e frequentes, cada uma agregando uma fatia de funcionalidade utilizável, em
+vez de um único grande lançamento ao final. Reconstituídas a partir do
+histórico de versionamento do repositório (06/05 a 15/06), essas iterações
+podem ser agrupadas em seis sprints, cada uma associada a um ciclo de
+construção e avaliação do Design Cycle e a uma ênfase predominante de
+Relevância, Rigor ou Projeto.
+
+[INSERIR QUADRO 1: As seis sprints de desenvolvimento. Colunas: Sprint;
+Período; Ênfase (Relevância/Rigor/Projeto); Principais entregas. Recomenda-se
+diagramar o conteúdo abaixo como quadro formatado. Legenda provisória:
+"Quadro 1 — As seis sprints reconstituídas a partir do histórico de
+versionamento e sua ênfase predominante de DSR."]
+
+  Sprint 1 (06/05–15/05) — Ênfase: Relevância. Autenticação e estrutura
+    inicial: cadastro e login com persistência no banco, roteamento de alto
+    nível e esqueleto da área autenticada.
+  Sprint 2 (18/05–23/05) — Ênfase: Projeto. Conjunto de dados e sessão:
+    upload de arquivos, filtros de listagem, esquema completo do banco,
+    persistência de sessão por cookie, página de configurações de perfil.
+  Sprint 3 (25/05–05/06) — Ênfase: Rigor. Arquitetura e dados reais:
+    protótipo de análise com dados fictícios, refatoração para MVC estrito,
+    registro de pacientes, substituição dos dados fictícios por arquivos
+    Condor reais.
+  Sprint 4 (07/06–08/06) — Ênfase: Rigor. Núcleo da análise de actigrafia:
+    modos PIM/TAT/ZCM, métricas não paramétricas IS/IV/L5/M10 (globais e por
+    período), corte de início/fim do registro, gráficos de luz e temperatura.
+  Sprint 5 (10/06–11/06) — Ênfase: Relevância. Exportação e infraestrutura:
+    exportação de dados em .zip, página de relatórios exportados,
+    simplificação da autenticação, containerização com Docker e Docker
+    Compose.
+  Sprint 6 (13/06–15/06) — Ênfase: Projeto. Refinamento e novas análises:
+    remoção da máscara de inatividade (simplificação por avaliação),
+    exportação de gráficos em imagem, análise de temperatura com filtro de
+    luz, comparação entre registros, ajustes finais para produção.
+
+[INSERIR FIGURA 1: Linha do tempo das seis sprints alinhada aos três ciclos de
+DSR. Conteúdo: eixo temporal de 06/05 a 15/06; faixas indicando a ênfase
+(Relevância/Rigor/Projeto) de cada sprint. Legenda provisória: "Figura 1 —
+Entrelaçamento entre as seis sprints de desenvolvimento e os ciclos de
+Relevância, Rigor e Projeto da DSR."]
+
+Cada sprint é, individualmente, uma volta completa do Ciclo de Projeto: algo é
+construído (incrementos parciais sucessivos registrados no versionamento) e
+avaliado antes de se avançar — seja pela constatação do próprio autor de que
+uma abordagem não estava funcionando (a sprint 6, por exemplo, registra a
+remoção da máscara de inatividade, incorporada na sprint 4 e descartada após
+avaliação, em favor do filtro de luz que a substituiu), seja pela validação do
+orientador nos pontos de checagem.
+
+O Ciclo de Relevância manifesta-se com maior intensidade nas sprints 1 e 5: a
+primeira estabelece a relação entre o sistema e seus usuários (autenticação,
+identidade), condição de qualquer interação posterior com o ambiente de uso; a
+quinta entrega a capacidade de exportar resultados e de implantar o sistema em
+ambiente real (Docker), reconectando o artefato ao ambiente prático que
+motivou o projeto — um profissional de saúde só realiza valor do sistema se
+puder, de fato, acessá-lo e levar seus resultados para o prontuário ou para a
+pesquisa em andamento.
+
+O Ciclo de Rigor concentra-se nas sprints 3 e 4: a terceira introduz a
+refatoração para o padrão MVC — adoção deliberada de conhecimento estabelecido
+de engenharia de software, antes de avançar para funcionalidades de domínio
+mais complexas — e a quarta incorpora a biblioteca pyActigraphy e suas
+métricas validadas pela literatura de cronobiologia, em vez de uma
+implementação própria dos cálculos de ritmo circadiano (ver subseção 3.5.4).
+
+As sprints 2 e 6, por fim, são as de maior densidade de iterações internas do
+Design Cycle — várias pequenas construções e avaliações dentro da mesma janela
+de tempo — e correspondem ao trabalho de refinamento típico de quando o
+artefato já existe em sua forma essencial e passa por ciclos rápidos de ajuste
+fino, guiados por avaliação imediata do próprio autor.
+
+Essa correspondência evidencia que DSR e desenvolvimento ágil não são
+metodologias concorrentes, mas operam em planos diferentes e complementares: a
+DSR caracteriza a natureza da investigação — construir e avaliar um artefato
+para gerar conhecimento de projeto sobre como resolver um problema real —,
+enquanto as sprints ágeis fornecem a cadência prática, iterativa e
+incremental, por meio da qual o Ciclo de Projeto foi efetivamente executado.
+Não há, neste trabalho, uma sprint "de DSR" e outras "de desenvolvimento":
+cada sprint ágil é, ela mesma, uma instância concreta do ciclo de construção e
+avaliação que a DSR formaliza como método de pesquisa.
+
+
+3.1.5  SÍNTESE
+----------------------------------------------------------------------------------------------------
+Em síntese, o trabalho caracteriza-se como pesquisa aplicada — por visar à
+solução de um problema prático e delimitado, identificado junto a
+profissionais de saúde que lidam com dados de actigrafia — e de natureza
+construtiva, sob o paradigma da Design Science Research, no qual o próprio
+sistema é o artefato de pesquisa. Sua avaliação combinou uma vertente
+formativa e contínua (acompanhamento do orientador ao longo das iterações) e
+uma vertente técnica e somativa (verificação de conformidade entre requisitos
+especificados e implementação realizada). Os três ciclos de Hevner et al.
+(2004) — Relevância, Rigor e Projeto — não correspondem a fases estanques do
+cronograma, mas a ênfases que se alternam e se sobrepõem ao longo das seis
+sprints identificadas, confirmando a DSR como o referencial metodológico
+adequado para caracterizar a pesquisa conduzida nos capítulos subsequentes.
+
+
+====================================================================================================
+3.3  REQUISITOS E ESPECIFICAÇÕES DO SISTEMA
+====================================================================================================
+
+3.3.1  INTRODUÇÃO
+----------------------------------------------------------------------------------------------------
+O sistema é uma aplicação web desenvolvida com o framework Streamlit para a
+organização, o tratamento e a visualização de dados de actigrafia, voltada a
+profissionais de saúde — médicos, enfermeiros, fisioterapeutas e
+pesquisadores — que necessitam acompanhar padrões de atividade, repouso e
+temperatura periférica de pacientes e voluntários de pesquisa a partir de
+registros gerados por dispositivos de actigrafia no formato Condor.
+
+Esta seção apresenta a especificação dos requisitos, obtida a partir da
+análise do código-fonte e das funcionalidades implementadas. São descritas,
+na sequência: (i) as personas que representam os perfis de usuário
+considerados no projeto; (ii) os requisitos funcionais (RF) e não funcionais
+(RNF), organizados em tabelas numeradas, com cada requisito funcional
+vinculado a um dos objetivos específicos (OE1 a OE7); e (iii) a descrição
+textual dos principais casos de uso, equivalente ao conteúdo de um diagrama de
+casos de uso UML.
+
+Para fins de rastreabilidade entre os requisitos funcionais e a motivação que
+os originou, foram definidos os seguintes objetivos específicos:
+
+  OE1 — Implementar um mecanismo de cadastro, autenticação e gerenciamento de
+    perfil que garanta o acesso individualizado e seguro de cada profissional
+    de saúde ao sistema.
+  OE2 — Disponibilizar funcionalidades de organização, armazenamento e
+    gerenciamento dos arquivos brutos de actigrafia (envio, edição,
+    substituição, download e exclusão).
+  OE3 — Permitir a organização dos registros de actigrafia por paciente, por
+    meio do cadastro de pacientes e do vínculo entre paciente e arquivo.
+  OE4 — Processar os arquivos de actigrafia no formato Condor e fornecer
+    visualizações gráficas e métricas não paramétricas de ritmo circadiano que
+    apoiem a interpretação clínica dos dados.
+  OE5 — Possibilitar a análise específica do padrão de temperatura periférica
+    registrado durante a actigrafia, complementar à análise de atividade.
+  OE6 — Possibilitar a comparação visual entre múltiplos registros de
+    actigrafia, alinhados temporalmente, para apoiar avaliações longitudinais
+    ou entre indivíduos.
+  OE7 — Permitir a exportação e o arquivamento histórico dos dados e gráficos
+    processados, em formatos reutilizáveis fora do sistema.
+
+
+3.3.2  PERSONAS DOS PROFISSIONAIS DE SAÚDE
+----------------------------------------------------------------------------------------------------
+As personas a seguir foram elaboradas a partir dos quatro perfis profissionais
+contemplados no cadastro de usuários (campo "profissão": Médico, Enfermeiro,
+Fisioterapeuta e Pesquisador) e das funcionalidades que cada módulo
+disponibiliza. Sintetizam objetivos, rotina de trabalho e dificuldades que
+orientaram as decisões de requisitos das subseções 3.3.3 e 3.3.4.
+
+[INSERIR QUADRO 2: As quatro personas. Colunas: Persona/idade; Profissão e
+contexto; Objetivos no sistema; Dificuldades atuais; Uso predominante.
+Recomenda-se diagramar como quadro de personas (eventualmente um cartão por
+persona, com avatar ilustrativo). Legenda provisória: "Quadro 2 — Personas dos
+quatro perfis profissionais e seu uso predominante do sistema."]
+
+Persona 1 — Dr. Carlos Andrade Mendes (47 anos)
+  Profissão / contexto: Médico geriatra, atuante em ambulatório de distúrbios
+    do sono.
+  Rotina: atende pacientes idosos com suspeita de alterações do ritmo
+    circadiano (insônia, fragmentação do sono, sundowning). Recebe
+    periodicamente, de sua equipe de enfermagem, os arquivos brutos gerados
+    pelos dispositivos de actigrafia usados pelos pacientes durante 7 a 14
+    dias de monitoramento contínuo.
+  Objetivos: visualizar rapidamente o padrão diário de atividade, luz e
+    temperatura de cada paciente; obter métricas objetivas de ritmo circadiano
+    (IS, IV, L5, M10) para subsidiar o diagnóstico; anexar gráficos e dados ao
+    prontuário.
+  Dificuldades atuais: pouco tempo por consulta; falta de familiaridade com
+    ferramentas de análise estatística ou programação; necessidade de comparar
+    visualmente pacientes sem manipular planilhas manualmente.
+  Uso predominante: páginas Análises (gráficos diários e métricas não
+    paramétricas) e Exportar relatório.
+
+Persona 2 — Fernanda Lima Costa (34 anos)
+  Profissão / contexto: Enfermeira em unidade de geriatria de uma clínica de
+    longa permanência.
+  Rotina: responsável por instalar e retirar os dispositivos dos pacientes
+    institucionalizados, descarregar os arquivos do equipamento e organizá-los
+    antes da avaliação médica. Acompanha diversos pacientes simultaneamente.
+  Objetivos: enviar e organizar com agilidade os arquivos de cada paciente;
+    manter um vínculo claro entre arquivo e paciente, evitando trocas ou
+    duplicidades; localizar rapidamente um arquivo específico em meio a dezenas
+    de registros.
+  Dificuldades atuais: volume crescente de arquivos com nomes pouco
+    descritivos gerados pelo equipamento; risco de associar um registro ao
+    paciente errado; falta de tempo para revisar manualmente cada arquivo.
+  Uso predominante: páginas Conjunto de dados (upload, busca e organização) e
+    Registro de pacientes (cadastro e vínculo com arquivos).
+
+Persona 3 — Rodrigo Tavares Nunes (29 anos)
+  Profissão / contexto: Fisioterapeuta em reabilitação motora e do sono.
+  Rotina: acompanha pacientes em programas de reabilitação ao longo de várias
+    semanas, repetindo a coleta de actigrafia em diferentes etapas do
+    tratamento para avaliar a evolução do padrão de atividade e repouso e as
+    variações de temperatura periférica associadas à resposta ao exercício.
+  Objetivos: comparar visualmente registros de diferentes semanas do mesmo
+    paciente, alinhados pelo dia da semana ou pelo dia do tratamento; observar
+    a evolução do padrão de temperatura ao longo do programa.
+  Dificuldades atuais: dificuldade em perceber tendências observando arquivos
+    isoladamente, sem visão comparativa lado a lado; necessidade de uma escala
+    visual comum entre os registros comparados.
+  Uso predominante: páginas Comparação (sobreposição de múltiplos registros) e
+    Análise de temperatura.
+
+Persona 4 — Dra. Beatriz Oliveira Ramos (41 anos)
+  Profissão / contexto: Pesquisadora — docente e cronobiologista em projeto de
+    extensão universitária.
+  Rotina: coordena um estudo com dezenas de voluntários monitorados por
+    actigrafia, recebendo arquivos de diferentes fontes e necessitando
+    padronizar parâmetros de processamento (modo de atividade, limiar de
+    binarização, frequência de reamostragem) entre todos os registros para
+    garantir comparabilidade metodológica.
+  Objetivos: processar um grande volume de arquivos de forma organizada;
+    ajustar parâmetros finos das métricas não paramétricas; exportar dados e
+    gráficos em formatos reutilizáveis (.csv, .png) para posterior análise
+    estatística e publicação.
+  Dificuldades atuais: necessidade de manter rastreabilidade entre arquivo
+    original, parâmetros utilizados e resultado exportado; risco de
+    inconsistência metodológica ao reprocessar o mesmo conjunto de dados em
+    momentos diferentes.
+  Uso predominante: páginas Conjunto de dados, Análises (parâmetros
+    configuráveis) e Exportar relatório (histórico para auditoria
+    metodológica).
+
+
+3.3.3  REQUISITOS FUNCIONAIS (RF)
+----------------------------------------------------------------------------------------------------
+Cada requisito funcional é apresentado com o objetivo específico ao qual está
+vinculado (OE1 a OE7) e uma prioridade relativa (Alta, Média ou Baixa),
+atribuída em função da centralidade da funcionalidade para os objetivos do
+sistema.
+
+[INSERIR TABELA 1: Requisitos funcionais (RF01–RF58). Recomenda-se diagramar o
+conteúdo abaixo como tabela formatada com as colunas ID / Objetivo /
+Prioridade / Descrição. Legenda provisória: "Tabela 1 — Requisitos funcionais
+do sistema, vinculados aos objetivos específicos (OE1–OE7)."]
+
+ID     Obj.  Prior.  Descrição
+------ ----- ------- ----------------------------------------------------------
+RF01   OE1   Alta    Permitir o cadastro de um novo usuário com nome, e-mail, CPF, senha e profissão.
+RF02   OE1   Alta    Validar, no cadastro, o preenchimento de todos os campos obrigatórios.
+RF03   OE1   Média   Validar que a senha possui no mínimo 6 caracteres e coincide com a confirmação.
+RF04   OE1   Média   Validar que o CPF informado contém 11 dígitos numéricos.
+RF05   OE1   Alta    Impedir o cadastro de usuário com e-mail ou CPF já existentes na base.
+RF06   OE1   Alta    Permitir o login por e-mail e senha, validando as credenciais.
+RF07   OE1   Média   Permitir que o usuário opte por manter a sessão ativa por 30 dias.
+RF08   OE1   Média   Encerrar automaticamente a sessão após 2 horas de inatividade quando "manter conectado" não for selecionado.
+RF09   OE1   Alta    Restaurar automaticamente a sessão em atualizações de página, a partir do token persistido em cookie.
+RF10   OE1   Alta    Permitir o encerramento manual da sessão (logout) a qualquer momento.
+RF11   OE1   Média   Permitir a visualização e a edição dos dados de perfil (nome, e-mail, CPF, profissão, telefone, data de nascimento e biografia).
+RF12   OE1   Baixa   Permitir a atualização da foto de perfil.
+RF13   OE1   Média   Permitir a alteração de senha mediante confirmação da senha atual.
+RF14   OE1   Baixa   Exibir um indicador visual da força da senha durante o cadastro ou a alteração de senha.
+RF15   OE2   Alta    Permitir o envio de um ou mais arquivos de actigrafia no formato .txt (Condor), com descrição opcional.
+RF16   OE2   Alta    Validar que o arquivo enviado possui extensão .txt, rejeitando formatos diferentes.
+RF17   OE2   Alta    Impedir o envio de arquivo com nome já cadastrado para o mesmo usuário.
+RF18   OE2   Alta    Listar os arquivos cadastrados pelo usuário autenticado, com busca textual por nome em tempo real.
+RF19   OE2   Média   Exibir a listagem de arquivos de forma paginada.
+RF20   OE2   Média   Permitir a edição do nome e da descrição de um arquivo já cadastrado.
+RF21   OE2   Média   Permitir a substituição do conteúdo de um arquivo existente, preservando seu vínculo com pacientes.
+RF22   OE2   Alta    Permitir o download individual de um arquivo cadastrado.
+RF23   OE2   Média   Permitir o download em lote, compactado em .zip, de múltiplos arquivos selecionados.
+RF24   OE2   Alta    Permitir a exclusão individual ou em lote de arquivos cadastrados.
+RF25   OE3   Alta    Permitir o cadastro de pacientes com nome (obrigatório), sexo, data de nascimento, e-mail, telefone, altura, peso e nota.
+RF26   OE3   Média   Validar o formato do e-mail informado no cadastro ou na edição de um paciente.
+RF27   OE3   Alta    Listar os pacientes cadastrados pelo usuário autenticado, com busca por nome ou e-mail e paginação.
+RF28   OE3   Média   Permitir a edição dos dados de um paciente cadastrado.
+RF29   OE3   Média   Permitir a exclusão de um paciente, desvinculando — sem excluir — os arquivos associados.
+RF30   OE3   Alta    Permitir vincular um ou mais arquivos de actigrafia a um paciente.
+RF31   OE3   Média   Permitir desvincular um arquivo de actigrafia de um paciente.
+RF32   OE3   Alta    Impedir o vínculo de um arquivo já associado a outro paciente do mesmo usuário, identificando o arquivo e o paciente conflitantes.
+RF33   OE4   Alta    Carregar e processar um arquivo de actigrafia no formato Condor, exibindo nome, sexo e data de nascimento do sujeito.
+RF34   OE4   Média   Permitir descartar um intervalo do início e/ou do fim do registro — por duração (passos de 2 h, de 0 a 12 h) ou por data e hora exatas —, recalculando dados, dias disponíveis e métricas.
+RF35   OE4   Alta    Permitir a seleção do modo de cálculo de atividade entre PIM, TAT e ZCM, restrito aos modos disponíveis no arquivo.
+RF36   OE4   Média   Permitir filtrar a exibição e a exportação de atividade e temperatura por uma faixa de luminosidade (Lux).
+RF37   OE4   Média   Permitir configurar faixas de valores (escala) de exibição para atividade, luz e temperatura.
+RF38   OE4   Média   Permitir configurar a frequência de reamostragem e o limiar de binarização das métricas não paramétricas.
+RF39   OE4   Alta    Calcular as métricas IS, IV, L5 e M10 a partir dos parâmetros configurados, de forma global ou segmentada por período (janelas de 1, 3, 7, 14 ou 30 dias).
+RF40   OE4   Alta    Exibir, para cada dia do registro, um gráfico combinado de atividade, luz e temperatura, com sombreamento do período noturno e de eventos marcados.
+RF41   OE4   Média   Permitir filtrar os dias exibidos por dia da semana.
+RF42   OE4   Média   Permitir filtrar os dias exibidos por período do dia (manhã, tarde, noite ou intervalo personalizado).
+RF43   OE4   Alta    Permitir a exportação, em .zip, dos dados filtrados nos formatos .txt (Condor) e .csv.
+RF44   OE4   Média   Permitir a exportação, em .zip, dos gráficos diários exibidos, no formato .png.
+RF45   OE4   Média   Salvar automaticamente cada exportação no histórico de relatórios do usuário.
+RF46   OE5   Alta    Calcular e exibir a temperatura média por hora do dia, em matriz dia × hora, para os canais de temperatura disponíveis.
+RF47   OE5   Média   Exibir um gráfico de linha com a média horária de temperatura ao longo do dia.
+RF48   OE5   Média   Exibir estatísticas descritivas da temperatura (média, mediana, mínimo, máximo, amplitude, desvio padrão e variância).
+RF49   OE5   Média   Permitir a exportação, em .zip, das tabelas de temperatura em .csv e/ou do gráfico em .png.
+RF50   OE6   Alta    Permitir a seleção de múltiplos arquivos para comparação simultânea.
+RF51   OE6   Média   Permitir configurar um modo de atividade comum a todos os arquivos comparados.
+RF52   OE6   Média   Permitir configurar faixas de escala compartilhadas de atividade, luz e temperatura entre os arquivos comparados.
+RF53   OE6   Alta    Permitir alinhar os dias comparados pelo número do dia do registro (posição relativa).
+RF54   OE6   Média   Permitir alinhar os dias comparados pela primeira ocorrência de um dia da semana selecionado.
+RF55   OE6   Alta    Exibir um gráfico comparativo por dia alinhado, sobrepondo a curva de atividade — e, opcionalmente, luz/temperatura — de cada arquivo.
+RF56   OE7   Média   Listar, de forma paginada, os relatórios exportados pelo usuário, exibindo nome, arquivo de origem e tamanho.
+RF57   OE7   Alta    Permitir o download de um relatório exportado previamente salvo.
+RF58   OE7   Média   Permitir a exclusão de um relatório exportado, mediante confirmação.
+
+
+3.3.4  REQUISITOS NÃO FUNCIONAIS (RNF)
+----------------------------------------------------------------------------------------------------
+Os requisitos não funcionais expressam atributos de qualidade do sistema —
+segurança, usabilidade, desempenho, confiabilidade, portabilidade e
+manutenibilidade — classificados conforme a categoria de qualidade
+predominante.
+
+[INSERIR TABELA 2: Requisitos não funcionais (RNF01–RNF14). Recomenda-se
+diagramar como tabela formatada com as colunas ID / Categoria / Descrição.
+Legenda provisória: "Tabela 2 — Requisitos não funcionais do sistema,
+agrupados por categoria de qualidade."]
+
+ID      Categoria         Descrição
+------- ----------------- ------------------------------------------------------
+RNF01   Segurança         Armazenar as senhas com função de hash criptográfico (bcrypt), nunca em texto plano.
+RNF02   Segurança         Isolar os dados de cada usuário (arquivos, pacientes, relatórios), impedindo acesso ou modificação de registros de outro.
+RNF03   Segurança         Persistir a sessão por meio de cookie HTTP com atributo SameSite=Strict.
+RNF04   Confiabilidade    Invalidar automaticamente sessões expiradas, conforme a opção de permanência (2 horas ou 30 dias).
+RNF05   Usabilidade       Fornecer feedback imediato (sucesso ou erro) para toda ação de cadastro, edição ou exclusão.
+RNF06   Manutenibilidade  Manter a arquitetura em camadas MVC (view → controller → model), de modo que a apresentação nunca acesse diretamente o banco.
+RNF07   Desempenho        Apresentar listagens de arquivos, pacientes e relatórios de forma paginada, preservando o desempenho independentemente da quantidade de registros.
+RNF08   Desempenho        Reaproveitar em cache (TTL de 120 s) o processamento de arquivos e a geração de gráficos e exportações.
+RNF09   Portabilidade     Ser executável em ambiente containerizado (Docker/Docker Compose), garantindo reprodutibilidade entre máquinas.
+RNF10   Compatibilidade   Detectar automaticamente a codificação dos arquivos de actigrafia (UTF-8, UTF-8 com BOM, Latin-1 ou CP1252).
+RNF11   Usabilidade       Disponibilizar a interface integralmente em português, com vocabulário adequado a profissionais de saúde.
+RNF12   Usabilidade       Iniciar automaticamente o download de arquivos e relatórios após a geração do conteúdo, sem etapas manuais adicionais.
+RNF13   Confiabilidade    Preservar a integridade do arquivo original (formato Condor) ao gerar exportações, reconstruindo fielmente cabeçalho e campos.
+RNF14   Portabilidade     Ser compatível com os principais navegadores web modernos, sem exigir instalação local de software adicional.
+
+
+3.3.5  CASOS DE USO PRINCIPAIS
+----------------------------------------------------------------------------------------------------
+Esta subseção descreve textualmente o conteúdo de um diagrama de casos de uso
+UML, contemplando atores, casos de uso, pacotes e relacionamentos.
+
+[INSERIR FIGURA 2: Diagrama de casos de uso UML do sistema. Conteúdo: ator
+"Profissional de Saúde" (com as especializações Médico, Enfermeiro,
+Fisioterapeuta, Pesquisador), os 26 casos de uso agrupados nos seis pacotes, e
+os relacionamentos de generalização, <<include>> e <<extend>> descritos no
+texto. Legenda provisória: "Figura 2 — Diagrama de casos de uso do sistema."]
+
+3.3.5.1  Atores
+
+  - Profissional de Saúde (ator primário, abstrato): qualquer usuário
+    autenticado. É especializado (generalização) em quatro papéis concretos,
+    correspondentes aos valores do campo "profissão": Médico, Enfermeiro,
+    Fisioterapeuta e Pesquisador. Todas as especializações herdam o acesso ao
+    mesmo conjunto de casos de uso, pois o sistema não diferencia permissões
+    por profissão — a distinção é apenas informativa, não restritiva.
+  - Sistema (limite do sistema): conjunto de casos de uso descritos nesta
+    subseção, delimitando o escopo da aplicação.
+
+3.3.5.2  Catálogo de Casos de Uso, por Pacote
+
+[INSERIR TABELA 3: Catálogo de casos de uso (UC01–UC26) por pacote.
+Recomenda-se diagramar como tabela formatada (ID / Caso de uso / Pacote).
+Legenda provisória: "Tabela 3 — Casos de uso do sistema, agrupados por
+pacote funcional."]
+
+  Autenticação e Conta: UC01 Cadastrar-se; UC02 Autenticar-se (login); UC03
+    Encerrar sessão (logout); UC04 Gerenciar perfil e segurança da conta.
+  Gestão de Arquivos: UC05 Enviar arquivo(s); UC06 Buscar e listar arquivos;
+    UC07 Editar metadados; UC08 Substituir conteúdo; UC09 Baixar arquivo(s);
+    UC10 Excluir arquivo(s).
+  Gestão de Pacientes: UC11 Cadastrar paciente; UC12 Editar paciente; UC13
+    Excluir paciente; UC14 Vincular/desvincular arquivos a um paciente.
+  Análise de Actigrafia: UC15 Configurar parâmetros de análise; UC16
+    Visualizar gráficos diários combinados; UC17 Consultar métricas não
+    paramétricas (IS, IV, L5, M10); UC18 Filtrar dias exibidos; UC19 Exportar
+    dados e gráficos da análise.
+  Análise de Temperatura: UC20 Visualizar matriz e estatísticas de temperatura
+    por hora; UC21 Exportar tabelas e gráfico de temperatura.
+  Comparação entre Registros: UC22 Selecionar arquivos e configurar
+    comparação; UC23 Visualizar gráfico comparativo entre arquivos.
+  Relatórios Exportados: UC24 Listar relatórios exportados; UC25 Baixar
+    relatório exportado; UC26 Excluir relatório exportado.
+
+3.3.5.3  Relacionamentos do Diagrama
+
+  - Generalização: "Médico", "Enfermeiro", "Fisioterapeuta" e "Pesquisador"
+    generalizam-se em "Profissional de Saúde", o ator efetivamente associado a
+    todos os casos de uso.
+  - <<include>>: UC14 inclui UC06 (depende da consulta aos arquivos
+    disponíveis antes da seleção); UC16 e UC20 incluem o subfluxo comum
+    "Carregar e processar arquivo de actigrafia", disparado ao selecionar
+    qualquer arquivo nas páginas de análise; UC19 e UC21 incluem o subfluxo
+    "Salvar relatório no histórico", executado automaticamente a cada
+    exportação concluída com sucesso.
+  - <<extend>>: UC09 é estendido por "Baixar em lote (.zip)" quando mais de um
+    arquivo é selecionado; UC10, por "Excluir em lote", sob a mesma condição;
+    UC02, por "Manter conectado por 30 dias", acionado apenas quando o ator
+    marca essa opção.
+  - Dependência entre pacotes: os pacotes Análise de Actigrafia, Análise de
+    Temperatura e Comparação entre Registros pressupõem ao menos um arquivo
+    previamente cadastrado em Gestão de Arquivos; o pacote Gestão de Pacientes
+    também depende deste último para o vínculo entre paciente e arquivo (UC14).
+
+3.3.5.4  Especificação Detalhada dos Casos de Uso Principais
+
+Dentre os 26 casos de uso, os cinco a seguir foram selecionados para
+especificação detalhada por representarem os fluxos centrais da jornada do
+usuário: autenticar-se, alimentar o sistema com dados, analisar um registro
+individual, comparar registros e exportar resultados.
+
+UC02 — Autenticar-se no sistema (login)
+  Ator: Profissional de Saúde (não autenticado).
+  Pré-condições: o profissional possui cadastro prévio.
+  Fluxo principal: (1) o ator acessa a tela de login e informa e-mail e senha;
+    (2) opcionalmente marca "Manter conectado por 30 dias"; (3) o sistema
+    valida as credenciais; (4) cria uma sessão persistente (token) associada
+    ao usuário; (5) grava o token em cookie HTTP; (6) redireciona para a área
+    autenticada (página Análises).
+  Exceções: (3a) e-mail não encontrado — exibe "Email não encontrado." e
+    permanece na tela; (3b) senha incorreta — exibe "Senha incorreta." e
+    permanece na tela.
+  Pós-condições: o ator está autenticado e sua sessão é restaurada
+    automaticamente em atualizações subsequentes, até o logout ou a expiração
+    do token.
+
+UC05 — Enviar arquivo(s) de actigrafia
+  Ator: Profissional de Saúde (autenticado).
+  Pré-condições: o ator está autenticado e possui ao menos um arquivo .txt no
+    formato Condor.
+  Fluxo principal: (1) acessa a página Conjunto de dados e a aba de envio; (2)
+    seleciona um ou mais arquivos .txt e, opcionalmente, informa descrição; (3)
+    confirma o envio; (4) para cada arquivo, o sistema valida a extensão e a
+    unicidade do nome para o usuário; (5) grava conteúdo, tamanho, número de
+    linhas e codificação detectada; (6) exibe a confirmação e atualiza a
+    listagem.
+  Exceções: (4a) extensão diferente de .txt — rejeita o arquivo, informa o
+    nome inválido e prossegue com os demais; (4b) nome já existente — rejeita o
+    arquivo e orienta o uso de edição ou substituição (UC07/UC08).
+  Pós-condições: o(s) arquivo(s) válido(s) tornam-se disponíveis para análise,
+    comparação e vínculo a pacientes.
+
+UC16 — Visualizar gráficos diários combinados de actigrafia
+  Ator: Profissional de Saúde (autenticado).
+  Pré-condições: o ator selecionou, na página Análises, um arquivo previamente
+    enviado.
+  Fluxo principal: (1) o sistema carrega e processa o arquivo (formato
+    Condor), extraindo metadados do sujeito e a série temporal; (2) o ator
+    configura, opcionalmente, o descarte de início/fim, o modo de atividade
+    (PIM/TAT/ZCM) e as faixas de escala; (3) define, opcionalmente, filtros por
+    dia da semana, período do dia e faixa de luz (Lux); (4) o sistema gera um
+    gráfico combinado por dia exibido, com sombreamento do período noturno e de
+    eventos; (5) calcula e exibe as métricas IS, IV, L5 e M10 (UC17).
+  Exceções: (2a) coluna de luz ou temperatura ausente ou nula — o respectivo
+    eixo extra não é exibido.
+  Pós-condições: o ator visualiza a representação gráfica e as métricas,
+    podendo prosseguir para a exportação (UC19).
+
+UC23 — Visualizar gráfico comparativo entre arquivos
+  Ator: Profissional de Saúde (autenticado).
+  Pré-condições: o ator possui ao menos dois arquivos previamente enviados.
+  Fluxo principal: (1) acessa a página Comparação e seleciona dois ou mais
+    arquivos; (2) escolhe um modo de atividade comum e, opcionalmente, faixas
+    de escala compartilhadas; (3) escolhe o critério de alinhamento dos dias
+    (número do dia do registro ou dia da semana); (4) o sistema agrupa os dias
+    correspondentes conforme o critério; (5) gera, para cada grupo, um gráfico
+    sobrepondo a curva de atividade — e, em linha tracejada, luz/temperatura —
+    de cada arquivo, normalizadas em um eixo horário comum (00h–24h).
+  Exceções: (1a) menos de dois arquivos selecionados — não gera o gráfico e
+    orienta a seleção de mais arquivos.
+  Pós-condições: o ator visualiza, lado a lado, a sobreposição dos registros
+    para o(s) dia(s) alinhado(s).
+
+UC19 — Exportar dados e gráficos da análise
+  Ator: Profissional de Saúde (autenticado).
+  Pré-condições: o ator está na página Análises (ou Análise de temperatura)
+    com um arquivo carregado e parâmetros de exibição definidos.
+  Fluxo principal: (1) marca, na seção Exportar, os itens desejados (dados
+    .txt/.csv e/ou gráficos .png); (2) aciona "Baixar exportação (.zip)"; (3) o
+    sistema aplica aos dados os mesmos filtros e máscaras da exibição (sinais
+    ocultos zerados, dias fora do filtro zerados, períodos de inatividade
+    vazios); (4) renderiza os gráficos selecionados em PNG, em colagem vertical
+    quando aplicável; (5) compacta os itens em um único .zip; (6) salva uma
+    cópia no histórico de relatórios (UC24); (7) inicia automaticamente o
+    download.
+  Exceções: (1a) nenhum item selecionado — o botão de exportação permanece
+    desabilitado.
+  Pós-condições: o ator obtém o .zip exportado, que passa a constar na página
+    Exportar relatório para download futuro.
+
+
+====================================================================================================
+3.5  TECNOLOGIAS E JUSTIFICATIVA
+====================================================================================================
+
+3.5.1  CRITÉRIOS DE SELEÇÃO
+----------------------------------------------------------------------------------------------------
+A seleção das tecnologias seguiu quatro critérios. Primeiro, a integração
+nativa ao ecossistema científico do Python, dado que o núcleo da análise
+depende da biblioteca pyActigraphy e de sua interoperabilidade direta com
+pandas e Plotly. Segundo, a maturidade e o suporte ativo de cada biblioteca,
+de modo a reduzir o risco de descontinuidade ao longo do desenvolvimento.
+Terceiro, a adequação ao prazo e à equipe de um Trabalho de Conclusão de Curso
+desenvolvido individualmente, o que favoreceu tecnologias de maior
+produtividade e menor complexidade de infraestrutura — caso do próprio
+Streamlit, que dispensa uma camada de front-end e uma API dedicadas. Quarto, o
+licenciamento livre e gratuito de todas as bibliotecas e do banco de dados,
+requisito relevante para um software acadêmico sem orçamento para licenças
+comerciais.
+
+
+3.5.2  STACK TECNOLÓGICA E JUSTIFICATIVA DE ESCOLHA
+----------------------------------------------------------------------------------------------------
+A descrição a seguir apresenta as tecnologias que compõem a stack, com as
+versões fixadas, a camada ou função que cada uma desempenha na arquitetura e a
+justificativa da escolha — fundamentada no uso concreto de cada tecnologia no
+projeto, e não apenas em sua popularidade.
+
+[INSERIR QUADRO 3: Stack tecnológica. Colunas: Tecnologia; Versão; Camada /
+função; Justificativa. Recomenda-se diagramar o conteúdo abaixo como quadro
+formatado. Legenda provisória: "Quadro 3 — Tecnologias que compõem a stack do
+sistema, com versões fixadas e justificativa de escolha."]
+
+  - Streamlit (1.50.0) — Front-end / aplicação web. Permite construir uma
+    aplicação web completa e interativa inteiramente em Python, sem uma camada
+    de front-end separada (HTML/CSS/JavaScript) nem uma API REST intermediária,
+    reduzindo a complexidade dentro do prazo de um TCC individual; seus widgets
+    nativos (seletores de pílulas, controles segmentados, expansores, diálogos)
+    e o mecanismo de cache sustentam diretamente os filtros, formulários e
+    mecanismos de cache de todas as páginas. [REFERÊNCIA NECESSÁRIA:
+    documentação oficial do Streamlit.]
+  - PostgreSQL (16) — Banco de dados relacional. Sistema gerenciador robusto,
+    gratuito e de código aberto, cujas chaves estrangeiras com ON DELETE
+    CASCADE e a restrição de unicidade sobre o vínculo arquivo–paciente
+    permitem impor, no próprio esquema, a regra de que cada arquivo pertence a,
+    no máximo, um paciente; o tipo de coluna binária (BYTEA) viabiliza
+    armazenar o conteúdo dos arquivos .txt, das fotos de perfil e dos
+    relatórios .zip diretamente no banco, sem um serviço externo de
+    armazenamento de objetos.
+  - psycopg2-binary (2.9.12) — Driver de acesso a dados. Biblioteca de
+    referência, madura e amplamente utilizada, para integração entre Python e
+    PostgreSQL; seu cursor que retorna dicionários é usado em todos os SELECT
+    dos models, evitando a complexidade de um ORM, e a variante binária elimina
+    a necessidade de compilar a biblioteca e instalar cabeçalhos de
+    desenvolvimento do PostgreSQL no ambiente de execução.
+  - bcrypt (5.0.0) — Segurança (hash de senha). Implementa uma função de hash
+    adaptativa, com salt e fator de custo configurável, resistente a força
+    bruta e a tabelas pré-computadas — indispensável em um sistema que lida com
+    dados de profissionais de saúde e, indiretamente, de pacientes —, usada no
+    cadastro, na verificação de login e na troca de senha. [REFERÊNCIA
+    NECESSÁRIA: documentação da biblioteca bcrypt / especificação do algoritmo
+    (PROVOS; MAZIÈRES, 1999).]
+  - streamlit-keyup (0.3.0) — Componente de UI (busca). Supre uma lacuna do
+    Streamlit nativo: dispara uma reexecução a cada tecla digitada, permitindo
+    a busca em tempo real pelo nome do arquivo sem botão explícito de busca nem
+    componente JavaScript customizado.
+  - pyActigraphy (1.2.2) — Domínio (análise de actigrafia). Biblioteca de
+    código aberto especializada e validada cientificamente, cuja classe
+    BaseRaw e cujos métodos de cálculo de IS, IV, L5 e M10 implementam, de
+    forma testada e reconhecida pela comunidade de cronobiologia, as métricas
+    não paramétricas usadas nas páginas Análises e Comparação — evitando
+    reimplementar algoritmos estatísticos sensíveis a erros e conferindo maior
+    confiabilidade científica aos resultados (HAMMAD et al., 2021).
+  - pandas (2.1.4) — Manipulação de dados. Estrutura central de manipulação,
+    com operações eficientes de filtragem, reamostragem e agregação temporal
+    sobre séries indexadas por tempo, empregadas no parsing e nas páginas de
+    análise; é, ainda, o formato de entrada nativamente aceito pelo
+    pyActigraphy e pelo Plotly, o que evita conversões intermediárias.
+  - Plotly (6.7.0) — Visualização de dados. Gera gráficos interativos (zoom,
+    hover, pan) com múltiplos eixos Y sobrepostos, recurso explorado para
+    exibir simultaneamente atividade, luz e temperatura em escalas
+    independentes — mais direto de implementar do que em bibliotecas de
+    gráficos estáticos como o Matplotlib — e integra-se nativamente ao
+    Streamlit.
+  - kaleido (1.3.0) — Exportação de imagens estáticas. Motor de renderização
+    estática do Plotly, pré-requisito técnico para converter em PNG gráficos
+    originalmente renderizados em JavaScript no navegador — indispensável para
+    a exportação de gráficos nas páginas Análises e Análise de temperatura.
+  - Pillow (11.3.0) — Processamento de imagens. Biblioteca padrão de
+    processamento de imagens em Python, empregada para compor a colagem
+    vertical dos gráficos diários exportados em PNG e para manipular as fotos
+    de perfil, sem dependências nativas além das bibliotecas de imagem já
+    amplamente disponíveis.
+
+
+3.5.3  AMBIENTE DE EXECUÇÃO
+----------------------------------------------------------------------------------------------------
+O ambiente de execução é containerizado por meio de Docker e Docker Compose, o
+que garante a reprodutibilidade entre máquinas distintas — relevante tanto
+para a avaliação do trabalho quanto para uma eventual continuidade. A
+configuração do Compose define dois serviços: um contêiner PostgreSQL 16
+(serviço "db"), com verificação de saúde (healthcheck) que garante o banco
+disponível antes da inicialização da aplicação; e um contêiner da aplicação
+(serviço "app"), construído a partir do Dockerfile do projeto, que recebe por
+variáveis de ambiente os parâmetros de conexão — em substituição aos valores
+padrão usados em execução local fora de contêiner.
+
+A imagem da aplicação parte de uma base Miniconda e cria um ambiente conda
+dedicado com Python 3.9, versão exigida pelo pyActigraphy 1.2.2 e incompatível
+com versões mais recentes do interpretador no momento do desenvolvimento. Por
+essa mesma exigência, o Dockerfile instala explicitamente numba (versão
+0.57.1) antes do pyActigraphy, ordem necessária para a correta resolução de
+dependências nativas. O isolamento do Python 3.9 em um ambiente conda
+dedicado, dentro do mesmo contêiner, concilia essa exigência específica com o
+restante da stack (Streamlit, psycopg2, etc.), evitando conflitos de versão
+com o Python do sistema.
+
+
+3.5.4  ALTERNATIVAS CONSIDERADAS
+----------------------------------------------------------------------------------------------------
+Para reforçar a justificativa das escolhas, descrevem-se as principais
+alternativas avaliadas e os motivos de não terem sido adotadas.
+
+  - Framework web: a combinação de um framework de back-end tradicional
+    (Flask ou Django) com uma biblioteca de front-end (React ou Vue) foi
+    descartada em favor do Streamlit por exigir o desenvolvimento e a
+    manutenção de duas camadas de código separadas (API e interface),
+    extrapolando o tempo disponível sem ganho proporcional para o escopo.
+  - Banco de dados: um banco não relacional (por exemplo, MongoDB) ou embutido
+    (SQLite) foi considerado, mas descartado porque o domínio é fortemente
+    relacional — usuários, arquivos, pacientes e relatórios mantêm vínculos de
+    integridade referencial, em especial a relação um-arquivo-para-um-paciente
+    — e porque o PostgreSQL oferece concorrência e robustez mais adequadas a um
+    cenário de múltiplos profissionais usando o sistema simultaneamente.
+  - Biblioteca de análise de actigrafia: a implementação manual das métricas
+    IS, IV, L5 e M10 foi descartada em favor do pyActigraphy por se tratar de
+    cálculos sensíveis a erros de implementação, cuja validação científica já
+    consolidada confere maior confiabilidade do que uma reimplementação própria
+    não validada por pares.
+  - Biblioteca de visualização: o Matplotlib foi considerado, mas descartado
+    em favor do Plotly por não oferecer, de forma nativa, interatividade nem
+    múltiplos eixos Y sobrepostos independentes — ambos centrais para a leitura
+    simultânea de atividade, luz e temperatura.
+
+
+3.5.5  LIMITAÇÕES DAS TECNOLOGIAS UTILIZADAS
+----------------------------------------------------------------------------------------------------
+Toda escolha tecnológica envolve concessões. Esta subseção complementa a
+justificativa da subseção 3.5.2 com as limitações identificadas em cada
+componente, a partir do próprio uso que o sistema faz de cada um — e não de
+críticas genéricas. Por concentrar o núcleo científico da aplicação, o
+pyActigraphy recebe tratamento mais detalhado (subseção 3.5.5.1); as demais
+tecnologias são tratadas de forma mais sucinta (subseção 3.5.5.2).
+
+3.5.5.1  Limitações do pyActigraphy
+
+  - Restrição de versão do Python: a versão 1.2.2 exige Python 3.9 e é
+    incompatível com versões mais recentes do interpretador, o que obrigou o
+    isolamento da biblioteca em um ambiente conda dedicado dentro do contêiner
+    (subseção 3.5.3). Essa restrição limita a adoção de versões futuras do
+    Python e de suas dependências sem revalidar toda a cadeia de
+    compatibilidade.
+  - Dependências nativas sensíveis à ordem de instalação: a biblioteca numba,
+    pré-requisito para a compilação just-in-time de parte dos algoritmos,
+    precisa ser instalada antes do próprio pyActigraphy; essa exigência
+    evidencia uma cadeia de dependências nativas frágil, que dificulta a
+    portabilidade para sistemas operacionais ou arquiteturas de processador
+    diferentes das previstas.
+  - Ausência de leitor nativo para o formato Condor: a biblioteca oferece
+    leitores apenas para um conjunto fixo de formatos comerciais, no qual o
+    Condor não está incluído. Por isso, foi necessário implementar um parser
+    próprio e construir manualmente o objeto BaseRaw a partir de uma série do
+    pandas — abordagem que prescinde de conveniências de pré-processamento
+    (detecção automática de lacunas, metadados padronizados) disponíveis apenas
+    para os formatos suportados nativamente.
+  - Recursos de análise de luz não aproveitados: o objeto BaseRaw construído
+    manualmente é instanciado sem dados de luz, pois a integração nativa da
+    biblioteca pressupõe estruturas específicas dos leitores suportados. Como
+    consequência, a API de análise de luz não é utilizada, e a sobreposição de
+    luz e temperatura aos gráficos de atividade foi implementada de forma
+    independente, com Plotly.
+  - Exigência de frequência de amostragem regular: os métodos de cálculo
+    pressupõem uma série de frequência constante. Como os arquivos Condor podem
+    apresentar pequenas irregularidades entre os intervalos, o sistema precisa
+    normalizar a série antes de construir o BaseRaw, o que pode introduzir
+    valores ausentes (NaN) nos pontos não exatamente alinhados à frequência
+    mediana — limitação inerente ao método, não tratada automaticamente pela
+    biblioteca.
+  - Sensibilidade metodológica das métricas: IS, IV, L5 e M10 são
+    estatisticamente mais robustas quanto maior o número de dias contínuos de
+    registro; a biblioteca não impõe nem alerta sobre um número mínimo de dias,
+    de modo que a responsabilidade de interpretar com cautela registros curtos
+    recai sobre o profissional de saúde, e não sobre uma validação automática
+    da ferramenta.
+  - Biblioteca de nicho, sem componente de interface: concebida para uso em
+    scripts e notebooks por um público acadêmico especializado, a biblioteca
+    não oferece nenhum componente de interface gráfica web — todas as
+    visualizações precisaram ser construídas com Plotly. Além disso, por ser
+    mantida por um grupo reduzido de colaboradores, há um risco a médio prazo
+    quanto à frequência de correções e à compatibilidade com versões futuras do
+    pandas/NumPy, mitigado parcialmente pela fixação da versão exata e pelo
+    isolamento em ambiente próprio, mas que permanece como ponto de atenção.
+
+3.5.5.2  Limitações das demais tecnologias
+
+  - Streamlit (1.50.0): o modelo de execução baseado em reexecução completa do
+    script a cada interação não oferece atualização parcial da interface,
+    exigindo uso extensivo de cache (TTL de 120 s) para evitar reprocessar
+    arquivos e regerar gráficos a cada clique; além disso, a ausência de uma
+    API nativa de cookies HTTP obrigou a injeção manual de JavaScript para
+    persistir a sessão entre atualizações de página.
+  - PostgreSQL (16): armazenar o conteúdo binário dos arquivos, fotos e
+    relatórios diretamente em colunas binárias simplifica a arquitetura, mas
+    tende a aumentar rapidamente o tamanho do banco e o tempo de backup à
+    medida que o volume cresce, sendo menos escalável do que um serviço
+    dedicado de armazenamento de objetos em um cenário de produção de grande
+    volume.
+  - psycopg2-binary (2.9.12): a documentação oficial recomenda a variante
+    compilada a partir do código-fonte (não a binária) para produção, por
+    reduzir o risco de conflito com a versão da libpq do sistema operacional; a
+    variante binária foi mantida pela conveniência de instalação, o que
+    representa uma concessão consciente. [REFERÊNCIA NECESSÁRIA: documentação
+    oficial do psycopg2.]
+  - bcrypt (5.0.0): o algoritmo trunca silenciosamente senhas com mais de 72
+    bytes, ignorando os caracteres excedentes; o sistema não impõe um limite
+    máximo de tamanho de senha (valida apenas o mínimo de 6 caracteres), de
+    modo que senhas muito longas poderiam ter parte de seu conteúdo ignorada
+    pela função de hash. [REFERÊNCIA NECESSÁRIA: documentação do bcrypt sobre o
+    limite de 72 bytes.]
+  - streamlit-keyup (0.3.0): por ser um componente de terceiros mantido pela
+    comunidade, sua compatibilidade com versões futuras do framework não é
+    garantida; cada tecla digitada dispara uma nova execução do script, o que
+    pode gerar chamadas redundantes ao backend em listas muito grandes.
+  - pandas (2.1.4): o processamento dos arquivos é feito inteiramente em
+    memória, carregando o DataFrame completo a cada análise; esse comportamento
+    não é otimizado para arquivos muito extensos (registros de muitos meses em
+    alta frequência) nem para o uso simultâneo por muitos usuários, já que o
+    consumo de memória cresce com o tamanho e a quantidade de arquivos
+    analisados em paralelo.
+  - Plotly (6.7.0): por ser renderizado no navegador via JavaScript, cada
+    gráfico embute uma quantidade não desprezível de dados e código no HTML; ao
+    exibir muitos dias de um registro extenso, ou muitos arquivos na
+    comparação, o tempo de carregamento e a responsividade podem degradar
+    perceptivelmente.
+  - kaleido (1.3.0): por empacotar um motor de renderização headless baseado
+    em Chromium, aumenta consideravelmente o tamanho da imagem Docker e o tempo
+    da primeira renderização de imagem (cold start); além disso, a fidelidade
+    visual do PNG exportado pode apresentar pequenas diferenças de fonte e
+    espaçamento em relação ao gráfico interativo.
+  - Pillow (11.3.0): a composição da colagem vertical dos gráficos opera
+    puramente no nível de pixels, sem informação semântica sobre o conteúdo; o
+    PNG resultante não é redimensionável sem perda nem pesquisável como texto,
+    ao contrário do que seria possível com um formato vetorial (PDF ou SVG).
+
+
+====================================================================================================
+3.6  ARQUITETURA DA SOLUÇÃO
+====================================================================================================
+
+O sistema adota o padrão arquitetural MVC (Model-View-Controller) em sua forma
+estrita: a camada de apresentação (View) nunca acessa o banco de dados ou a
+lógica de domínio diretamente, e toda comunicação entre camadas segue um fluxo
+unidirecional — View chama Controller, e Controller chama Model — sem chamadas
+no sentido inverso e sem a View "pular" o Controller para acessar o Model.
+Essa regra é tratada como invariante de projeto: qualquer trecho de código que
+a violasse — por exemplo, uma página executando uma consulta SQL diretamente —
+seria considerado um defeito de arquitetura a ser corrigido, e não uma exceção
+aceitável.
+
+A organização em diretórios do repositório espelha diretamente essa divisão em
+camadas: a View, o Controller e o Model ocupam diretórios próprios; o ponto de
+entrada da aplicação, na raiz do projeto, atua como raiz de composição,
+concentrando a inicialização (criação do esquema do banco), a restauração de
+sessão e o roteamento de mais alto nível entre as áreas pública
+(login/cadastro) e autenticada — sendo, por isso, tratado como parte da camada
+View nesta descrição, ainda que fisicamente fora do diretório da View.
+
+[INSERIR FIGURA 3: Diagrama de camadas e componentes. Conteúdo: blocos
+empilhados View → Controller → Model → PostgreSQL, com setas unidirecionais;
+destaque para o módulo utilitário da View (único da camada que chama o
+Controller em nome das páginas) e para o parser Condor dentro do Model (único
+componente sem acesso ao banco). Legenda provisória: "Figura 3 — Arquitetura
+em camadas e componentes: comunicação unidirecional View → Controller →
+Model."]
+
+O diagrama evidencia duas particularidades. Primeiro, o módulo de utilitários
+compartilhados é o único da camada View que importa diretamente do Controller
+— concentrando, em nome das páginas, operações repetidas como o carregamento
+cacheado de um arquivo de actigrafia, e preservando a regra de que nenhuma
+página chama o Model diretamente. Segundo, dentro da própria camada Model, o
+parser do formato Condor é o único componente sem nenhuma dependência do banco
+de dados: opera exclusivamente sobre bytes, texto e estruturas do pandas,
+podendo, em princípio, ser reaproveitado ou testado de forma isolada, fora de
+uma aplicação Streamlit ou de uma conexão PostgreSQL ativa.
+
+Distribuição dos componentes por camada:
+  - View: ponto de entrada/composição; páginas de login e cadastro; shell da
+    área autenticada; sete páginas internas; módulo de utilitários
+    compartilhados.
+  - Controller: UserController; ArquivoController; PacienteController;
+    RelatorioController.
+  - Model: módulo de conexão e esquema; UserModel; ArquivoModel; SessaoModel;
+    PacienteModel; RelatorioModel; parser do formato Condor.
+  - Infraestrutura externa: PostgreSQL 16 (contêiner "db"); sistema de
+    arquivos do contêiner da aplicação (imagem Docker).
+
+
+3.6.1  MODELO DE DADOS
+----------------------------------------------------------------------------------------------------
+O esquema relacional é composto por seis tabelas, criadas de forma idempotente
+na inicialização da aplicação por meio de instruções CREATE TABLE IF NOT
+EXISTS. A descrição a seguir corresponde ao conteúdo de um Diagrama
+Entidade-Relacionamento (DER): as seis entidades, seus atributos principais,
+chaves, e os relacionamentos e regras de integridade que as conectam.
+
+[INSERIR FIGURA 4: Diagrama Entidade-Relacionamento (DER). Conteúdo: as seis
+entidades (usuarios, arquivos, sessoes, pacientes, paciente_arquivos,
+relatorios), seus atributos e chaves, e as cardinalidades descritas no texto,
+com destaque para a restrição UNIQUE(arquivo_id) que impõe "um arquivo, um
+paciente". Legenda provisória: "Figura 4 — Diagrama Entidade-Relacionamento do
+esquema do sistema."]
+
+Entidades e atributos principais:
+  - usuarios: id (PK, serial); nome; email (único, obrigatório); cpf (único,
+    obrigatório); senha (obrigatória — hash bcrypt); profissao (obrigatória);
+    telefone; data_nascimento; bio; foto_perfil (binário); foto_nome;
+    foto_tipo; criado_em. É a entidade raiz do esquema, sem chaves
+    estrangeiras.
+  - arquivos: id (PK); usuario_id (FK → usuarios, ON DELETE CASCADE); nome;
+    descricao; tamanho_bytes; num_linhas; encoding; conteudo (binário,
+    obrigatório); criado_em; atualizado_em.
+  - sessoes: id (PK); token (único, obrigatório — UUID v4); usuario_id (FK →
+    usuarios, ON DELETE CASCADE); criado_em; expira_em (obrigatório).
+  - pacientes: id (PK); usuario_id (FK → usuarios, ON DELETE CASCADE); nome
+    (obrigatório); sexo; data_nascimento; email; telefone; altura; peso; nota;
+    criado_em; atualizado_em.
+  - paciente_arquivos: tabela puramente associativa, sem atributos próprios
+    além das chaves; PK composta (paciente_id, arquivo_id); FKs para pacientes
+    e arquivos, ambas ON DELETE CASCADE; restrição adicional de unicidade sobre
+    arquivo_id.
+  - relatorios: id (PK); usuario_id (FK → usuarios, ON DELETE CASCADE); nome
+    (do .zip exportado); arquivo_origem; tamanho_bytes; conteudo (binário,
+    obrigatório); criado_em.
+
+Relacionamentos e cardinalidades:
+  - usuarios (1) — (0..N) arquivos, sessoes, pacientes e relatorios: cada uma
+    dessas entidades pertence a exatamente um usuário, que pode possuir zero ou
+    mais registros de cada tipo (um usuário pode manter, por exemplo, várias
+    sessões ativas em dispositivos diferentes).
+  - pacientes (1) — (0..N) arquivos, por meio da tabela associativa
+    paciente_arquivos: estruturalmente, a PK composta modela um relacionamento
+    N:N; na prática, porém, a restrição de unicidade sobre arquivo_id restringe
+    esse relacionamento a, no máximo, um paciente por arquivo — um paciente
+    pode ter vários arquivos vinculados, mas um arquivo nunca pode estar
+    vinculado a mais de um paciente simultaneamente. Essa é a regra de negócio
+    "um arquivo pertence a um único paciente", imposta diretamente no esquema,
+    e não apenas validada em código.
+
+Regras de integridade:
+  - Integridade referencial em cascata: todas as chaves estrangeiras que
+    apontam para usuarios, bem como as duas de paciente_arquivos, usam ON
+    DELETE CASCADE. Excluir um usuário remove automaticamente todos os seus
+    arquivos, sessões, pacientes e relatórios; e excluir um paciente remove
+    apenas a linha correspondente na tabela associativa — nunca o arquivo em
+    si, já que a tabela de arquivos não possui chave estrangeira para
+    pacientes. É esse comportamento que permite "desvincular, sem apagar" os
+    arquivos de um paciente removido.
+  - Unicidade de identidade: as restrições de unicidade em e-mail e CPF impedem
+    contas duplicadas; a unicidade do token garante que cada sessão ativa
+    corresponda a exatamente um token; e a unicidade sobre arquivo_id impõe, no
+    nível do esquema, a regra "um arquivo, um paciente".
+  - Obrigatoriedade de campos: colunas centrais para a identidade ou a
+    integridade (nome, e-mail, CPF e senha em usuarios; nome em arquivos e
+    pacientes; conteúdo e tamanho em arquivos e relatorios) são declaradas
+    NOT NULL, complementando — no nível do banco — as validações da camada
+    Controller (subseção 3.6.3).
+  - Valores padrão: as colunas de auditoria temporal usam o timestamp atual
+    como padrão, dispensando a camada Controller de gerenciar manualmente esses
+    carimbos de tempo.
+
+Isolamento por usuário:
+Todas as tabelas que armazenam dados de um usuário específico (arquivos,
+pacientes, relatorios e, indiretamente, sessoes) possuem uma coluna usuario_id,
+e cada método do Model que lê, atualiza ou remove um registro individual
+inclui essa coluna na cláusula WHERE — nunca apenas o id. Esse padrão garante
+que um usuário autenticado não consiga ler, alterar ou excluir um registro de
+outro usuário, mesmo que descobrisse o identificador numérico desse registro.
+É importante notar que esse isolamento é garantido no nível da aplicação —
+pela disciplina, seguida de forma consistente em todos os métodos do Model, de
+sempre incluir o filtro por usuario_id — e não por um mecanismo do próprio
+PostgreSQL, como Row-Level Security ou esquemas separados por usuário. A tabela
+associativa paciente_arquivos é o único caso particular: por não possuir
+coluna usuario_id própria, seu isolamento é transitivo — depende de a camada
+Controller só resolver identificadores de paciente e de arquivo que já
+pertençam ao usuário autenticado antes de consultar ou alterar essa tabela.
+
+
+3.6.2  CAMADA MODEL
+----------------------------------------------------------------------------------------------------
+A camada Model concentra dois tipos de responsabilidade distintos, mantidos em
+módulos separados: o acesso a dados propriamente dito — operações de banco,
+sem nenhuma regra de negócio ou validação — e o parsing de domínio do formato
+Condor, que não acessa o banco em nenhum momento.
+
+  - Módulo de conexão e esquema (acessa o banco): infraestrutura de conexão —
+    leitura de host/porta/usuário/senha de variáveis de ambiente, com defaults
+    locais; um gerenciador de contexto que abre cursor, comita em sucesso ou
+    desfaz (rollback) em exceção, e sempre fecha cursor e conexão; e a criação
+    idempotente das seis tabelas.
+  - UserModel (acessa o banco): CRUD da tabela de usuários; hash da senha com
+    bcrypt na criação; conversão de tipos do banco (memoryview de campos
+    binários para bytes) para a aplicação.
+  - ArquivoModel (acessa o banco): CRUD da tabela de arquivos, sempre filtrado
+    por usuário; busca por nome (case-insensitive) usada para impedir
+    duplicidade no upload.
+  - SessaoModel (acessa o banco): criação de sessão com token UUID v4 e
+    expiração calculada (2 horas ou N dias); busca do usuário válido filtrando
+    por expiração futura; remoção da sessão no logout.
+  - PacienteModel (acessa o banco): CRUD da tabela de pacientes, sempre
+    filtrado por usuário; consultas de vínculo com arquivos por junção com a
+    tabela associativa; vinculação idempotente (ignora conflito de inserção
+    duplicada).
+  - RelatorioModel (acessa o banco): CRUD da tabela de relatórios, sempre
+    filtrado por usuário; a mais simples das classes de acesso a dados, sem
+    consultas compostas.
+  - Parser do formato Condor (não acessa o banco): parsing de domínio puro,
+    descrito a seguir; opera apenas sobre bytes, texto e DataFrame.
+
+Em todas as classes de acesso a dados, os métodos são estáticos e não mantêm
+estado entre chamadas: cada chamada abre sua própria conexão e a encerra ao
+final, sem reaproveitamento entre requisições — opção compatível com o modelo
+de execução do Streamlit, no qual cada reexecução do script é tratada como uma
+unidade independente. Nenhuma classe Model realiza validação de regras de
+negócio: essa responsabilidade é delegada inteiramente à camada Controller
+(subseção 3.6.3).
+
+O módulo de parsing do formato Condor implementa o tratamento do arquivo
+proprietário gerado pelos dispositivos de actigrafia por meio de funções
+independentes, todas operando sobre bytes, texto ou DataFrame:
+  - O carregamento separa o cabeçalho dos dados percorrendo as linhas do
+    arquivo: linhas no formato "chave : valor" alimentam o dicionário de
+    metadados do sujeito; a última linha de cabeçalho antes da primeira linha
+    de dados é tratada como o cabeçalho real da tabela — necessário porque o
+    arquivo Condor pode repetir uma legenda genérica, com número de colunas
+    diferente, antes do cabeçalho efetivo. O corpo é interpretado com o leitor
+    de CSV do pandas (separador ";"), e os registros cuja data/hora não pôde
+    ser interpretada são descartados, pois uma única data inválida no índice
+    corromperia o cálculo de período e frequência e, por consequência, as
+    métricas de ritmo. Marcações de tempo duplicadas (falha eventual de
+    gravação do dispositivo) também são removidas, pois fariam o reamostramento
+    posterior falhar com erro de índice duplicado.
+  - As demais funções retornam a lista ordenada e sem repetição das datas do
+    registro; filtram as linhas de um único dia; reconstroem o arquivo .txt no
+    formato Condor original, preservando integralmente o cabeçalho do arquivo
+    enviado e substituindo apenas as linhas de dados pelos valores atuais —
+    usado para que a exportação (RF43) devolva um arquivo no mesmo formato em
+    que foi recebido, mesmo após filtros; e serializam o DataFrame como CSV
+    simples.
+
+Por não depender do banco nem do Streamlit, esse parser é o único módulo do
+sistema que poderia ser testado de forma unitária e isolada sem nenhuma
+infraestrutura externa — característica buscada deliberadamente ao mantê-lo
+separado das classes de acesso a dados, ainda que ambos pertençam à camada
+Model.
+
+
+3.6.3  CAMADA CONTROLLER
+----------------------------------------------------------------------------------------------------
+A camada Controller concentra toda a validação de entrada e toda a
+orquestração de regras de negócio — é a única autorizada a decidir se uma
+operação solicitada pela View deve ou não ser executada pelo Model. Por
+convenção consistente nas quatro classes, os métodos que alteram dados
+retornam uma tupla (sucesso, mensagem) — ou (sucesso, mensagem, dado), quando
+a View precisa do identificador ou do objeto criado; isso permite que cada
+página exiba mensagens de erro ou sucesso sem nunca precisar capturar exceções
+brutas do Model.
+
+  - UserController (usuários e sessões): validação de cadastro (campos
+    obrigatórios, senha com mínimo de 6 caracteres e confirmação, CPF com 11
+    dígitos) e de login (verificação do hash bcrypt); atualização de perfil,
+    foto e senha; ciclo de vida da sessão (iniciar/encerrar/restaurar),
+    delegado ao SessaoModel.
+  - ArquivoController (arquivos de actigrafia): validação de upload (extensão
+    .txt, nome não duplicado); detecção de codificação e contagem de linhas;
+    ponte entre a tabela de arquivos e o parsing de domínio (carregar, listar
+    dias, filtrar dia, exportar dados, todos delegando ao parser Condor);
+    geração de ZIPs (download em lote e exportação).
+  - PacienteController (pacientes e vínculos): validação de nome obrigatório e
+    formato de e-mail; normalização de campos opcionais (sexo, datas, contato,
+    altura/peso aceitos apenas se positivos); a sincronização de vínculos
+    calcula, por diferença de conjuntos, quais vínculos criar e remover,
+    rejeitando arquivos já vinculados a outro paciente antes de aplicar
+    qualquer alteração.
+  - RelatorioController (relatórios exportados): repasse direto ao
+    RelatorioModel, sem regras de validação próprias — reflete a natureza do
+    relatório como artefato derivado, gerado pela exportação e pelas páginas de
+    análise, e não uma entidade com regras de negócio independentes.
+
+Duas particularidades merecem destaque. Primeiro, o PacienteController é a
+única classe que depende de outro Controller — usa o ArquivoController para
+listar os arquivos do usuário, em vez de consultar o ArquivoModel diretamente;
+essa escolha preserva o encapsulamento do ArquivoController sobre a tabela de
+arquivos, evitando que dois Controllers implementem a mesma consulta de forma
+duplicada. Segundo, há um pequeno resíduo de duplicação de código — um
+validador de CPF idêntico declarado em dois Controllers, sendo um deles nunca
+chamado (a tabela de pacientes não possui campo de CPF) —, que poderia ser
+eliminado extraindo o validador para um módulo utilitário comum.
+
+
+3.6.4  CAMADA VIEW
+----------------------------------------------------------------------------------------------------
+A camada View é responsável exclusivamente pela apresentação e pela captura de
+entrada do usuário; nenhum módulo desta camada contém regras de validação de
+negócio além de verificações elementares de preenchimento de formulário — toda
+validação efetiva é delegada ao Controller correspondente, que devolve uma
+mensagem de sucesso ou erro a ser exibida.
+
+  - Ponto de entrada e raiz de composição: inicializa o esquema do banco a
+    cada execução (idempotente); processa operações de cookie agendadas
+    injetando JavaScript; tenta restaurar a sessão a partir do cookie HTTP
+    quando o usuário ainda não está autenticado; e roteia, em primeiro nível,
+    entre as páginas públicas (login, cadastro) e a área autenticada,
+    constituindo o guarda de autenticação principal — nenhuma rota protegida é
+    alcançável sem uma sessão válida.
+  - Página de login: formulário em duas colunas; em caso de sucesso, inicia a
+    sessão, agenda a gravação do cookie e força a reexecução.
+  - Página de cadastro: formulário de novo usuário; usa os utilitários
+    compartilhados para o seletor de profissão e o indicador de força de senha.
+  - Shell da área autenticada: navbar (avatar e nome do usuário), sidebar de
+    navegação e roteamento de segundo nível, que importa cada página interna
+    apenas quando selecionada (importação tardia) — evitando carregar as
+    dependências de todas as páginas a cada execução. Também implementa o
+    logout: encerra a sessão no banco, agenda a remoção do cookie e limpa as
+    chaves de sessão.
+  - Sete páginas internas (Análises, Análise de temperatura, Comparação,
+    Conjunto de dados, Registro de pacientes, Exportar relatório,
+    Configurações): uma por arquivo, cada uma obtendo o identificador do
+    usuário autenticado no início da função de página, como guarda de
+    autenticação local; nenhuma delas importa qualquer módulo do Model, apenas
+    os Controllers correspondentes.
+  - Módulo de utilitários compartilhados: enum de profissões; formatadores;
+    indicador de força de senha; auxiliares de exibição de domínio; construção
+    de avatar; o guarda de autenticação reutilizável; paginação; o padrão de
+    notificações entre reexecuções; e o núcleo de visualização de actigrafia
+    (carregamento cacheado, construção do objeto BaseRaw, gráfico combinado
+    diário, sombreamento do período noturno), reaproveitado pelas páginas
+    Análises e Comparação. É o único módulo da View que importa do Controller.
+
+O sistema implementa, na prática, dois níveis de guarda de autenticação. O
+primeiro e principal está no ponto de entrada: a verificação de autenticação é
+executada antes de qualquer roteamento para a área autenticada, de modo que
+nenhuma página protegida chega a ser importada — quanto mais executada — sem
+uma sessão válida. O segundo nível, o guarda local no início de cada página, é
+uma conveniência de acesso ao identificador do usuário que exibe um aviso e
+interrompe a página caso esse dado não esteja disponível; por já estar atrás
+do guarda principal, funciona menos como barreira de segurança independente e
+mais como padrão defensivo de acesso ao dado de sessão.
+
+
+====================================================================================================
+3.7  IMPLEMENTAÇÃO DAS FUNCIONALIDADES
+====================================================================================================
+
+Esta seção descreve, em nível técnico-funcional, como cada requisito funcional
+da seção 3.3 foi efetivamente implementado — encadeando o controle de
+interface (View), a validação e orquestração (Controller) e o acesso a dados
+ou o processamento de domínio (Model) envolvidos em cada funcionalidade. A
+divisão em subseções segue as sete grandes áreas funcionais do sistema, cada
+uma correspondente a um intervalo de requisitos:
+
+  3.7.1  RF01–RF14   Autenticação, cadastro e sessão persistente
+  3.7.2  RF15–RF24   Gestão do conjunto de dados
+  3.7.3  RF25–RF32   Registro de pacientes e vínculo arquivo–paciente
+  3.7.4  RF33–RF45   Análise de actigrafia
+  3.7.5  RF46–RF49   Análise de temperatura
+  3.7.6  RF50–RF55   Comparação de múltiplos registros
+  3.7.7  RF43–RF45; RF49; RF56–RF58   Exportação e gestão de relatórios
+
+Como o mapeamento evidencia, a exportação é tratada em duas camadas distintas:
+o ato de gerar um relatório (RF43–RF45, na página Análises, e RF49, na página
+Análise de temperatura) e a gestão do histórico de relatórios já gerados
+(RF56–RF58, na página Exportar relatório).
+
+
+3.7.1  AUTENTICAÇÃO, CADASTRO E SESSÃO PERSISTENTE
+----------------------------------------------------------------------------------------------------
+O fluxo começa na página de cadastro: o formulário coleta nome, e-mail, CPF,
+senha, confirmação e profissão e, a cada tecla digitada no campo de senha,
+recalcula em tempo real o indicador de força (RF14). Ao confirmar, delega
+integralmente a validação ao UserController: preenchimento obrigatório (RF02),
+senha com mínimo de 6 caracteres e igual à confirmação (RF03), CPF com 11
+dígitos (RF04) e, por fim, a tentativa de inserção, cuja falha por violação de
+unicidade (e-mail ou CPF já cadastrados) é capturada e traduzida em mensagem
+amigável (RF05). A senha só é convertida em hash (bcrypt) dentro do Model — em
+nenhum momento a senha em texto plano chega a ser persistida ou registrada em
+log (RF01).
+
+O login segue o mesmo princípio de delegação: e-mail, senha e a opção "Manter
+conectado por 30 dias" são repassados ao UserController, que busca o usuário
+por e-mail e compara a senha com o hash salvo (RF06) — qualquer descompasso
+gera mensagem de erro sem revelar, de forma diferenciada, qual das duas
+condições falhou, evitando auxiliar um ataque de enumeração de contas. Em caso
+de sucesso, a página decide a duração da sessão (30 dias se a opção estiver
+marcada, 2 horas caso contrário) e inicia a sessão: um token UUID v4 é gerado
+e gravado com a expiração correspondente (RF07/RF08). O token é guardado em
+dois locais do estado de sessão — para uso pelo logout e como operação de
+gravação de cookie ainda pendente.
+
+A persistência efetiva do cookie HTTP só ocorre no ciclo de renderização
+seguinte: o ponto de entrada verifica a operação de cookie pendente e injeta
+um pequeno script que grava o cookie no navegador, com prazo proporcional à
+opção escolhida (ou como cookie de sessão, que expira ao fechar o navegador,
+quando a opção não é marcada). Em qualquer atualização de página subsequente —
+inclusive após fechar e reabrir o navegador, no caso de 30 dias — o ponto de
+entrada lê o cookie, recupera o token e o valida diretamente no banco
+(filtrando por expiração futura); se válido, recarrega o perfil completo do
+usuário para o estado de sessão, concretizando o RF09 sem exigir novo login a
+cada atualização.
+
+O logout inverte o processo: remove o token da tabela de sessões, agenda a
+remoção do cookie (executada no próximo render por um script que expira o
+cookie no passado) e limpa as chaves de sessão antes de redirecionar para a
+tela de login (RF10).
+
+Por fim, a gestão de perfil (RF11–RF13) é centralizada na página de
+configurações: a aba Perfil reúne a troca de foto (limitada a 10 MB e aos
+tipos jpg/jpeg/png antes mesmo de chamar o Controller) e um formulário com os
+mesmos campos do cadastro; a aba Segurança reaproveita o indicador de força de
+senha e delega a troca ao Controller, que exige a senha atual correta antes de
+gravar o novo hash — completando o RF14 também no fluxo de troca de senha.
+
+
+3.7.2  GESTÃO DO CONJUNTO DE DADOS
+----------------------------------------------------------------------------------------------------
+A página Conjunto de dados é organizada em duas abas — Enviar e Meus arquivos
+— e em torno de um padrão rascunho/aplicado para os filtros.
+
+Upload (RF15–RF17): o seletor aceita múltiplos arquivos .txt; quando mais de
+um é selecionado, um campo de descrição é exibido para cada um. Ao enviar, a
+página chama o upload uma vez por arquivo e agrega o resultado (sucesso total,
+erro total ou sucesso parcial); é dentro do Controller que ocorrem a validação
+da extensão (RF16) e a verificação de nome duplicado (RF17) — arquivos
+rejeitados não interrompem o envio dos demais.
+
+Busca em tempo real (RF18): o campo de busca dispara uma reexecução a cada
+tecla digitada e filtra por substring no nome ou na descrição
+(case-insensitive); uma mudança no termo também reposiciona a listagem na
+primeira página, evitando que o usuário fique "perdido" em uma página vazia
+após estreitar os resultados.
+
+Filtros e ordenação: ao contrário da busca, os demais filtros (intervalo de
+datas, "só atualizados" e ordenação) seguem um padrão rascunho/aplicado
+deliberadamente menos reativo — os widgets escrevem em chaves de rascunho e só
+são efetivados quando o usuário clica em "Aplicar"; um botão "Limpar" remove
+todas as chaves de uma vez. Isso evita que a lista seja refiltrada e a página
+role de posição a cada clique dentro do expansor de filtros, reação aceitável
+apenas para a busca textual, de uso mais frequente.
+
+Listagem e paginação (RF18, RF19): a seção de listagem calcula o número de
+páginas a partir do total filtrado (5 itens por página) e renderiza cada linha
+com nome, descrição, contagem de linhas, tamanho formatado, data de envio,
+indicação de "atualizado em" (quando há diferença relevante entre as datas de
+criação e atualização) e três ações: baixar, editar e excluir.
+
+Seleção em massa e download/exclusão em lote (RF23, RF24): os botões
+"Selecionar todos" e "Limpar seleção" recalculam o conjunto selecionado e
+forçam os checkboxes a assumir o novo valor. Quando há itens selecionados, uma
+barra de ações exibe "Download" — que gera o ZIP e dispara o download
+automático no próximo render, pela mesma técnica de âncora HTML em base64
+descrita na subseção 3.7.7 — e "Excluir", que abre um diálogo de confirmação
+em massa (listando até cinco nomes e resumindo o restante) antes de remover
+cada arquivo selecionado.
+
+Edição de metadados e substituição de conteúdo (RF20, RF21): um único diálogo
+atende aos dois casos — sem novo arquivo anexado, atualiza apenas nome e
+descrição; com um novo arquivo .txt anexado, substitui o conteúdo (tamanho,
+linhas e codificação recalculados), preservando o identificador e, por
+consequência, qualquer vínculo existente com um paciente.
+
+Download e exclusão individuais (RF22, RF24): o download usa o conteúdo do
+arquivo (obtido de forma cacheada para não reler o binário do banco a cada
+render); a exclusão abre um diálogo de confirmação equivalente ao de exclusão
+em massa, para um único arquivo.
+
+
+3.7.3  REGISTRO DE PACIENTES E VÍNCULO ARQUIVO–PACIENTE
+----------------------------------------------------------------------------------------------------
+A página Registro de pacientes abre com três métricas de contexto — número de
+pacientes, arquivos já atribuídos a algum paciente e arquivos ainda sem
+paciente —, calculadas a partir da contagem agregada de arquivos por paciente
+e do total de arquivos do usuário.
+
+Cadastro e edição (RF25, RF26, RF28) compartilham um único diálogo modal
+organizado em duas abas. Na aba Dados, o único campo obrigatório é o nome; o
+sexo é um seletor fechado; altura e peso aparecem vazios quando o paciente
+ainda não tem o dado, em vez de exibir "0.0". Ao salvar, a página decide entre
+cadastrar (paciente novo) e atualizar (edição), e é dentro do Controller que
+ocorrem a validação de nome obrigatório e de formato de e-mail (RF26) e a
+normalização dos campos opcionais (string vazia ou altura/peso não positivos
+tornam-se nulos, em vez de persistidos como valores "zerados" sem significado
+clínico).
+
+A aba Arquivos vinculados só fica disponível depois que o paciente já existe
+(o vínculo exige um identificador de paciente válido). Ela consulta os
+arquivos disponíveis para montar um seletor múltiplo cujas opções já excluem
+os arquivos vinculados a outros pacientes do mesmo usuário (RF32) e cujo valor
+padrão é a lista de arquivos já vinculados a este paciente. Ao salvar, a
+página não envia incrementalmente cada vínculo: delega a íntegra da nova
+seleção à sincronização, que calcula por diferença de conjuntos o que inserir
+e remover (RF30, RF31), rejeitando a operação inteira — antes de vincular
+qualquer arquivo — caso algum dos arquivos a vincular já pertença a outro
+paciente (RF32), relatando explicitamente o conflito.
+
+Busca, listagem e paginação (RF27): a busca por nome ou e-mail filtra a lista
+já carregada em memória (sem nova consulta ao banco a cada tecla, diferente da
+busca de arquivos), e a paginação reaproveita o mesmo utilitário compartilhado,
+com 8 pacientes por página.
+
+Exclusão (RF29): diferentemente das demais páginas, a confirmação de exclusão
+de paciente é renderizada inline, na própria linha, como um aviso seguido de
+dois botões. O texto já informa, antes da confirmação, que os arquivos
+vinculados serão desvinculados e não apagados — comportamento garantido, no
+nível do banco, pelas regras de integridade da subseção 3.6.1.
+
+
+3.7.4  ANÁLISE DE ACTIGRAFIA
+----------------------------------------------------------------------------------------------------
+A página Análises é a mais extensa do sistema e concentra a maior parte dos
+requisitos RF33–RF45. Após selecionar o arquivo (RF33, com metadados do
+sujeito exibidos), a página segue uma sequência de expansores independentes,
+descritos na ordem em que afetam o pipeline de dados.
+
+Descartar início/fim do registro (RF34): ao marcar o checkbox, a página
+oferece dois modos de corte. No modo "Por duração", dois seletores (0 h a 12
+h, em passos de 2 h) definem, independentemente, quanto descartar do início
+(padrão: 2 h) e do fim (padrão: nenhum), calculados a partir do primeiro e do
+último instante presentes no arquivo. No modo "Por data e hora", o
+profissional escolhe diretamente início e fim, limitados ao intervalo real do
+registro. Em ambos, o recorte é aplicado antes de qualquer outro cálculo —
+afetando dias disponíveis, métricas e gráficos, mas nunca o arquivo salvo —,
+concretizando a íntegra do RF34.
+
+Modo de atividade (RF35): dentro do expansor Opções de exibição, o seletor de
+modo é restrito aos modos de fato presentes no arquivo (PIM, TAT e/ou ZCM) —
+se nenhum estiver presente, a página interrompe a renderização com um aviso. O
+mesmo expansor contém um checkbox e um controle de faixa por sinal (atividade,
+luz, temperatura), com faixa total pré-calculada a partir dos valores reais de
+cada coluna (RF37), e um destaque opcional de marcações de evento, habilitado
+apenas quando essa coluna existe — sustentando o sombreamento de eventos usado
+no RF40.
+
+Filtrar dias exibidos (RF36, RF41, RF42): o expansor combina três filtros
+independentes, todos exclusivamente de exibição (não alteram os dados nem as
+métricas calculadas sobre o registro completo): dia da semana (seleção
+múltipla, todos marcados por padrão — RF41); período do dia (Dia inteiro,
+Manhã, Tarde, Noite ou um intervalo personalizado de horas — RF42); e uma
+faixa de luz (Lux) opcional (RF36) que, ativada, oculta os pontos de atividade
+e temperatura cujo valor de luz no mesmo instante esteja fora da faixa
+selecionada — tanto na exibição quanto na exportação.
+
+Configurações das métricas não paramétricas (RF38, RF39): o terceiro expansor
+reúne a frequência de reamostragem (10 min a 2 h, padrão 1 h) e o limiar de
+binarização (padrão 4) repassados ao cálculo das métricas (RF38); os quatro
+resultados são exibidos com texto explicativo e calculados por uma função
+cacheada que envolve a chamada ao pyActigraphy em um bloco de tratamento de
+exceções — erros esperados quando o registro, após os recortes, é curto demais
+para o cálculo, situação na qual a página exibe um aviso em vez de travar. Um
+checkbox alterna para o cálculo segmentado por período, em janelas de 1, 3, 7,
+14 ou 30 dias — apenas as janelas que caibam ao menos duas vezes no registro
+são oferecidas —, concretizando, junto com o cálculo global, a íntegra do
+RF39.
+
+Gráficos diários combinados (RF40): a numeração "Dia N" é calculada a partir
+da lista completa de dias disponíveis, antes de qualquer filtro de exibição,
+justamente para que não mude quando o profissional altera os filtros de dia da
+semana — o "Dia 3" continua sendo o terceiro dia do registro mesmo que o "Dia
+1" e o "Dia 2" estejam ocultos. Para cada dia exibido, o gráfico combinado é
+gerado com as séries de atividade, luz, temperatura e evento já recortadas e,
+quando aplicável, a máscara de luz; o sombreamento do período noturno e das
+marcações de evento ocorre dentro dessa mesma função compartilhada (ver
+subseção 3.6.4).
+
+Exportação (RF43, RF44, RF45): a seção Exportar, ao final da página, oferece
+dois checkboxes independentes — Dados (.txt + .csv) e Gráficos (.png) — e só
+executa qualquer processamento ao clique em "Baixar exportação (.zip)",
+evitando reprocessar a cada interação. A preparação dos dados copia o
+DataFrame e zera (ou esvazia, no caso dos pontos fora da faixa de luz)
+exatamente os mesmos sinais, faixas e dias ocultos na tela, garantindo que o
+.txt/.csv exportado (RF43) reflita fielmente o que o profissional está vendo. A
+geração de imagens renderiza cada gráfico exibido como PNG e os empilha
+verticalmente, uma linha por dia (RF44) — etapa que exige reconstruir a figura
+a partir de sua serialização antes da rasterização, pois o motor de imagens
+não aceita diretamente os tipos de data usados nas formas de sombreamento. O
+ZIP resultante é, na sequência, salvo automaticamente no histórico de
+relatórios (RF45) e só então entregue ao navegador — mecanismo detalhado na
+subseção 3.7.7.
+
+
+3.7.5  ANÁLISE DE TEMPERATURA
+----------------------------------------------------------------------------------------------------
+A página Análise de temperatura reaproveita o mesmo carregamento cacheado de
+arquivo e verifica a presença de qualquer um dos canais de temperatura
+(TEMPERATURE ou EXT TEMPERATURE), descartando colunas ausentes ou totalmente
+nulas; se nenhuma estiver disponível, a página interrompe a renderização com
+uma mensagem informativa.
+
+Matriz dia × hora (RF46): os registros são agrupados por dia e por hora
+(agregação por média), reindexando as colunas para garantir as 24 horas mesmo
+quando alguma hora não tem dados em um dia específico, e acrescentando uma
+coluna "Média" (de cada dia ao longo das 24 horas) e uma linha "Média" (de
+cada hora ao longo de todos os dias). A mesma matriz é gerada independentemente
+para cada canal de temperatura presente, lado a lado. A apresentação visual
+calcula uma escala de cores azul→vermelho relativa apenas aos valores reais da
+matriz — excluindo deliberadamente a linha e a coluna "Média" do cálculo do
+mínimo e do máximo, para que essas células de resumo não distorçam a escala —
+e a matriz é renderizada em um contêiner com rolagem e cabeçalhos fixos, já que
+o número de linhas (um por dia) e de colunas (24 horas + média) pode ser
+grande.
+
+Gráfico de médias horárias (RF47): traça uma linha por canal de temperatura
+disponível, usando a linha "Média" da matriz correspondente como série de
+dados — ou seja, gráfico e matriz compartilham exatamente os mesmos valores
+agregados, calculados uma única vez.
+
+Estatísticas descritivas (RF48): média, mediana, mínimo, máximo, amplitude,
+desvio padrão e variância são derivados diretamente da série de temperatura
+(sobre todos os pontos do registro, sem o agrupamento por hora/dia da matriz)
+e apresentados como cartões lado a lado, com tooltips explicando amplitude,
+desvio padrão e variância — separadamente para cada canal presente.
+
+Exportação (RF49): segue o mesmo padrão de checkbox duplo (Tabelas .csv e
+Gráfico .png) e botão único da página Análises. As tabelas exportadas são a
+própria matriz e um CSV de estatísticas, gerados para cada canal de
+temperatura — até quatro arquivos .csv no mesmo .zip, quando ambos os canais
+existem —, e o gráfico é renderizado em PNG. Como esta página nunca envolve
+dados de atividade, a exportação é acionada sem incluir o registro Condor
+original: o .zip contém somente as tabelas e o gráfico. O mesmo mecanismo de
+salvamento automático no histórico e de disparo do download no próximo render
+(subseção 3.7.7) é reaplicado aqui de forma praticamente idêntica à da página
+Análises — uma duplicação de código entre as duas páginas que poderia, no
+futuro, ser extraída para uma função compartilhada.
+
+
+3.7.6  COMPARAÇÃO DE MÚLTIPLOS REGISTROS
+----------------------------------------------------------------------------------------------------
+A página Comparação exige a seleção de ao menos dois arquivos (RF50); cada
+arquivo selecionado recebe uma cor fixa de uma paleta de seis cores,
+reaproveitada de forma cíclica — com mais de seis arquivos, duas ou mais
+curvas voltam a compartilhar a mesma cor, limitação prática não tratada
+explicitamente pela interface.
+
+Antes de exibir qualquer opção, a página calcula a interseção dos modos de
+atividade (PIM/TAT/ZCM) presentes em todos os arquivos selecionados e
+interrompe a renderização com um aviso caso essa interseção seja vazia, já que
+não haveria um sinal de atividade comparável entre os arquivos.
+
+Escala compartilhada (RF52): a faixa total de atividade, luz e temperatura é
+calculada sobre todos os arquivos selecionados — e não arquivo por arquivo,
+como na página Análises —, de modo que o mesmo controle de faixa valha
+simultaneamente para todas as curvas sobrepostas, viabilizando a comparação
+direta de amplitude entre registros (RF51 para o modo de atividade comum; RF52
+para as faixas compartilhadas).
+
+Alinhamento dos dias (RF53, RF54): há dois critérios. Em "Número do dia do
+registro", seletores numerados de 1 até o maior número de dias entre os
+arquivos permitem escolher quais posições comparar; para cada número, a página
+inclui apenas os arquivos que realmente possuem um dia naquela posição
+(arquivos mais curtos são naturalmente excluídos das posições que não
+alcançam). Em "Dia da semana", a página busca, para cada arquivo, a primeira
+data cujo dia da semana corresponda à opção marcada — de modo que selecionar
+"Sábado", por exemplo, compare o primeiro sábado de cada arquivo, ainda que em
+datas de calendário diferentes.
+
+Gráfico comparativo (RF55): para cada grupo de dias resultante do alinhamento,
+a página desenha uma curva de atividade por arquivo (mais, opcionalmente, luz
+e temperatura como eixos extras tracejados) — mas, antes de plotar, reindexa
+cada série para uma data de referência fixa e arbitrária, fazendo com que
+todas as curvas, vindas de datas de calendário diferentes, compartilhem o
+mesmo eixo X de horário (00h–24h), o que torna visualmente direta a comparação
+ponto a ponto. A legenda de cada curva inclui o nome do arquivo e a data real
+entre parênteses, preservando a rastreabilidade da data original mesmo após a
+normalização visual do eixo.
+
+Diferentemente das páginas Análises e Análise de temperatura, a página
+Comparação não possui seção de exportação: os gráficos podem ser visualizados
+e baixados individualmente pelo menu nativo do Plotly, mas não integram o
+histórico de relatórios.
+
+
+3.7.7  EXPORTAÇÃO E GESTÃO DE RELATÓRIOS
+----------------------------------------------------------------------------------------------------
+O mecanismo de exportação é compartilhado, com pequenas variações, pelas
+páginas Análises e Análise de temperatura: em ambas, a geração do .zip passa
+por uma função cacheada que delega a montagem do arquivo ao ArquivoController
+— este busca o conteúdo original do arquivo no banco, delega ao parser Condor
+a regeneração do .txt (preservando o cabeçalho original) e do .csv quando os
+dados são incluídos (RF43), e agrupa quaisquer arquivos extras (imagens de
+gráficos ou tabelas .csv, conforme a página) em um único ZIP em memória (RF44,
+RF49).
+
+Imediatamente após uma exportação bem-sucedida, ambas as páginas persistem o
+nome do .zip, o nome do arquivo de origem e o conteúdo binário na tabela de
+relatórios (RF45) — antes mesmo de o download chegar ao navegador. Em seguida,
+o resultado é armazenado no estado de sessão e a página força uma reexecução.
+Esse repasse em duas etapas existe porque, no instante em que o botão "Baixar
+exportação" é clicado, o script ainda está em execução — disparar nesse mesmo
+momento um download via JavaScript não é confiável em todos os navegadores; ao
+guardar o resultado no estado de sessão e forçar um novo ciclo de
+renderização, a página seguinte já começa com o ZIP pronto e apenas injeta um
+pequeno script que cria um elemento de âncora com o conteúdo do ZIP codificado
+em base64, aciona o clique programaticamente e remove o elemento — produzindo,
+do ponto de vista do usuário, um único clique que já desencadeia o download. O
+mesmo padrão é reaproveitado no download em massa da página Conjunto de dados
+(subseção 3.7.2).
+
+A gestão do histórico (RF56–RF58) é responsabilidade exclusiva da página
+Exportar relatório, que lista — sempre filtrado por usuário, conforme a
+subseção 3.6.1 — os relatórios salvos, ordenados do mais recente para o mais
+antigo, paginados em grupos de 8 (RF56), exibindo nome do relatório, arquivo
+de origem (preservando a rastreabilidade até o .txt que o gerou) e tamanho
+formatado. Cada linha oferece o download do conteúdo já salvo (cacheado, RF57)
+e um botão de exclusão com diálogo de confirmação (RF58). Diferentemente da
+página Conjunto de dados, esta não oferece busca textual nem filtros
+adicionais — opção de design compatível com um volume de relatórios
+tipicamente bem menor do que o de arquivos brutos enviados.
+
+
+====================================================================================================
+3.8  IMPLANTAÇÃO (DEPLOY)
+====================================================================================================
+
+Concluído o desenvolvimento, o sistema foi implantado em um servidor de
+produção, onde se encontra em operação. Esta seção descreve o ambiente de
+hospedagem, a configuração do banco de dados em produção e o processo de
+publicação (deploy), tanto na implantação inicial quanto nas atualizações
+subsequentes. A implantação reaproveita integralmente a containerização
+descrita na subseção 3.5.3 — não foi necessário nenhum processo de build ou de
+configuração específico para o ambiente de produção, distinto do de
+desenvolvimento.
+
+
+3.8.1  AMBIENTE DE HOSPEDAGEM
+----------------------------------------------------------------------------------------------------
+O sistema está hospedado em uma VPS (Virtual Private Server) da Hostinger, no
+plano KVM 2, executando Ubuntu 24.04 LTS. Conforme as especificações
+publicadas pelo provedor para esse nível de contratação, o plano inclui
+virtualização KVM, 2 vCPU, 8 GB de RAM, 100 GB de armazenamento NVMe SSD e 8
+TB/mês de transferência. [REFERÊNCIA NECESSÁRIA: especificações oficiais do
+plano KVM 2 da Hostinger, sujeitas a confirmação no painel de controle da
+própria VPS.]
+
+[INSERIR QUADRO 4: Especificações da VPS de produção. Colunas: Especificação;
+Valor (provedor/plano, virtualização, vCPU, RAM, armazenamento, transferência,
+sistema operacional). Legenda provisória: "Quadro 4 — Especificações do
+ambiente de hospedagem em produção."]
+
+Sobre o Ubuntu 24.04 foram instalados o Docker Engine e o plugin Docker
+Compose, pelo processo padrão de pacotes — escolha de runtime que reproduz, em
+produção, exatamente o mesmo par de configuração de contêineres usado em
+desenvolvimento (subseção 3.5.3), satisfazendo o requisito de portabilidade
+(RNF09) sem qualquer adaptação adicional para o servidor de produção.
+
+A administração do servidor (deploy, verificação de logs, reinício de
+contêineres) é realizada por acesso SSH direto à VPS. O acesso dos usuários
+finais, por sua vez, ocorre exclusivamente pelo endereço IP público da VPS,
+sem domínio próprio registrado e sem HTTPS — não há, no momento, nenhum proxy
+reverso (Nginx, Caddy ou similar) entre o usuário e o contêiner da aplicação; o
+navegador conecta-se diretamente à porta publicada pelo Docker para o serviço
+"app", cuja determinação é detalhada na subseção 3.8.3. As implicações dessa
+escolha — em especial a ausência de criptografia em trânsito — são discutidas
+na subseção 3.8.4.
+
+
+3.8.2  CONFIGURAÇÃO DO BANCO DE DADOS
+----------------------------------------------------------------------------------------------------
+Em produção, o PostgreSQL é executado exatamente como definido pelo serviço
+"db" da configuração de contêineres (subseção 3.5.3): a imagem oficial
+PostgreSQL 16, sem customização adicional além das variáveis de ambiente já
+versionadas no repositório — as mesmas credenciais que o módulo de banco usa
+como valor padrão quando as variáveis de ambiente não estão definidas. Em
+produção, essas variáveis são explicitamente repassadas ao contêiner da
+aplicação, que resolve o host do banco por meio da rede interna e do DNS
+automático criado pelo Docker Compose para os serviços de um mesmo arquivo —
+de modo que a comunicação entre os contêineres "app" e "db" nunca depende da
+porta publicada para fora do host (subseção 3.8.3), apenas da rede interna do
+Compose.
+
+A persistência dos dados é garantida por um volume Docker nomeado: como o
+processo de deploy pode recriar contêineres a cada publicação, é esse volume —
+e não o sistema de arquivos do contêiner, descartado a cada recriação — quem
+preserva o conteúdo das seis tabelas (subseção 3.6.1) entre uma implantação e
+a seguinte. Um healthcheck (verificado a cada 5 segundos, com até 5
+tentativas) faz o Compose considerar o serviço "db" pronto somente quando o
+PostgreSQL já aceita conexões; o serviço "app" declara depender dessa condição,
+garantindo que a aplicação só inicie depois que o banco esteja disponível —
+evitando o erro comum, em ambientes containerizados, de a aplicação tentar
+conectar a um banco ainda em inicialização.
+
+Não há, na implantação atual, nenhum processo de migração de esquema distinto
+da própria aplicação: a criação das tabelas é chamada a cada execução, por
+meio de instruções CREATE TABLE IF NOT EXISTS (subseção 3.6.2) — o primeiro
+deploy cria o esquema do zero, automaticamente, e os deploys seguintes
+encontram as tabelas já existentes e não as recriam nem alteram. Por outro
+lado, não foi identificada nenhuma rotina de backup automatizado do volume de
+dados — aspecto retomado como oportunidade de melhoria na subseção 3.8.4.
+
+
+3.8.3  PROCESSO DE PUBLICAÇÃO
+----------------------------------------------------------------------------------------------------
+A implantação inicial seguiu, em essência, a sequência: (1) provisionamento da
+VPS pelo painel da Hostinger, com a imagem do Ubuntu 24.04 LTS; (2) acesso
+inicial via SSH e instalação do Docker Engine e do plugin Docker Compose; (3)
+clonagem do repositório do projeto na VPS; (4) execução de "docker compose up
+-d --build", que constrói a imagem da aplicação (criação do ambiente conda
+Python 3.9, instalação de numba e pyActigraphy e, em seguida, das demais
+dependências), baixa a imagem oficial do PostgreSQL, inicia o contêiner do
+banco e aguarda seu healthcheck, e só então inicia o contêiner da aplicação,
+que cria o esquema do banco pela primeira vez; e (5) identificação da porta
+publicada pelo Docker para o serviço "app" e verificação de que a aplicação
+responde nesse endereço.
+
+[INSERIR FIGURA 5: Fluxo do processo de publicação (deploy). Conteúdo:
+sequência da implantação inicial e do fluxo de atualização (git pull → docker
+compose up -d --build → verificação da porta), destacando a preservação do
+volume de dados entre publicações. Legenda provisória: "Figura 5 — Processo de
+publicação inicial e de atualização do sistema em produção."]
+
+Para atualizações de código já com o sistema em produção, o processo é manual,
+executado via SSH: (1) atualização do código-fonte na VPS a partir do
+repositório remoto; (2) reconstrução da imagem do serviço "app" e recriação
+apenas do contêiner cuja imagem foi reconstruída — o serviço "db", cuja imagem
+não é construída localmente e cuja definição não foi alterada, permanece em
+execução sem interrupção, preservando as conexões e, sobretudo, o volume de
+dados intacto.
+
+Um ponto da configuração versionada merece destaque: o serviço "app" declara a
+porta no formato curto (sem o mapeamento explícito host:contêiner), o que faz
+o Docker atribuir, a cada criação do contêiner, uma porta efêmera aleatória do
+host — o mesmo vale para a porta do serviço "db". Assim, a cada publicação que
+recrie o contêiner da aplicação, o número da porta externa pode mudar; por
+isso, o processo inclui uma etapa de verificação pós-deploy para descobrir o
+endereço atual antes de validar ou divulgar o acesso. No momento da redação, o
+sistema está em produção nesse servidor, acessível pelo endereço IP público da
+VPS na porta atualmente publicada para o contêiner da aplicação.
+
+
+3.8.4  CONSIDERAÇÕES SOBRE A IMPLANTAÇÃO ATUAL
+----------------------------------------------------------------------------------------------------
+A implantação descrita foi suficiente para colocar o sistema em produção
+dentro do escopo e do prazo de um Trabalho de Conclusão de Curso, mas alguns
+pontos identificados são registrados como riscos conhecidos e oportunidades de
+evolução, no mesmo espírito das limitações tecnológicas da subseção 3.5.5.
+
+  - Tráfego sem criptografia (sem HTTPS): por não haver proxy reverso nem
+    certificado TLS na frente da aplicação, todo o tráfego entre o navegador e
+    a VPS — incluindo a senha digitada na tela de login, antes de ser comparada
+    ao hash armazenado (subseção 3.7.1) — trafega sem criptografia em trânsito.
+    A mitigação natural é a introdução de um proxy reverso (Nginx ou Caddy) com
+    um certificado TLS — via Let's Encrypt, por exemplo —, com ou sem a
+    contratação de um domínio próprio. [REFERÊNCIA NECESSÁRIA: diretrizes de
+    segurança de aplicações web sobre criptografia em trânsito, por exemplo
+    OWASP.]
+  - Porta do host não fixada: a porta externa do serviço "app" é redefinida
+    pelo Docker a cada recriação do contêiner, dificultando a divulgação de um
+    endereço estável e exigindo uma etapa manual de verificação após cada
+    deploy. Fixar a porta na configuração eliminaria essa necessidade, ao custo
+    de exigir que ela esteja sempre livre no host.
+  - Credenciais padrão do PostgreSQL expostas ao host: o usuário e a senha do
+    banco são adequados para desenvolvimento local, mas, em produção, o serviço
+    "db" também tem sua porta publicada para o host (igualmente efêmera), o que
+    representa um vetor de risco caso o firewall da VPS não restrinja
+    adequadamente o acesso externo a essa porta. Como a comunicação entre os
+    contêineres ocorre inteiramente pela rede interna do Compose (subseção
+    3.8.2) e nunca depende dessa porta publicada, a recomendação mais direta é
+    remover por completo o mapeamento de portas do serviço "db" em produção —
+    preservando-o, se necessário, apenas em desenvolvimento — e substituir a
+    senha padrão por uma credencial específica de produção via variável de
+    ambiente.
+  - Ausência de backup automatizado: nenhuma rotina de cópia de segurança do
+    volume de dados (por exemplo, dump agendado ou snapshot periódico) foi
+    identificada — todo o conteúdo das seis tabelas depende exclusivamente da
+    integridade contínua desse único volume Docker.
+  - Deploy manual, sem integração/entrega contínua: a publicação de
+    atualizações depende de um operador humano executar os comandos corretos,
+    na ordem correta, via SSH — abordagem aceitável para o volume de mudanças e
+    a equipe de um TCC individual, mas suscetível a erro humano e sem qualquer
+    execução automatizada de testes antes da publicação.
+
+====================================================================================================

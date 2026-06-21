@@ -1,0 +1,357 @@
+====================================================================================================
+1  INTRODUÇÃO
+====================================================================================================
+
+[Norma de citação adotada: ABNT — NBR 10520 (citações) e NBR 6023 (referências).
+As citações autor-data já presentes no texto seguem esse padrão e foram mantidas.]
+
+Este capítulo apresenta a motivação, o recorte e os objetivos do trabalho que
+resultou no sistema desenvolvido, detalhado no referencial teórico (Capítulo
+2) e na caracterização da pesquisa, requisitos, tecnologias, arquitetura,
+implementação e implantação (Capítulo 3). Diferentemente desses capítulos —
+voltados a justificar decisões já tomadas —, este responde a uma pergunta
+anterior e mais fundamental, que a banca avaliadora costuma formular antes de
+qualquer detalhe técnico: por que este trabalho importa e o que, exatamente,
+ele se propõe a fazer. As seções seguintes contextualizam o problema (1.1),
+formulam-no como uma pergunta de pesquisa única (1.2), declaram o objetivo
+geral (1.3) e os objetivos específicos (1.4) que dele derivam, justificam a
+relevância do trabalho (1.5), enunciam a proposição de design que orienta a
+construção do artefato (1.6), delimitam o escopo do que foi e do que não foi
+desenvolvido (1.7) e, por fim, mapeiam a estrutura do restante do artigo (1.8).
+
+
+1.1  CONTEXTUALIZAÇÃO
+----------------------------------------------------------------------------------------------------
+A actigrafia consolidou-se, ao longo das últimas quatro décadas, como um
+método objetivo e não invasivo de monitoramento do padrão de atividade e
+repouso humano, registrado de forma contínua por dias ou semanas em ambiente
+domiciliar (ANCOLI-ISRAEL et al., 2003; SADEH, 2011). Frente ao diário de
+sono autorrelatado, a actigrafia independe da memória e da disposição do
+paciente em registrar seus horários; frente à polissonografia — exame de
+referência para o diagnóstico de distúrbios do sono —, oferece custo muito
+inferior e a possibilidade de monitoramento prolongado fora do ambiente
+laboratorial, ao preço de menor acurácia para diferenciar estágios específicos
+de sono (MORGENTHALER et al., 2007; SMITH et al., 2018). Essa relação
+custo-benefício explica por que a actigrafia não substituiu a polissonografia,
+mas se firmou como ferramenta de triagem, acompanhamento longitudinal e
+pesquisa em larga escala (subseção 2.1.1) — exatamente o nicho de uso dos
+usuários deste trabalho: médicos, enfermeiros, fisioterapeutas e pesquisadores
+que dependem de registros de actigrafia para avaliar pacientes geriátricos,
+acompanhar programas de reabilitação ou conduzir estudos com coortes de
+voluntários (seção 3.3.2).
+
+O valor clínico e científico da actigrafia, no entanto, depende inteiramente
+da capacidade de transformar o dado bruto registrado pelo dispositivo em
+informação interpretável — e é exatamente nessa etapa, posterior à coleta, que
+a literatura e a prática cotidiana revelam um descompasso recorrente. Cada
+fabricante de actígrafo grava seus arquivos em um formato proprietário próprio
+(no caso deste trabalho, o formato Condor, gerado pelo dispositivo ActTrust,
+da Condor Instruments), incompatível com o de outros fabricantes e, com
+frequência, pouco documentado publicamente — um obstáculo direto à reutilização
+e à interoperabilidade dos dados que a literatura de gestão de dados
+científicos reconhece como barreira recorrente à reprodutibilidade da pesquisa
+(WILKINSON et al., 2016). Diante dessa barreira, é prática comum — embora
+raramente registrada como tal nas publicações da área [REFERÊNCIA NECESSÁRIA:
+evidência empírica do uso de planilhas eletrônicas como solução de contorno na
+análise de actigrafia ou em contexto clínico análogo] — que profissionais de
+saúde e pesquisadores sem formação técnica em análise de dados recorram a
+exportações manuais para planilhas eletrônicas (Excel ou similares): uma
+alternativa acessível, mas que desloca para o próprio profissional, sem
+qualquer rede de segurança automatizada, tarefas como o recorte de intervalos,
+o cálculo de médias por período e a construção de gráficos, repetidas
+manualmente a cada novo arquivo recebido.
+
+[INSERIR FIGURA 1: Fluxo de trabalho artesanal versus fluxo proposto.
+Conteúdo: à esquerda, o caminho atual (arquivo proprietário → exportação
+manual → planilha ad hoc → recorte/cálculo/gráfico repetidos a cada arquivo);
+à direita, o fluxo padronizado e reaproveitável proposto pelo sistema. Legenda
+provisória: "Figura 1 — Descompasso entre o valor potencial da actigrafia e a
+prática artesanal de análise por planilhas, e o fluxo padronizado que o
+sistema propõe em seu lugar."]
+
+Esse caminho tem um custo duplo, bem documentado fora do domínio específico da
+actigrafia, mas plenamente aplicável a ele. De um lado, o tempo consumido em
+manipulação repetitiva de planilhas é tempo subtraído da própria atividade
+assistencial ou de pesquisa — cada novo registro de cada novo paciente
+reinicia, do zero, o mesmo trabalho manual de recorte, cálculo e formatação. De
+outro, planilhas construídas ad hoc, sem revisão por pares nem controle de
+versão, apresentam uma taxa de erro humano (fórmulas copiadas incorretamente,
+células desalinhadas após uma reordenação, intervalos de referência que não se
+atualizam ao se inserir uma nova linha) sistematicamente subestimada por quem
+as constrói — fenômeno extensamente documentado na literatura sobre qualidade
+de planilhas corporativas e científicas (PANKO, 1998). O resultado prático,
+replicado de forma dispersa em laboratórios e ambulatórios que lidam com
+actigrafia, é uma análise artesanal e pouco padronizada — sem os cuidados de
+documentação de parâmetros, controle de versão dos dados intermediários e
+separação entre dado bruto e dado processado que a literatura de pesquisa
+computacional reprodutível recomenda como mínimo metodológico (SANDVE et al.,
+2013) —, na qual cada profissional reinventa, de forma isolada e não auditável,
+uma rotina de processamento que poderia ser construída uma única vez, de forma
+confiável, e reaproveitada por todos.
+
+Esse descompasso entre o valor potencial da actigrafia e a dificuldade prática
+de explorá-lo plenamente é o pano de fundo sobre o qual se apoia o problema de
+pesquisa formulado na seção 1.2 — e o levantamento detalhado das ferramentas
+hoje disponíveis para mitigá-lo, e da lacuna que persiste mesmo após esse
+levantamento, é tratado em profundidade no Capítulo 2 (seção 2.3).
+
+
+1.2  PROBLEMA DE PESQUISA
+----------------------------------------------------------------------------------------------------
+A partir da contextualização anterior, o problema de pesquisa deste trabalho
+pode ser formulado como uma única pergunta, respondível pela construção e pela
+avaliação de um artefato de software:
+
+    Como tornar a organização, a análise e a visualização de dados de
+    actigrafia acessíveis a profissionais de saúde sem formação técnica em
+    análise de dados?
+
+Essa pergunta delimita uma lacuna concreta, e não apenas uma insatisfação
+genérica com o estado da arte. Primeiro, a lacuna dos formatos proprietários:
+os softwares fornecidos pelos próprios fabricantes de actígrafos — como o
+ActiLife (ActiGraph) ou o Actiware (Philips Respironics) — leem apenas os
+arquivos do respectivo fabricante, e nenhum deles oferece suporte ao formato
+Condor utilizado neste trabalho, o que exigiu o desenvolvimento de um parser
+próprio só para tornar o dado legível por qualquer ferramenta além do software
+de origem (subseção 2.3.3). Segundo, a lacuna da curva de aprendizado: as
+alternativas de código aberto mais rigorosas cientificamente — pyActigraphy,
+em Python, ou nparACT e GGIR, em R (subseções 2.3.2 e 2.3.4) — exigem que o
+usuário escreva e execute código, competência fora do escopo de formação de
+médicos, enfermeiros e fisioterapeutas, ainda que dentro do escopo de
+pesquisadores com maior afinidade computacional. Terceiro, a lacuna da gestão
+integrada: nenhuma das ferramentas levantadas — proprietárias, de código
+aberto ou acadêmicas de nicho — combina o cálculo de métricas de ritmo
+circadiano com o cadastro de pacientes, o vínculo entre paciente e registro e
+o histórico auditável de exportações que o acompanhamento clínico longitudinal
+de múltiplos pacientes exige na prática (subseção 2.3.6); todas tratam cada
+arquivo como uma unidade isolada de análise, e não como parte de um fluxo de
+trabalho assistencial contínuo. É a sobreposição dessas três lacunas —
+formato, curva de aprendizado e gestão de dados — em um único público de
+usuários, e não qualquer uma delas isoladamente, que define o espaço de
+problema que o sistema se propõe a ocupar.
+
+[INSERIR FIGURA 2: As três lacunas convergentes. Conteúdo: diagrama
+(por exemplo, três conjuntos sobrepostos) das lacunas de formato proprietário,
+curva de aprendizado e gestão integrada de dados, com a interseção
+identificando o público sem solução adequada. Legenda provisória: "Figura 2 —
+Sobreposição das três lacunas (formato, curva de aprendizado e gestão
+integrada) que delimitam o espaço de problema do trabalho."]
+
+
+1.3  OBJETIVO GERAL
+----------------------------------------------------------------------------------------------------
+O objetivo geral deste trabalho é desenvolver e avaliar, sob o paradigma da
+Design Science Research (HEVNER et al., 2004), uma aplicação web que permita a
+profissionais de saúde sem formação técnica em análise de dados organizar,
+processar e visualizar registros de actigrafia no formato Condor, com o mesmo
+rigor científico das métricas não paramétricas de ritmo circadiano
+consolidadas na literatura de cronobiologia, integrada a um fluxo de gestão de
+pacientes e de histórico de exportações.
+
+
+1.4  OBJETIVOS ESPECÍFICOS
+----------------------------------------------------------------------------------------------------
+O objetivo geral decompõe-se nos sete objetivos específicos a seguir, cada um
+diretamente rastreável — pela mesma numeração OEn — ao conjunto de requisitos
+funcionais especificado no Capítulo 3 (seção 3.3) e à verificação de
+conformidade entre requisito e implementação ali registrada (seção 3.7):
+
+  OE1 — Implementar um mecanismo de cadastro, autenticação e gerenciamento de
+        perfil que garanta o acesso individualizado e seguro de cada
+        profissional de saúde ao sistema.
+  OE2 — Disponibilizar funcionalidades de organização, armazenamento e
+        gerenciamento dos arquivos brutos de actigrafia (envio, edição,
+        substituição, download e exclusão).
+  OE3 — Permitir a organização dos registros de actigrafia por paciente, por
+        meio do cadastro de pacientes e do vínculo entre paciente e arquivo.
+  OE4 — Processar os arquivos de actigrafia no formato Condor e fornecer
+        visualizações gráficas e métricas não paramétricas de ritmo circadiano
+        que apoiem a interpretação clínica dos dados.
+  OE5 — Possibilitar a análise específica do padrão de temperatura periférica
+        registrado durante a actigrafia, complementar à análise de atividade.
+  OE6 — Possibilitar a comparação visual entre múltiplos registros de
+        actigrafia, alinhados temporalmente, para apoiar avaliações
+        longitudinais ou entre indivíduos.
+  OE7 — Permitir a exportação e o arquivamento histórico dos dados e gráficos
+        processados, em formatos reutilizáveis fora do sistema.
+
+Essa rastreabilidade — cada OEn revisitado, requisito a requisito, e
+verificado contra a implementação efetiva no Capítulo 3 — é o que permite
+avaliar o artefato não apenas por sua existência, mas pelo grau em que de fato
+cumpre cada objetivo aqui declarado.
+
+
+1.5  JUSTIFICATIVA
+----------------------------------------------------------------------------------------------------
+Do ponto de vista científico, este trabalho insere-se na tradição da Design
+Science Research em Sistemas de Informação, que reconhece a construção e a
+avaliação de um artefato como forma legítima de produção de conhecimento de
+projeto (design knowledge), e não apenas como aplicação de conhecimento já
+existente (MARCH; SMITH, 1995; HEVNER et al., 2004). A contribuição científica
+específica é o próprio conhecimento de projeto gerado ao encapsular, de forma
+confiável, uma biblioteca de cálculo cientificamente validada (pyActigraphy)
+por trás de uma interface acessível, sem abrir mão do rigor metodológico dos
+parâmetros que ela expõe — em especial a frequência de reamostragem e o limiar
+de binarização (subseção 2.2.5). Esse é um problema de projeto que, embora
+tratado aqui no domínio específico da actigrafia, generaliza-se a qualquer
+situação em que uma biblioteca científica de código aberto exista sem uma
+camada de interface voltada ao profissional que precisa do resultado, e não do
+código.
+
+Do ponto de vista prático, a relevância decorre diretamente do descompasso
+descrito na seção 1.1: reduzir o tempo dedicado à manipulação manual de
+planilhas e o risco de erro humano associado a essa prática (PANKO, 1998)
+libera tempo do profissional de saúde para a atividade assistencial
+propriamente dita, e substitui uma rotina de análise artesanal e não auditável
+por um fluxo padronizado, documentado e reaproveitável entre pacientes e entre
+profissionais de uma mesma equipe.
+
+Do ponto de vista social, o sistema é disponibilizado sem custo de licença e é
+executável em infraestrutura modesta (containerização descrita na subseção
+3.5.3), o que reduz a barreira de acesso a uma ferramenta de análise de
+actigrafia cientificamente rigorosa para instituições e profissionais sem
+orçamento para softwares proprietários — contexto particularmente relevante
+para serviços públicos de saúde e para projetos de extensão universitária.
+
+Por fim, quanto à pergunta "por que construir em vez de usar o existente": o
+levantamento das alternativas disponíveis (seção 2.3) mostra que nenhuma delas
+— proprietária, de código aberto de uso geral ou acadêmica de nicho — resolve
+simultaneamente as três lacunas identificadas na seção 1.2 (formato, curva de
+aprendizado e gestão integrada de dados clínicos). Construir o sistema não é,
+portanto, uma rejeição das ferramentas existentes — ele reaproveita
+integralmente o motor de cálculo do pyActigraphy, em vez de reimplementá-lo
+(subseção 2.3.2) —, mas uma resposta a uma combinação de exigências para a
+qual não foi identificada, na literatura ou no mercado de software levantados,
+uma solução gratuita e de código aberto já existente.
+
+
+1.6  PROPOSIÇÃO DE DESIGN
+----------------------------------------------------------------------------------------------------
+Sob o paradigma da Design Science Research, a contribuição deste trabalho não
+é testada por meio de uma hipótese estatística sobre uma amostra populacional,
+mas formulada como uma proposição de design (design proposition) — uma
+conjectura sobre a relação entre uma intervenção de projeto e um efeito
+desejado, avaliada pela construção e pela observação do próprio artefato
+(HEVNER et al., 2004; PEFFERS et al., 2007). A proposição que orienta a
+construção do sistema é a seguinte:
+
+    Uma interface web guiada, que encapsula a biblioteca pyActigraphy por trás
+    de formulários, controles visuais e gráficos interativos, reduz a barreira
+    de uso da análise de actigrafia para profissionais de saúde sem formação
+    técnica em análise de dados, sem comprometer o rigor científico das
+    métricas não paramétricas de ritmo circadiano (IS, IV, L5, M10) calculadas
+    por essa biblioteca.
+
+Essa proposição decompõe-se em duas metades, ambas necessárias e nenhuma
+suficiente isoladamente para validar o artefato. A primeira — redução da
+barreira de uso — é abordada pelas decisões de interface descritas no Capítulo
+3 (parâmetros expostos como controles visuais em vez de argumentos de função,
+valores padrão sensatos, feedback imediato de sucesso ou erro). A segunda —
+preservação do rigor científico — é garantida pela decisão de nunca
+reimplementar os algoritmos de cálculo das métricas, apenas encapsulá-los
+(Ciclo de Rigor da DSR, subseção 3.1.3). A avaliação dessa proposição,
+detalhada na seção 3.1, combina o acompanhamento formativo do orientador ao
+longo do desenvolvimento com a verificação técnica de conformidade entre os
+requisitos especificados e a implementação obtida — e não, é importante
+registrar desde já, um estudo controlado de usabilidade com profissionais de
+saúde reais, delimitação retomada na seção 1.7.
+
+
+1.7  DELIMITAÇÃO DO ESCOPO
+----------------------------------------------------------------------------------------------------
+Para evitar cobranças indevidas sobre algo que este trabalho não se propôs a
+fazer, esta seção delimita explicitamente o que está e o que não está incluído
+no escopo do sistema e de sua avaliação.
+
+[INSERIR QUADRO 1: Delimitação do escopo. Duas colunas — "Incluído no escopo"
+e "Fora do escopo" — com os itens listados a seguir. Legenda provisória:
+"Quadro 1 — Delimitação do escopo do trabalho: o que foi e o que não foi
+desenvolvido e avaliado."]
+
+Está incluído no escopo deste trabalho:
+  - O suporte à leitura e ao processamento de arquivos já exportados pelo
+    dispositivo de actigrafia Condor ActTrust, no formato proprietário Condor.
+  - O cálculo das métricas não paramétricas de ritmo circadiano IS, IV, L5 e
+    M10 — global e segmentado por período —, integralmente delegado à
+    biblioteca pyActigraphy, sem reimplementação própria dos algoritmos.
+  - A gestão completa de usuários (profissionais de saúde), arquivos de
+    actigrafia, pacientes e relatórios exportados, com isolamento de dados por
+    usuário (seção 3.6.1).
+  - A visualização gráfica combinada de atividade, luz e temperatura; a
+    análise dedicada do padrão de temperatura periférica; e a comparação
+    visual entre múltiplos registros alinhados temporalmente.
+  - A exportação dos dados e dos gráficos processados em formatos reutilizáveis
+    fora do sistema (.txt, .csv, .png, .zip).
+  - A implantação containerizada (Docker) do sistema em um ambiente de produção
+    real (seção 3.8).
+
+Não está incluído no escopo deste trabalho:
+  - O suporte a formatos de arquivo de outros fabricantes de actígrafo — apenas
+    o formato Condor é processado.
+  - Qualquer integração direta com o firmware ou o hardware do dispositivo: o
+    sistema parte do arquivo já descarregado pelo profissional, não da captura
+    do sinal em si.
+  - A detecção automática de estágios de sono (sleep scoring) ou qualquer
+    funcionalidade de diagnóstico automatizado — o sistema calcula e exibe
+    métricas descritivas, não emite laudos nem substitui o julgamento clínico.
+  - Uma validação clínica formal ou um estudo de usabilidade controlado com
+    profissionais de saúde reais: a avaliação do artefato (seção 3.1) é
+    formativa (acompanhamento do orientador) e técnica (conformidade entre
+    requisitos e implementação), não um ensaio com usuários finais; as personas
+    descritas no Capítulo 3 são construções analíticas derivadas dos perfis
+    profissionais previstos no cadastro do sistema, e não o resultado de
+    entrevistas empíricas com profissionais reais.
+  - A criptografia em trânsito (HTTPS), um domínio próprio e uma rotina
+    automatizada de backup no ambiente de produção atual — riscos conhecidos,
+    já registrados como oportunidades de evolução (subseção 3.8.4) e não
+    tratados neste trabalho.
+  - O suporte a múltiplos idiomas de interface — o sistema é disponibilizado
+    exclusivamente em português.
+  - Qualquer análise estatística inferencial entre grupos de pacientes (testes
+    de hipótese, modelos estatísticos comparativos) — o sistema oferece
+    estatística descritiva e visualização individual ou comparativa, não
+    inferência estatística populacional.
+
+
+1.8  ESTRUTURA DO ARTIGO
+----------------------------------------------------------------------------------------------------
+O restante deste artigo está organizado em capítulos que seguem,
+aproximadamente, a ordem em que o problema apresentado neste capítulo foi
+investigado, fundamentado teoricamente e, por fim, resolvido por meio da
+construção do artefato.
+
+O Capítulo 2 apresenta o referencial teórico que fundamenta as decisões de
+projeto: os princípios de medição da actigrafia e sua relação com os ritmos
+circadianos (seção 2.1); as métricas não paramétricas de atividade-repouso e
+seus parâmetros metodológicos (seção 2.2); o panorama das ferramentas de
+análise de actigrafia hoje disponíveis e a lacuna que persiste entre elas
+(seção 2.3); os princípios de visualização de dados em saúde que orientam a
+apresentação gráfica dos resultados (seção 2.4); o referencial de arquitetura
+e engenharia de software adotado (seção 2.5); e a discussão da metodologia
+ágil de desenvolvimento (seção 2.6) e do referencial de Design Science
+Research (seção 2.7), encerrando-se com a síntese comparativa que formaliza de
+forma sistemática a lacuna identificada nesta introdução (seção 2.8).
+
+O Capítulo 3 descreve a caracterização metodológica da pesquisa sob o
+paradigma da DSR (seção 3.1); os requisitos funcionais e não funcionais
+especificados, incluindo as personas de usuário e os casos de uso (seção 3.3);
+a stack tecnológica adotada e sua justificativa, incluindo as alternativas
+consideradas e as limitações identificadas (seção 3.5); a arquitetura da
+solução em camadas MVC e o modelo de dados (seção 3.6); a implementação de
+cada funcionalidade, requisito a requisito (seção 3.7); e o processo de
+implantação do sistema em ambiente de produção (seção 3.8).
+
+[INSERIR FIGURA 3: Mapa da estrutura do artigo. Conteúdo: fluxo dos capítulos
+(Introdução → Referencial Teórico → Desenvolvimento → Resultados/Discussão →
+Considerações Finais), indicando, para cada um, a pergunta que responde.
+Legenda provisória: "Figura 3 — Estrutura do artigo e o percurso do problema
+(Capítulo 1) à construção e avaliação do artefato (Capítulo 3)."]
+
+Os capítulos finais, ainda em elaboração no momento da redação desta
+introdução, devem apresentar os resultados obtidos e sua discussão à luz da
+proposição de design enunciada na seção 1.6, seguidos das considerações
+finais, das limitações do trabalho e das sugestões de continuidade para
+trabalhos futuros — encerrando o percurso que se inicia, neste capítulo, na
+pergunta sobre por que e para quem o sistema foi construído.
+
+====================================================================================================
