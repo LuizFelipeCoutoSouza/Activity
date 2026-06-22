@@ -1,5 +1,10 @@
-"""
-view/pages/comparacao.py — Comparação de registros entre arquivos.
+"""Página de comparação de registros entre múltiplos arquivos.
+
+Sobrepõe, em um gráfico por dia comparado, as séries de atividade (mais luz e
+temperatura como eixos extras) de vários arquivos, com uma cor por arquivo e
+escala compartilhada. Os dias podem ser alinhados pelo número do dia no registro
+("Dia N") ou pelo dia da semana, normalizando datas calendário diferentes a uma
+data de referência comum.
 """
 
 from __future__ import annotations
@@ -23,6 +28,18 @@ _REFERENCIA = pd.Timestamp("2000-01-01")
 # ── Eixo de tempo relativo (alinha "Dia N" de registros com datas diferentes) ──
 
 def _eixo_relativo(serie: pd.Series) -> pd.Series:
+    """Reindexa uma série diária sobre a data de referência comum.
+
+    Preserva a hora de cada ponto, mas substitui a data pela de referência
+    (`2000-01-01`), permitindo sobrepor visualmente dias de datas calendário
+    diferentes no eixo de 00:00 a 24:00.
+
+    Args:
+        serie: Série de um único dia, indexada por timestamp.
+
+    Returns:
+        pandas.Series: Cópia com o índice deslocado para a data de referência.
+    """
     nova = serie.copy()
     nova.index = _REFERENCIA + (serie.index - serie.index.normalize())
     return nova
@@ -39,6 +56,26 @@ def _grafico_comparacao_dia(
     escala_luz: tuple[float, float] | None = None,
     escala_temperatura: tuple[float, float] | None = None,
 ) -> go.Figure:
+    """Monta o gráfico sobreposto de um grupo de dias (um por arquivo).
+
+    Desenha uma linha de atividade por registro e, quando habilitadas, as séries
+    de luz e temperatura como eixos y extras tracejados. Todas as séries são
+    normalizadas para a data de referência, de modo a alinhá-las no mesmo eixo de
+    horas.
+
+    Args:
+        titulo: Título do gráfico (ex.: ``"Dia 1"`` ou ``"Sábado"``).
+        registros: Lista de dicionários por arquivo, com `nome`, `cor`, `dia` e
+            as séries `serie_atividade`, `serie_luz` e `serie_temp`.
+        escala_atividade: Par `(min, max)` do eixo de atividade.
+        rotulo_atividade: Rótulo do modo de atividade (ex.: ``"PIM"``).
+        mostrar_atividade: Se False, omite as linhas de atividade.
+        escala_luz: Par `(min, max)` do eixo de luz, ou None para ocultá-lo.
+        escala_temperatura: Par `(min, max)` do eixo de temperatura, ou None.
+
+    Returns:
+        plotly.graph_objs.Figure: Figura comparativa do grupo de dias.
+    """
     extras = [
         (rotulo, cor, chave, faixa)
         for rotulo, cor, chave, faixa in (
@@ -112,6 +149,14 @@ def _grafico_comparacao_dia(
 # ── Página principal ──────────────────────────────────────────────────────────
 
 def comparacao_page():
+    """Renderiza a página de comparação entre arquivos.
+
+    Aplica o guard de autenticação, deixa selecionar dois ou mais arquivos,
+    carrega-os e exibe os dados dos sujeitos. Oferece as opções de exibição (modo
+    de atividade comum, sinais e escalas compartilhadas) e o alinhamento de dias
+    (por número do dia ou por dia da semana), desenhando um gráfico sobreposto por
+    grupo de dias resultante.
+    """
     st.title("Comparação")
     st.divider()
 

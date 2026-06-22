@@ -1,11 +1,12 @@
-"""
-view/pages/conjunto_de_dados.py — Gerenciamento de arquivos .txt do usuário.
+"""Página de gerenciamento dos arquivos `.txt` do usuário.
 
-Funcionalidades: upload, listagem paginada com filtros, busca, edição e exclusão.
+Cobre upload, listagem paginada com busca e filtros, edição, exclusão (individual
+e em massa) e download (individual e compactado).
 
-Filtros seguem o padrão draft/aplicado:
-  _d_*        → estado dos widgets antes de clicar "Aplicar"
-  filtro_*    → estado efetivamente usado na listagem
+Os filtros seguem o padrão *draft/aplicado*: as chaves `_d_*` guardam o estado
+dos widgets antes de "Aplicar", e as chaves `filtro_*` guardam o estado
+efetivamente usado na listagem. Isso evita refiltrar a cada interação com os
+widgets.
 """
 
 import base64
@@ -28,12 +29,28 @@ _CHAVES_FILTRO = ["filtro_data_ini", "filtro_data_fim", "filtro_ordenar_por", "f
 
 @st.cache_data(ttl=120)
 def _buscar_conteudo(arquivo_id: int, usuario_id: int) -> tuple:
+    """Recupera o conteúdo de um arquivo para download (cacheado).
+
+    Args:
+        arquivo_id: Id do arquivo.
+        usuario_id: Id do usuário dono.
+
+    Returns:
+        tuple: `(conteudo, nome)`; ou `(None, mensagem)` se não encontrado.
+    """
     return ArquivoController.baixar(arquivo_id, usuario_id)
 
 
 # ── Callback de checkbox ──────────────────────────────────────────────────────
 
 def _toggle_chk(arq_id: int, gen: int):
+    """Sincroniza o conjunto de selecionados ao marcar/desmarcar um checkbox.
+
+    Args:
+        arq_id: Id do arquivo associado ao checkbox.
+        gen: Geração atual dos checkboxes, usada para compor a key e forçar a
+            recriação dos widgets após operações em massa.
+    """
     key = f"chk_{arq_id}_{gen}"
     sel = st.session_state.setdefault("selecionados", set())
     if st.session_state.get(key, False):
@@ -46,6 +63,16 @@ def _toggle_chk(arq_id: int, gen: int):
 
 @st.dialog("Editar arquivo")
 def _dialogo_editar(arquivo_id: int, usuario_id: int):
+    """Exibe o diálogo de edição de um arquivo (metadados e substituição).
+
+    Permite alterar nome e descrição e, opcionalmente, substituir o conteúdo por
+    um novo `.txt`. Ao salvar, escolhe entre substituir o conteúdo ou apenas os
+    metadados conforme um novo arquivo tenha sido enviado.
+
+    Args:
+        arquivo_id: Id do arquivo a editar.
+        usuario_id: Id do usuário dono.
+    """
     arquivos = ArquivoController.listar(usuario_id)
     arquivo  = next((a for a in arquivos if a["id"] == arquivo_id), None)
 
@@ -102,6 +129,16 @@ def _dialogo_editar(arquivo_id: int, usuario_id: int):
 
 @st.dialog("Excluir arquivo")
 def _dialogo_excluir(arquivo_id: int, usuario_id: int, nome: str):
+    """Exibe o diálogo de confirmação de exclusão de um arquivo.
+
+    Ao confirmar, remove o arquivo, descarta-o da seleção, limpa o cache de
+    conteúdo e agenda o toast de resultado.
+
+    Args:
+        arquivo_id: Id do arquivo a excluir.
+        usuario_id: Id do usuário dono.
+        nome: Nome do arquivo, exibido na confirmação.
+    """
     st.write(f"Tem certeza que deseja excluir **{nome}**?")
     st.caption("Esta ação não pode ser desfeita.")
     col1, col2 = st.columns(2)
@@ -119,6 +156,17 @@ def _dialogo_excluir(arquivo_id: int, usuario_id: int, nome: str):
 
 @st.dialog("Excluir arquivos")
 def _dialogo_excluir_em_massa(ids: list, usuario_id: int, nomes: list):
+    """Exibe o diálogo de confirmação de exclusão em massa.
+
+    Mostra uma prévia de até cinco nomes e, ao confirmar, remove todos os
+    arquivos, atualiza a seleção, incrementa a geração de checkboxes e limpa o
+    cache.
+
+    Args:
+        ids: Ids dos arquivos a excluir.
+        usuario_id: Id do usuário dono.
+        nomes: Nomes dos arquivos (para a prévia).
+    """
     n = len(ids)
     st.write(f"Tem certeza que deseja excluir **{n}** arquivo(s)?")
     preview = nomes[:5]
@@ -142,6 +190,11 @@ def _dialogo_excluir_em_massa(ids: list, usuario_id: int, nomes: list):
 # ── Página principal ──────────────────────────────────────────────────────────
 
 def conjunto_de_dados_page():
+    """Renderiza a página de conjunto de dados.
+
+    Aplica o guard de autenticação, processa os diálogos pendentes (edição e
+    exclusões), exibe métricas-resumo e monta as abas de listagem e de upload.
+    """
     st.title("🗃️ Conjunto de dados")
 
     usuario_id = get_usuario_id()
@@ -185,6 +238,15 @@ def conjunto_de_dados_page():
 # ── Upload ────────────────────────────────────────────────────────────────────
 
 def _resumir_upload(msgs: list) -> tuple:
+    """Resume os resultados de um lote de uploads em uma única notificação.
+
+    Args:
+        msgs: Lista de pares `(ok, mensagem)`, um por arquivo enviado.
+
+    Returns:
+        tuple[str, str]: `(tipo, texto)`, onde `tipo` é ``"success"``,
+        ``"error"`` ou ``"warning"`` conforme o resultado agregado.
+    """
     n     = len(msgs)
     n_ok  = sum(1 for ok, _ in msgs if ok)
     n_err = n - n_ok
@@ -199,6 +261,15 @@ def _resumir_upload(msgs: list) -> tuple:
 
 
 def _secao_upload(usuario_id: int):
+    """Renderiza a aba de envio de arquivos.
+
+    Aceita um ou vários `.txt`, com descrição por arquivo, e processa o lote
+    exibindo um resumo. Um contador de geração nas keys dos widgets força a
+    limpeza do uploader após cada envio.
+
+    Args:
+        usuario_id: Id do usuário dono.
+    """
     counter = st.session_state.get("upload_counter", 0)
 
     if "upload_msg" in st.session_state:
@@ -247,6 +318,16 @@ def _secao_upload(usuario_id: int):
 # ── Listagem ──────────────────────────────────────────────────────────────────
 
 def _secao_listagem(usuario_id: int, arquivos: list):
+    """Renderiza a aba de listagem de arquivos.
+
+    Aplica filtros e ordenação, pagina o resultado, oferece seleção em massa
+    (download compactado e exclusão) e dispara o download automático do ZIP
+    pronto. Mantém o conjunto de selecionados coerente com os arquivos atuais.
+
+    Args:
+        usuario_id: Id do usuário dono.
+        arquivos: Lista de metadados dos arquivos do usuário.
+    """
     n = len(arquivos)
 
     if not arquivos:
@@ -356,9 +437,10 @@ def _secao_listagem(usuario_id: int, arquivos: list):
 # ── Painel de filtros ─────────────────────────────────────────────────────────
 
 def _painel_filtros() -> None:
-    """
-    Busca textual sempre visível (reativa). Filtros de data, ordenação e
-    checkboxes ficam num expander para não poluir a listagem por padrão.
+    """Renderiza a busca reativa e o expander de filtros (padrão draft/aplicado).
+
+    A busca textual fica sempre visível; os filtros de data, ordenação e
+    checkboxes ficam em um expander e só passam a valer ao clicar em "Aplicar".
     """
     _init_draft()
 
@@ -395,6 +477,11 @@ def _painel_filtros() -> None:
 # ── Estado dos filtros (draft / aplicado) ─────────────────────────────────────
 
 def _init_draft() -> None:
+    """Inicializa os widgets de filtro (chaves `_d_*`) a partir do estado aplicado.
+
+    Garante que, ao abrir o painel, os widgets reflitam os filtros atualmente em
+    vigor.
+    """
     st.session_state.setdefault("_d_data_ini",           st.session_state.get("filtro_data_ini"))
     st.session_state.setdefault("_d_data_fim",           st.session_state.get("filtro_data_fim"))
     st.session_state.setdefault("_d_ordenar_por",        st.session_state.get("filtro_ordenar_por", "Nome"))
@@ -403,6 +490,11 @@ def _init_draft() -> None:
 
 
 def _commit_draft() -> None:
+    """Promove o estado dos widgets (`_d_*`) para os filtros aplicados (`filtro_*`).
+
+    Chamado ao clicar em "Aplicar"; também reseta a paginação para a primeira
+    página.
+    """
     st.session_state["filtro_data_ini"]           = st.session_state.get("_d_data_ini")
     st.session_state["filtro_data_fim"]           = st.session_state.get("_d_data_fim")
     st.session_state["filtro_ordenar_por"]        = st.session_state.get("_d_ordenar_por", "Nome")
@@ -412,12 +504,19 @@ def _commit_draft() -> None:
 
 
 def _limpar_filtros() -> None:
+    """Remove todos os filtros (draft e aplicados), a busca e reseta a paginação."""
     for k in _CHAVES_DRAFT + _CHAVES_FILTRO + ["busca_arquivo", "_busca_anterior"]:
         st.session_state.pop(k, None)
     st.session_state["pag_arquivos"] = 0
 
 
 def _tem_filtros_ativos() -> bool:
+    """Indica se há algum filtro aplicado ou busca em vigor.
+
+    Returns:
+        bool: True se data, "só atualizados", ordenação não padrão ou busca
+        estiverem ativos.
+    """
     return any([
         st.session_state.get("filtro_data_ini"),
         st.session_state.get("filtro_data_fim"),
@@ -429,6 +528,7 @@ def _tem_filtros_ativos() -> bool:
 
 
 def _caption_filtros_ativos() -> None:
+    """Exibe um resumo textual dos filtros e da busca atualmente ativos."""
     partes = []
     busca  = st.session_state.get("busca_arquivo", "")
     ini    = st.session_state.get("filtro_data_ini")
@@ -459,6 +559,20 @@ def _aplicar_filtros(
     ordenar_por: str,
     ordem_asc: bool,
 ) -> list:
+    """Aplica busca, filtros de data, "só atualizados" e ordenação à lista.
+
+    Args:
+        arquivos: Lista de metadados dos arquivos.
+        busca: Termo de busca por nome ou descrição (case-insensitive).
+        data_ini: Data inicial (inclusive) de criação, ou None.
+        data_fim: Data final (inclusive) de criação, ou None.
+        apenas_atualizados: Se True, mantém só arquivos editados após o envio.
+        ordenar_por: Critério de ordenação (chave de `OPCOES_ORDEM`).
+        ordem_asc: Se True, ordena de forma crescente; senão, decrescente.
+
+    Returns:
+        list: Lista filtrada e ordenada (cópia; a entrada não é modificada).
+    """
     resultado = arquivos
 
     if busca:
@@ -495,8 +609,15 @@ def _aplicar_filtros(
 # ── Linha de arquivo ──────────────────────────────────────────────────────────
 
 def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
+    """Renderiza uma linha da listagem de arquivos (seleção, dados e ações).
+
+    Args:
+        arq: Dicionário de metadados do arquivo.
+        usuario_id: Id do usuário dono (usado no download).
+        gen: Geração atual dos checkboxes, para compor a key de seleção.
+    """
     st.divider()
-    # Proporcional ao cabeçalho [0.5, 4, 2.5, 1.8, 3] — os últimos 3 botões somam 3
+    # Larguras proporcionais ao cabeçalho [0.5, 4, 2.5, 1.8, 3]: os 3 botões finais somam 3.
     cols = st.columns([0.5, 4, 2.5, 1.8, 1, 1, 1])
 
     cols[0].checkbox(
@@ -537,6 +658,14 @@ def _linha_arquivo(arq: dict, usuario_id: int, gen: int):
 # ── Helper ────────────────────────────────────────────────────────────────────
 
 def _formatar_bytes(n: int) -> str:
+    """Formata um tamanho em bytes como texto legível (B, KB ou MB).
+
+    Args:
+        n: Tamanho em bytes.
+
+    Returns:
+        str: Tamanho com a unidade apropriada (ex.: ``"1.5 MB"``).
+    """
     if n < 1_024:
         return f"{n} B"
     if n < 1_024 ** 2:

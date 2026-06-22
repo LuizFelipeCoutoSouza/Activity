@@ -1,3 +1,12 @@
+"""Página principal de análise de actigrafia de um único arquivo.
+
+Construída em torno do objeto `BaseRaw` do pyActigraphy. Permite recortar o início
+e o fim do registro, escolher os sinais exibidos e suas faixas, filtrar os dias
+mostrados, ajustar os parâmetros das métricas não paramétricas (IS, IV, L5, M10) e
+exportar dados (`.txt`/`.csv`) e gráficos (`.png`) em um `.zip`, salvando uma cópia
+em "Exportar relatório".
+"""
+
 from __future__ import annotations
 
 import base64
@@ -55,6 +64,22 @@ def _gerar_export_zip(
     arquivo_id: int, usuario_id: int, df: pd.DataFrame,
     incluir_dados: bool, extras: tuple[tuple[str, bytes], ...],
 ) -> tuple:
+    """Monta o ZIP de exportação com dados e/ou arquivos extras (cacheado).
+
+    Recebe `extras` como tupla de pares (em vez de dict) para ser hasheável pelo
+    cache do Streamlit.
+
+    Args:
+        arquivo_id: Id do arquivo de origem.
+        usuario_id: Id do usuário dono.
+        df: DataFrame com os dados (já recortado) a exportar.
+        incluir_dados: Se True, inclui os arquivos `.txt` e `.csv`.
+        extras: Pares `(nome_no_zip, conteúdo)` adicionais (ex.: PNG da colagem).
+
+    Returns:
+        tuple: `(zip_bytes, nome_arquivo)`; ou `(None, None)` se o arquivo de
+        origem não for encontrado.
+    """
     return ArquivoController.exportar_dados(arquivo_id, usuario_id, df, incluir_dados, dict(extras))
 
 
@@ -65,6 +90,19 @@ def _computar_metricas_globais(
     df: pd.DataFrame, nome: str, coluna: str,
     freq: str, limiar: int,
 ) -> dict | None:
+    """Calcula as métricas de ritmo globais (IS, IV, L5, M10) do registro.
+
+    Args:
+        df: DataFrame Condor já recortado.
+        nome: Nome/identificador do registro.
+        coluna: Coluna de atividade usada (ex.: ``"PIM"``).
+        freq: Frequência de reamostragem para IS e IV (ex.: ``"1H"``).
+        limiar: Limiar de binarização da atividade.
+
+    Returns:
+        dict | None: Mapa com as chaves ``is``, ``iv``, ``l5`` e ``m10``; None se
+        os dados forem insuficientes para o cálculo.
+    """
     raw = construir_raw_cached(nome, df, coluna)
     try:
         return {
@@ -82,6 +120,20 @@ def _computar_metricas_periodo(
     df: pd.DataFrame, nome: str, coluna: str,
     freq: str, limiar: int, periodo: str,
 ) -> pd.DataFrame | None:
+    """Calcula as métricas de ritmo por período (ISp, IVp, L5p, M10p).
+
+    Args:
+        df: DataFrame Condor já recortado.
+        nome: Nome/identificador do registro.
+        coluna: Coluna de atividade usada (ex.: ``"PIM"``).
+        freq: Frequência de reamostragem para ISp e IVp (ex.: ``"1H"``).
+        limiar: Limiar de binarização da atividade.
+        periodo: Tamanho da janela de cada período (ex.: ``"7D"``).
+
+    Returns:
+        pandas.DataFrame | None: Tabela com uma linha por período e as colunas
+        ``IS``, ``IV``, ``L5`` e ``M10``; None se os dados forem insuficientes.
+    """
     raw = construir_raw_cached(nome, df, coluna)
     try:
         vals_is  = raw.ISp(period=periodo, freq=freq, threshold=limiar)
@@ -115,14 +167,37 @@ def _preparar_df_exportacao(
     hora_fim: int,
     faixa_luz_filtro: tuple[float, float] | None = None,
 ) -> pd.DataFrame:
-    """
-    Copia df e zera os valores de atividade/luz/temperatura que não
-    correspondem aos sinais e filtros selecionados em "Opções de exibição"
-    e "Filtrar dias exibidos" — preserva todas as colunas e linhas.
+    """Prepara uma cópia do DataFrame refletindo os recortes de exibição.
+
+    Zera os valores de atividade, luz e temperatura que não correspondem aos
+    sinais e filtros selecionados em "Opções de exibição" e "Filtrar dias
+    exibidos", preservando todas as colunas e linhas (apenas o conteúdo dos
+    sinais é zerado).
+
+    Args:
+        df: DataFrame Condor de origem (não é modificado).
+        dt_index: Índice de timestamps pré-computado de `df`.
+        modos_disponiveis: Modos de atividade presentes (ex.: ``["PIM", "TAT"]``).
+        modo_atividade: Modo selecionado, único a ser preservado.
+        mostrar_atividade: Se False, zera a atividade.
+        escala_atividade: Faixa exibida da atividade; valores fora são zerados.
+        mostrar_luz: Se False, zera a luz.
+        escala_luz: Faixa exibida da luz, ou None.
+        mostrar_temperatura: Se False, zera a temperatura.
+        escala_temperatura: Faixa exibida da temperatura, ou None.
+        dias_exibidos: Datas (``YYYY-MM-DD``) mantidas; demais linhas são zeradas.
+        hora_inicio: Hora inicial (inclusive) do período exibido.
+        hora_fim: Hora final (exclusive) do período exibido.
+        faixa_luz_filtro: Faixa de luz; fora dela, atividade e temperatura são
+            zeradas. None desativa esse filtro.
+
+    Returns:
+        pandas.DataFrame: Cópia com os sinais zerados conforme a seleção.
     """
     df = df.copy()
 
     def _zerar_fora_da_faixa(nome_coluna: str, faixa: tuple[float, float] | None) -> None:
+        """Zera os valores de uma coluna fora da faixa `[min, max]` informada."""
         if faixa is None:
             return
         valores = pd.to_numeric(df[nome_coluna], errors="coerce")
@@ -191,7 +266,32 @@ def _gerar_colagem_graficos(
     serie_luz_filtro: pd.Series | None = None,
     faixa_luz_filtro: tuple[float, float] | None = None,
 ) -> bytes:
-    """Renderiza o gráfico de cada dia como imagem e empilha verticalmente — uma linha por dia."""
+    """Renderiza cada dia exibido como imagem e os empilha em uma colagem vertical.
+
+    Gera o `grafico_combinado_dia` de cada dia, converte para PNG via kaleido e
+    empilha as imagens (uma linha por dia, na ordem dos dias exibidos).
+
+    Args:
+        dias_exibidos: Datas (``YYYY-MM-DD``) a renderizar, na ordem desejada.
+        numero_por_dia: Mapa data → número sequencial "Dia N" no registro.
+        raw_data: Série de atividade do `BaseRaw`, indexada por timestamp.
+        escala_atividade: Faixa `(min, max)` do eixo de atividade.
+        rotulo_atividade: Rótulo do modo de atividade (ex.: ``"PIM"``).
+        cor_atividade: Cor da linha de atividade.
+        mostrar_atividade: Se False, omite a linha de atividade.
+        serie_luz: Série de luz a sobrepor, ou None.
+        serie_temp: Série de temperatura a sobrepor, ou None.
+        serie_evento: Série de marcações de evento, ou None.
+        escala_luz: Faixa do eixo de luz, ou None.
+        escala_temperatura: Faixa do eixo de temperatura, ou None.
+        hora_inicio: Hora inicial do recorte exibido.
+        hora_fim: Hora final do recorte exibido.
+        serie_luz_filtro: Série de luz usada para filtrar por faixa, ou None.
+        faixa_luz_filtro: Faixa de luz para filtrar atividade/temperatura, ou None.
+
+    Returns:
+        bytes: Imagem PNG única com todos os gráficos diários empilhados.
+    """
     imagens = []
     for dia in dias_exibidos:
         fig = grafico_combinado_dia(
@@ -203,8 +303,8 @@ def _gerar_colagem_graficos(
             hora_inicio=hora_inicio, hora_fim=hora_fim,
             serie_luz_filtro=serie_luz_filtro, faixa_luz_filtro=faixa_luz_filtro,
         )
-        # round-trip via PlotlyJSONEncoder: serializa Timestamps/numpy antes do kaleido,
-        # que não os aceita diretamente em add_vrect (x0/x1) e nos eixos
+        # Round-trip pelo JSON do plotly: serializa Timestamps/numpy antes do
+        # kaleido, que não os aceita diretamente em add_vrect (x0/x1) e nos eixos.
         fig_serializavel = go.Figure(json.loads(pio.to_json(fig)))
         png = fig_serializavel.to_image(format="png", width=_LARGURA_COLAGEM, height=_ALTURA_GRAFICO_COLAGEM, scale=2)
         imagens.append(Image.open(io.BytesIO(png)))
@@ -234,6 +334,21 @@ def _metricas_ritmo(
     usar_periodo: bool = False,
     periodo: str = "7D",
 ) -> None:
+    """Exibe as métricas de ritmo do registro (globais ou por período).
+
+    Mostra um aviso quando os dados são insuficientes para o cálculo.
+
+    Args:
+        df: DataFrame Condor já recortado.
+        nome: Nome/identificador do registro.
+        coluna: Coluna de atividade usada.
+        titulo: Título da seção exibida.
+        freq: Frequência de reamostragem para IS e IV.
+        limiar: Limiar de binarização da atividade.
+        usar_periodo: Se True, calcula por período (ISp/IVp/L5p/M10p) e exibe uma
+            tabela; senão, exibe as métricas globais em cartões.
+        periodo: Tamanho da janela de cada período (usado quando `usar_periodo`).
+    """
     st.subheader(titulo)
     if usar_periodo:
         resultado = _computar_metricas_periodo(df, nome, coluna, freq, limiar, periodo)
@@ -260,6 +375,14 @@ def _metricas_ritmo(
 # ── Callback de exportação ─────────────────────────────────────────────────────
 
 def _salvar_relatorio(usuario_id: int, nome_origem: str, zip_nome: str, zip_bytes: bytes) -> None:
+    """Salva o ZIP exportado em "Exportar relatório" e agenda o toast de confirmação.
+
+    Args:
+        usuario_id: Id do usuário dono.
+        nome_origem: Nome do arquivo `.txt` que originou a exportação.
+        zip_nome: Nome do `.zip` exportado.
+        zip_bytes: Conteúdo binário do `.zip`.
+    """
     RelatorioController.salvar(usuario_id, zip_nome, nome_origem, zip_bytes)
     set_toast("Relatório exportado e salvo em Exportar relatório.")
 
@@ -267,6 +390,14 @@ def _salvar_relatorio(usuario_id: int, nome_origem: str, zip_nome: str, zip_byte
 # ── Página principal ──────────────────────────────────────────────────────────
 
 def analises_page():
+    """Renderiza a página de análises de actigrafia.
+
+    Aplica o guard de autenticação, deixa escolher um arquivo, exibe os dados do
+    sujeito e oferece os controles de recorte do registro, opções de exibição,
+    filtros de dias e parâmetros das métricas. Mostra as métricas de ritmo e um
+    gráfico combinado por dia exibido, além do fluxo de exportação com download
+    automático do `.zip`.
+    """
     st.title("Análises")
     st.divider()
 

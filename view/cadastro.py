@@ -1,5 +1,7 @@
-"""
-view/cadastro.py — Tela de cadastro de novos usuários.
+"""Tela de cadastro de novos usuários.
+
+Apresenta o produto à esquerda e o formulário de criação de conta à direita. Após
+um cadastro bem-sucedido, exibe uma tela de confirmação com atalho para o login.
 """
 
 import streamlit as st
@@ -8,6 +10,12 @@ from view.ui import Profissao, forca_senha
 
 
 def cadastro_page():
+    """Renderiza a página de cadastro e processa a criação da conta.
+
+    Enquanto o sinalizador `cadastro_ok` estiver no estado da sessão, mostra a
+    tela de sucesso. Caso contrário, exibe o formulário, valida via controller e,
+    em sucesso, marca `cadastro_ok` e força o rerun.
+    """
     if st.session_state.get("cadastro_ok"):
         _tela_sucesso()
         return
@@ -113,6 +121,11 @@ def cadastro_page():
 # ── Tela de sucesso ───────────────────────────────────────────────────────────
 
 def _tela_sucesso():
+    """Exibe a confirmação de cadastro e o atalho para o login.
+
+    Ao acionar o botão, limpa o sinalizador `cadastro_ok` e roteia para a tela
+    de login.
+    """
     st.success("Conta criada com sucesso!")
     st.info("Sua conta está pronta. Faça o login para acessar o Activity.")
     if st.button("Ir para o login", type="primary", width="stretch"):

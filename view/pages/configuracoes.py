@@ -1,9 +1,8 @@
-"""
-view/pages/configuracoes.py — Página de configurações de perfil do usuário.
+"""Página de configurações de perfil do usuário.
 
-Seções:
-  - Perfil : foto, dados pessoais e profissionais
-  - Segurança: troca de senha
+Organizada em duas abas: **Perfil** (foto, dados pessoais e profissionais) e
+**Segurança** (troca de senha). Carrega sempre os dados frescos do banco pelo
+e-mail da sessão e mantém a foto do `session_state` sincronizada após alterações.
 """
 
 from __future__ import annotations
@@ -27,6 +26,11 @@ FOTO_TIPOS     = ["jpg", "jpeg", "png"]
 # ── Entrada principal ─────────────────────────────────────────────────────────
 
 def configuracoes_page():
+    """Renderiza a página de configurações com as abas Perfil e Segurança.
+
+    Recarrega o perfil do banco pelo e-mail da sessão e monta o cabeçalho, a
+    seção de foto, o formulário de perfil e a seção de senha.
+    """
     usuario = st.session_state.get("usuario", {})
     email   = usuario.get("email")
 
@@ -54,6 +58,11 @@ def configuracoes_page():
 # ── Cabeçalho ─────────────────────────────────────────────────────────────────
 
 def _cabecalho(dados: dict):
+    """Renderiza o cabeçalho do perfil (avatar, nome, profissão e bio resumida).
+
+    Args:
+        dados: Dicionário de perfil do usuário.
+    """
     col_foto, col_info = st.columns([1, 6])
 
     with col_foto:
@@ -74,6 +83,14 @@ def _cabecalho(dados: dict):
 # ── Foto de perfil ─────────────────────────────────────────────────────────────
 
 def _secao_foto(dados: dict):
+    """Renderiza a seção de foto de perfil (visualização, remoção e upload).
+
+    Valida o tamanho da imagem enviada, exibe pré-visualização e persiste a nova
+    foto, sincronizando o `session_state`.
+
+    Args:
+        dados: Dicionário de perfil do usuário.
+    """
     st.subheader("Foto de perfil")
 
     col_atual, col_upload = st.columns([1, 3], gap="large")
@@ -132,6 +149,14 @@ def _secao_foto(dados: dict):
 # ── Formulário de perfil ───────────────────────────────────────────────────────
 
 def _formulario_perfil(dados: dict):
+    """Renderiza o formulário de dados do perfil e persiste as alterações.
+
+    Pré-preenche os campos com os dados atuais (CPF/telefone formatados) e, ao
+    salvar com sucesso, atualiza os campos espelhados no `session_state`.
+
+    Args:
+        dados: Dicionário de perfil do usuário.
+    """
     st.subheader("Dados do perfil")
 
     with st.form("form_perfil"):
@@ -200,6 +225,11 @@ def _formulario_perfil(dados: dict):
 # ── Segurança / senha ──────────────────────────────────────────────────────────
 
 def _secao_senha(dados: dict):
+    """Renderiza o formulário de troca de senha, com indicador de força.
+
+    Args:
+        dados: Dicionário de perfil do usuário.
+    """
     st.subheader("Alterar senha")
 
     with st.form("form_senha"):
@@ -223,7 +253,14 @@ def _secao_senha(dados: dict):
 # ── Helpers internos ──────────────────────────────────────────────────────────
 
 def _sync_sessao_foto(foto_bytes: bytes | None, foto_tipo: str | None) -> None:
-    """Mantém a foto do perfil em session_state sincronizada com o banco."""
+    """Sincroniza a foto do perfil no `session_state` com o que foi persistido.
+
+    Mantém o avatar exibido na navbar coerente sem recarregar o perfil do banco.
+
+    Args:
+        foto_bytes: Novo conteúdo binário da foto, ou None se removida.
+        foto_tipo: Novo tipo MIME da foto, ou None se removida.
+    """
     if "usuario" in st.session_state:
         st.session_state["usuario"]["foto_perfil"] = foto_bytes
         st.session_state["usuario"]["foto_tipo"]   = foto_tipo

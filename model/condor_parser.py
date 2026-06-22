@@ -1,15 +1,38 @@
+"""Parsing e geração de arquivos Condor de actigrafia.
+
+Lógica de domínio para o formato de arquivo `.txt` do actígrafo Condor. Não
+acessa o banco de dados; é consumido exclusivamente pelo `ArquivoController`.
+Oferece o carregamento do arquivo em `(metadata, DataFrame)`, utilitários de
+filtragem por dia e a reconstrução do arquivo (`.txt`) ou exportação (`.csv`) a
+partir de um DataFrame.
+"""
+
 import io
 import re
 
 import pandas as pd
 
 _LINHA_DE_DADOS = re.compile(r"^\d{2}/\d{2}/\d{4}")
+"""Reconhece o início de uma linha de dados Condor (data no formato dd/mm/aaaa)."""
 
 
 def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
-    """
-    Recebe caminho (str) ou bytes do arquivo Condor.
-    Retorna (metadata dict, DataFrame com os dados).
+    """Carrega um arquivo Condor, separando metadados dos registros.
+
+    Aceita o conteúdo de três formas diferentes e o decodifica como UTF-8
+    (substituindo bytes inválidos). Linhas de dados com data/hora inválida,
+    timestamps duplicados ou fora de ordem são saneados para não corromper
+    cálculos posteriores de frequência e métricas de ritmo.
+
+    Args:
+        path_ou_bytes: Caminho do arquivo (str), seu conteúdo (bytes) ou um
+            objeto file-like com método `read()`.
+
+    Returns:
+        tuple[dict, pandas.DataFrame]: Par `(metadata, df)`. `metadata` mapeia as
+        chaves do cabeçalho aos respectivos valores; `df` traz os registros, com
+        a coluna `DATE/TIME` já convertida para datetime. Se cabeçalho ou dados
+        não forem encontrados, `df` é um DataFrame vazio.
     """
     if isinstance(path_ou_bytes, str):
         with open(path_ou_bytes, encoding="utf-8", errors="replace") as f:
@@ -21,11 +44,10 @@ def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
 
     linhas = raw.splitlines()
 
-    # --- separa cabeçalho dos dados ---
     # O arquivo pode trazer mais de uma linha "DATE/TIME;...": uma legenda
     # genérica do formato seguida do cabeçalho real, com número de colunas
-    # diferente. A que vale é a última antes da primeira linha de dados —
-    # é ela que casa com as colunas efetivamente presentes nos registros.
+    # diferente. Vale a última antes da primeira linha de dados — é ela que casa
+    # com as colunas efetivamente presentes nos registros.
     metadata = {}
     cabecalho = None
     inicio_dados = None
@@ -43,20 +65,17 @@ def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
     if cabecalho is None or inicio_dados is None:
         return metadata, pd.DataFrame()
 
-    # --- parse da tabela ---
     corpo = "\n".join([cabecalho] + linhas[inicio_dados:])
     df = pd.read_csv(io.StringIO(corpo), sep=";", decimal=".")
 
-    # --- converte timestamp ---
-    # linhas com data/hora ilegível viram NaT e são descartadas: um único
-    # NaT no índice corrompe o cálculo de período/frequência do registro
-    # (e, com isso, as métricas de ritmo do pyActigraphy, que passam a
-    # lançar KeyError: NaT).
+    # Datas ilegíveis viram NaT e são removidas: um único NaT no índice corrompe
+    # o cálculo de período/frequência do registro e faz as métricas de ritmo do
+    # pyActigraphy lançarem KeyError: NaT.
     df["DATE/TIME"] = pd.to_datetime(df["DATE/TIME"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
     df.dropna(subset=["DATE/TIME"], inplace=True)
-    # timestamps duplicados (falha de gravação do dispositivo) fazem o
-    # asfreq() usado para montar o BaseRaw falhar com "cannot reindex on an
-    # axis with duplicate labels", interrompendo o cálculo de IS/IV/L5/M10.
+    # Timestamps duplicados (falha de gravação do dispositivo) fazem o asfreq()
+    # da montagem do BaseRaw falhar com "cannot reindex on an axis with duplicate
+    # labels", interrompendo o cálculo de IS/IV/L5/M10.
     df.drop_duplicates(subset=["DATE/TIME"], keep="first", inplace=True)
     df.sort_values("DATE/TIME", inplace=True)
     df.reset_index(drop=True, inplace=True)
@@ -65,18 +84,45 @@ def carregar_condor(path_ou_bytes) -> tuple[dict, pd.DataFrame]:
 
 
 def dias_disponiveis(df: pd.DataFrame) -> list[str]:
+    """Lista as datas distintas presentes no DataFrame, em ordem crescente.
+
+    Args:
+        df: DataFrame Condor com a coluna `DATE/TIME`.
+
+    Returns:
+        list[str]: Datas únicas no formato ``YYYY-MM-DD``, ordenadas.
+    """
     return sorted(df["DATE/TIME"].dt.date.astype(str).unique().tolist())
 
 
 def filtrar_dia(df: pd.DataFrame, data_str: str) -> pd.DataFrame:
+    """Filtra o DataFrame para os registros de um único dia.
+
+    Args:
+        df: DataFrame Condor com a coluna `DATE/TIME`.
+        data_str: Data alvo no formato ``YYYY-MM-DD``.
+
+    Returns:
+        pandas.DataFrame: Cópia com apenas as linhas cuja data corresponde a
+        `data_str`.
+    """
     return df[df["DATE/TIME"].dt.date.astype(str) == data_str].copy()
 
 
 def gerar_txt(raw_original: bytes, df: pd.DataFrame) -> bytes:
-    """
-    Reconstrói o arquivo Condor (.txt), preservando todas as linhas de
-    cabeçalho (incluindo a linha de campos) e substituindo as linhas de
-    dados pelos valores de df.
+    """Reconstrói o arquivo Condor (.txt) com os dados de um DataFrame.
+
+    Preserva integralmente o cabeçalho original (incluindo a linha de campos) e
+    substitui apenas as linhas de dados pelos valores de `df`, reformatando a
+    coluna `DATE/TIME` no padrão Condor e gravando valores ausentes como vazios.
+
+    Args:
+        raw_original: Conteúdo binário do arquivo Condor original (fonte do
+            cabeçalho e da ordem das colunas).
+        df: DataFrame com os registros a escrever.
+
+    Returns:
+        bytes: Conteúdo do arquivo `.txt` reconstruído, codificado em UTF-8.
     """
     linhas = raw_original.decode("utf-8", errors="replace").splitlines()
 
@@ -107,5 +153,12 @@ def gerar_txt(raw_original: bytes, df: pd.DataFrame) -> bytes:
 
 
 def gerar_csv(df: pd.DataFrame) -> bytes:
-    """Gera um CSV contendo apenas os campos (colunas) e seus valores."""
+    """Serializa o DataFrame como CSV simples (colunas e valores).
+
+    Args:
+        df: DataFrame a exportar.
+
+    Returns:
+        bytes: Conteúdo CSV (sem índice), codificado em UTF-8.
+    """
     return df.to_csv(index=False).encode("utf-8")

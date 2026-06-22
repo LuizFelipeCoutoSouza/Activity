@@ -1,5 +1,10 @@
-"""
-view/pages/analise_temperatura.py — Análise de temperatura.
+"""Página de análise de temperatura de um único arquivo.
+
+Para os sinais de temperatura disponíveis (`TEMPERATURE` e/ou `EXT TEMPERATURE`),
+monta uma matriz dia × hora com a média horária, um gráfico de médias por hora,
+a matriz estilizada por escala de cores e estatísticas descritivas. Permite
+exportar tabelas (`.csv`) e o gráfico (`.png`) em um `.zip`, salvando uma cópia
+em "Exportar relatório".
 """
 
 from __future__ import annotations
@@ -26,6 +31,20 @@ COR_TEMPERATURA_EXT = "#1f77b4"
 
 @st.cache_data(ttl=120, show_spinner=False)
 def _gerar_export_zip(arquivo_id: int, usuario_id: int, extras: tuple[tuple[str, bytes], ...]) -> tuple:
+    """Monta o ZIP de exportação apenas com arquivos extras (cacheado).
+
+    Recebe `extras` como tupla de pares (em vez de dict) para ser hasheável pelo
+    cache do Streamlit.
+
+    Args:
+        arquivo_id: Id do arquivo de origem.
+        usuario_id: Id do usuário dono.
+        extras: Pares `(nome_no_zip, conteúdo)` a incluir (CSVs e/ou PNG).
+
+    Returns:
+        tuple: `(zip_bytes, nome_arquivo)`; ou `(None, None)` se o arquivo de
+        origem não for encontrado.
+    """
     return ArquivoController.exportar_dados(arquivo_id, usuario_id, pd.DataFrame(), incluir_dados=False, extras=dict(extras))
 
 
@@ -35,10 +54,20 @@ _DIAS_SEMANA_ABREV = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
 
 
 def _matriz_temperatura_horaria(df: pd.DataFrame, temperatura: pd.Series) -> pd.DataFrame:
-    """
-    Monta uma matriz dia x hora com a temperatura média de cada hora (00h-23h).
+    """Monta a matriz dia × hora com a temperatura média de cada hora.
+
+    Cada célula é a média da temperatura naquela hora (00h–23h) daquele dia.
     Acrescenta uma coluna "Média" (média das horas do dia) e uma linha "Média"
-    (média de cada hora entre todos os dias).
+    (média de cada hora entre todos os dias). O índice combina data e o dia da
+    semana abreviado.
+
+    Args:
+        df: DataFrame Condor com a coluna `DATE/TIME`.
+        temperatura: Série de temperatura alinhada às linhas de `df`.
+
+    Returns:
+        pandas.DataFrame: Matriz com 24 colunas horárias mais a coluna/linha
+        "Média".
     """
     dt = pd.DatetimeIndex(df["DATE/TIME"])
     base = pd.DataFrame({
@@ -60,7 +89,17 @@ def _matriz_temperatura_horaria(df: pd.DataFrame, temperatura: pd.Series) -> pd.
 
 
 def _grafico_medias_horarias(matriz: pd.DataFrame | None, matriz_ext: pd.DataFrame | None) -> go.Figure:
-    """Linha com a temperatura média de cada hora (00h-23h), uma cor por sinal disponível."""
+    """Monta o gráfico de linha da temperatura média por hora (00h–23h).
+
+    Desenha uma linha por sinal disponível, lendo a linha "Média" de cada matriz.
+
+    Args:
+        matriz: Matriz da temperatura interna, ou None se ausente.
+        matriz_ext: Matriz da temperatura externa, ou None se ausente.
+
+    Returns:
+        plotly.graph_objs.Figure: Figura com as médias horárias.
+    """
     horas = [f"{h:02d}h" for h in range(24)]
 
     fig = go.Figure()
@@ -90,13 +129,25 @@ def _grafico_medias_horarias(matriz: pd.DataFrame | None, matriz_ext: pd.DataFra
 
 
 def _faixa_valores(matriz: pd.DataFrame) -> tuple[float, float]:
-    """Retorna (mínimo, máximo) da matriz, excluindo a linha e a coluna 'Média'."""
+    """Calcula a faixa de valores da matriz, ignorando a linha/coluna "Média".
+
+    Args:
+        matriz: Matriz dia × hora (com a linha e a coluna "Média" no fim).
+
+    Returns:
+        tuple[float, float]: Par `(mínimo, máximo)` dos valores horários.
+    """
     dados = matriz.iloc[:-1, :-1]
     return float(dados.min().min()), float(dados.max().max())
 
 
 def _legenda_escala_cores(vmin: float, vmax: float) -> None:
-    """Barra de gradiente indicando a escala de cores da matriz (azul = frio, vermelho = quente)."""
+    """Renderiza a barra de gradiente da escala de cores (azul = frio, vermelho = quente).
+
+    Args:
+        vmin: Valor mínimo da faixa (extremidade fria).
+        vmax: Valor máximo da faixa (extremidade quente).
+    """
     st.markdown(
         f"""
         <div style="display:flex;align-items:center;gap:10px;margin:2px 0 10px 0;">
@@ -111,11 +162,21 @@ def _legenda_escala_cores(vmin: float, vmax: float) -> None:
 
 
 def _estilizar_matriz(matriz: pd.DataFrame):
+    """Aplica formatação e escala de cores à matriz de temperatura.
+
+    Colore cada célula conforme a posição do valor na faixa do registro (azul =
+    frio, vermelho = quente), destaca a linha/coluna "Média" e fixa cabeçalhos.
+
+    Args:
+        matriz: Matriz dia × hora a estilizar.
+
+    Returns:
+        pandas.io.formats.style.Styler: Objeto de estilo pronto para `to_html()`.
+    """
     idx_media_linha = matriz.shape[0] - 1
     idx_media_coluna = matriz.shape[1] - 1
 
-    # escala de cores azul (frio) → vermelho (quente), relativa à faixa de valores
-    # do próprio registro — exclui a linha e a coluna "Média" do cálculo da faixa
+    # Faixa relativa ao próprio registro, excluindo a linha e a coluna "Média".
     vmin, vmax = _faixa_valores(matriz)
 
     def _cor_celula(valor: float) -> str:
@@ -147,7 +208,11 @@ def _estilizar_matriz(matriz: pd.DataFrame):
 
 
 def _renderizar_matriz(matriz: pd.DataFrame) -> None:
-    """Exibe a legenda de cores e a matriz estilizada dentro de um contêiner com rolagem e cabeçalhos fixos."""
+    """Exibe a legenda de cores e a matriz estilizada em um contêiner rolável.
+
+    Args:
+        matriz: Matriz dia × hora a renderizar.
+    """
     vmin, vmax = _faixa_valores(matriz)
     _legenda_escala_cores(vmin, vmax)
     html = _estilizar_matriz(matriz).to_html()
@@ -167,7 +232,15 @@ _HELP_ESTATISTICAS = {
 
 
 def _calcular_estatisticas(serie: pd.Series) -> dict[str, float]:
-    """Calcula as estatísticas descritivas (°C) sobre todos os registros da série."""
+    """Calcula estatísticas descritivas (°C) sobre todos os registros da série.
+
+    Args:
+        serie: Série de temperatura.
+
+    Returns:
+        dict[str, float]: Média, mediana, mínimo, máximo, amplitude, desvio
+        padrão e variância, indexados pelo respectivo rótulo.
+    """
     minimo, maximo = float(serie.min()), float(serie.max())
     return {
         "Média": float(serie.mean()),
@@ -181,7 +254,11 @@ def _calcular_estatisticas(serie: pd.Series) -> dict[str, float]:
 
 
 def _exibir_estatisticas(serie: pd.Series) -> None:
-    """Exibe as estatísticas descritivas em um cartão com uma métrica por coluna."""
+    """Exibe as estatísticas descritivas em um cartão, uma métrica por coluna.
+
+    Args:
+        serie: Série de temperatura sobre a qual calcular as estatísticas.
+    """
     with st.container(border=True):
         st.markdown("**📊 Estatísticas descritivas**")
         for col, (rotulo, valor) in zip(st.columns(7), _calcular_estatisticas(serie).items()):
@@ -190,7 +267,14 @@ def _exibir_estatisticas(serie: pd.Series) -> None:
 
 
 def _estatisticas_para_csv(serie: pd.Series) -> bytes:
-    """Serializa as estatísticas descritivas em CSV (colunas: Estatística, Valor (°C))."""
+    """Serializa as estatísticas descritivas de uma série em CSV.
+
+    Args:
+        serie: Série de temperatura.
+
+    Returns:
+        bytes: CSV com as colunas ``Estatística`` e ``Valor (°C)``, em UTF-8.
+    """
     df_stats = pd.DataFrame(_calcular_estatisticas(serie).items(), columns=["Estatística", "Valor (°C)"])
     return df_stats.to_csv(index=False).encode("utf-8")
 
@@ -198,6 +282,14 @@ def _estatisticas_para_csv(serie: pd.Series) -> bytes:
 # ── Callback de exportação ─────────────────────────────────────────────────────
 
 def _salvar_relatorio(usuario_id: int, nome_origem: str, zip_nome: str, zip_bytes: bytes) -> None:
+    """Salva o ZIP exportado em "Exportar relatório" e agenda o toast de confirmação.
+
+    Args:
+        usuario_id: Id do usuário dono.
+        nome_origem: Nome do arquivo `.txt` que originou a exportação.
+        zip_nome: Nome do `.zip` exportado.
+        zip_bytes: Conteúdo binário do `.zip`.
+    """
     RelatorioController.salvar(usuario_id, zip_nome, nome_origem, zip_bytes)
     set_toast("Relatório exportado e salvo em Exportar relatório.")
 
@@ -205,6 +297,13 @@ def _salvar_relatorio(usuario_id: int, nome_origem: str, zip_nome: str, zip_byte
 # ── Página principal ──────────────────────────────────────────────────────────
 
 def analise_temperatura_page():
+    """Renderiza a página de análise de temperatura.
+
+    Aplica o guard de autenticação, deixa escolher um arquivo, exibe os dados do
+    sujeito e, para cada sinal de temperatura utilizável, mostra o gráfico de
+    médias horárias, a matriz dia × hora e as estatísticas. Trata também o fluxo
+    de exportação e o download automático do `.zip`.
+    """
     st.title("Análise de temperatura")
     st.divider()
 

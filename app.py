@@ -1,13 +1,9 @@
-"""
-app.py — Ponto de entrada da aplicação Activity.
+"""Ponto de entrada da aplicação Activity e única fonte de verdade de autenticação.
 
-Responsabilidades:
-  - Inicializar o banco de dados (init_db).
-  - Processar operações pendentes de cookie (set / delete).
-  - Restaurar sessão a partir de cookie persistido entre refreshes.
-  - Detectar autenticação por e-mail.
-  - Normalizar os dados do usuário em st.session_state["usuario"].
-  - Rotear para as áreas públicas (login, cadastro) ou protegidas (home).
+A cada render, o script inicializa o banco (`init_db`), aplica operações pendentes
+de cookie (gravar/apagar), tenta restaurar a sessão a partir do cookie persistido,
+detecta a autenticação e roteia para as áreas públicas (`login`, `cadastro`) ou
+protegidas (`home`).
 """
 
 import sys
@@ -28,10 +24,13 @@ _COOKIE = "activity_session"
 # ── Helpers de cookie ─────────────────────────────────────────────────────────
 
 def _gravar_cookie(token: str, dias: int) -> None:
-    """
-    Grava o cookie de sessão via JS no iframe same-origin.
-    dias=0 → session cookie (apagado ao fechar o browser).
-    dias>0 → cookie persistente com max-age em segundos.
+    """Grava o cookie de sessão via JS, a partir do iframe same-origin.
+
+    Args:
+        token: Token UUID da sessão a guardar no cookie.
+        dias: Validade em dias. Se 0, grava um session cookie (apagado ao fechar
+            o navegador); se maior que 0, grava um cookie persistente com
+            `max-age` correspondente.
     """
     if dias > 0:
         js = (f'window.parent.document.cookie="'

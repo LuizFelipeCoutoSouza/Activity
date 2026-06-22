@@ -1,8 +1,22 @@
+"""Tela de login da aplicação.
+
+Layout em duas colunas: à esquerda, a apresentação do produto; à direita, o
+formulário de autenticação. No login bem-sucedido, inicia a sessão persistente e
+agenda a gravação do cookie, deixando a escrita efetiva para o próximo render em
+`app.py`.
+"""
+
 import streamlit as st
 from controller.user_controller import UserController
 
 
 def login_page():
+    """Renderiza a página de login e processa a tentativa de autenticação.
+
+    Em caso de sucesso, cria a sessão (com validade conforme "manter conectado"),
+    grava os dados em `st.session_state`, agenda o cookie e força o rerun. Em
+    falha, exibe a mensagem de erro retornada pelo controller.
+    """
     col_esq, col_dir = st.columns(2, border=True)
 
     with col_esq:
@@ -82,7 +96,7 @@ def login_page():
         if st.button("Entrar", type="primary", width="stretch"):
             sucesso, mensagem, usuario = UserController.login(email, senha)
             if sucesso:
-                # dias=0 → session cookie; dias=30 → cookie persistente de 30 dias
+                # 30 dias → cookie persistente; 0 → session cookie (fecha com o navegador).
                 dias  = 30 if manter_conectado else 0
                 token = UserController.iniciar_sessao(usuario["id"], dias)
 

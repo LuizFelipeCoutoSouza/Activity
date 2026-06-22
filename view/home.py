@@ -1,5 +1,7 @@
-"""
-view/home.py — Shell autenticado: navbar, sidebar e roteamento entre páginas.
+"""Shell da área autenticada: navbar, sidebar e roteamento entre páginas.
+
+Monta a moldura comum a todas as telas internas e despacha, via import lazy, para
+a página selecionada na barra lateral. Concentra também o fluxo de logout.
 """
 
 import base64
@@ -19,6 +21,7 @@ PAGINAS = [
 
 
 def home_page():
+    """Renderiza a moldura autenticada (navbar, sidebar e conteúdo da página)."""
     usuario = st.session_state.get("usuario", {})
 
     _navbar(usuario)
@@ -29,6 +32,11 @@ def home_page():
 # ── Navbar ────────────────────────────────────────────────────────────────────
 
 def _navbar(usuario: dict):
+    """Renderiza a barra superior com a marca e o avatar/nome do usuário.
+
+    Args:
+        usuario: Dicionário de perfil do usuário logado.
+    """
     nome      = usuario.get("nome", "Usuário")
     foto      = usuario.get("foto_perfil")
     foto_tipo = usuario.get("foto_tipo")
@@ -44,6 +52,12 @@ def _navbar(usuario: dict):
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 def _sidebar():
+    """Renderiza a barra lateral de navegação.
+
+    Desenha um botão por página de `PAGINAS` (destacando a ativa), além dos
+    atalhos de configurações e logout, atualizando `pagina_atual` no estado da
+    sessão a cada escolha.
+    """
     pagina_atual = st.session_state.get("pagina_atual", "Análises")
 
     with st.sidebar:
@@ -129,6 +143,10 @@ def _sidebar():
 # ── Roteamento de conteúdo ────────────────────────────────────────────────────
 
 def _conteudo():
+    """Importa e renderiza a página correspondente a `pagina_atual`.
+
+    Usa import lazy: cada módulo de página só é carregado quando selecionado.
+    """
     pagina = st.session_state.get("pagina_atual", "Análises")
 
     if pagina == "Análises":
@@ -157,6 +175,11 @@ def _conteudo():
 # ── Logout ────────────────────────────────────────────────────────────────────
 
 def _logout():
+    """Encerra a sessão do usuário e retorna à tela de login.
+
+    Invalida a sessão no banco, agenda a remoção do cookie, limpa as chaves de
+    estado de autenticação e força o rerun.
+    """
     token = st.session_state.pop("_session_token", None)
     if token:
         UserController.encerrar_sessao(token)

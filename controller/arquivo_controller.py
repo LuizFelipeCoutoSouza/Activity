@@ -1,3 +1,11 @@
+"""Validação e orquestração de arquivos de actigrafia.
+
+Camada intermediária entre as views e os modelos `ArquivoModel`/`condor_parser`.
+Cobre o CRUD dos arquivos `.txt`, a detecção de encoding/contagem de linhas no
+upload, o carregamento/filtragem dos dados Condor e a exportação compactada
+(`.zip`). As operações com validação seguem o padrão de retorno em tupla.
+"""
+
 from __future__ import annotations
 
 import io
@@ -16,6 +24,18 @@ from model.condor_parser import (
 
 
 def _detectar_encoding(raw: bytes) -> str:
+    """Detecta o encoding provável de um arquivo a partir dos bytes.
+
+    Testa BOM de UTF-8 e, em seguida, decodificações candidatas até uma ter
+    sucesso.
+
+    Args:
+        raw: Conteúdo binário do arquivo.
+
+    Returns:
+        str: Nome do encoding (``utf-8-sig``, ``utf-8``, ``latin-1`` ou
+        ``cp1252``); ``binary`` se nenhum candidato decodificar o conteúdo.
+    """
     if raw.startswith(b'\xef\xbb\xbf'):
         return 'utf-8-sig'
     for enc in ('utf-8', 'latin-1', 'cp1252'):
@@ -28,6 +48,15 @@ def _detectar_encoding(raw: bytes) -> str:
 
 
 def _extrair_stats(raw: bytes) -> tuple:
+    """Extrai número de linhas e encoding do conteúdo de um arquivo.
+
+    Args:
+        raw: Conteúdo binário do arquivo.
+
+    Returns:
+        tuple[int, str]: `(num_linhas, encoding)`. Para conteúdo binário ou
+        indecodificável, retorna `(0, encoding)`.
+    """
     encoding = _detectar_encoding(raw)
     if encoding == 'binary':
         return 0, encoding
@@ -39,9 +68,23 @@ def _extrair_stats(raw: bytes) -> tuple:
 
 
 class ArquivoController:
+    """Orquestra o CRUD de arquivos e a análise/exportação de actigrafia."""
 
     @staticmethod
     def fazer_upload(usuario_id: int, uploaded_file, descricao: str = "") -> tuple:
+        """Valida e salva um arquivo `.txt` enviado.
+
+        Rejeita arquivos vazios, com extensão diferente de `.txt` ou com nome já
+        em uso pelo usuário.
+
+        Args:
+            usuario_id: Id do usuário dono.
+            uploaded_file: Objeto de upload do Streamlit (com `.name` e `.read()`).
+            descricao: Descrição opcional do arquivo.
+
+        Returns:
+            tuple[bool, str]: `(sucesso, mensagem)`.
+        """
         if uploaded_file is None:
             return False, "Nenhum arquivo selecionado."
         if not uploaded_file.name.lower().endswith('.txt'):
@@ -64,6 +107,18 @@ class ArquivoController:
 
     @staticmethod
     def fazer_upload_em_massa(usuario_id: int, uploaded_files: list, descricao: str = "") -> tuple:
+        """Envia vários arquivos, reaproveitando `fazer_upload` em cada um.
+
+        Args:
+            usuario_id: Id do usuário dono.
+            uploaded_files: Lista de objetos de upload.
+            descricao: Descrição aplicada a todos os arquivos.
+
+        Returns:
+            tuple[list, int]: `(resultados, sucesso)`, onde `resultados` é uma
+            lista de `(nome, ok, mensagem)` e `sucesso` é a contagem de envios
+            bem-sucedidos.
+        """
         resultados = []
         for f in uploaded_files:
             ok, msg = ArquivoController.fazer_upload(usuario_id, f, descricao)
@@ -73,10 +128,28 @@ class ArquivoController:
 
     @staticmethod
     def listar(usuario_id: int) -> list:
+        """Lista os metadados dos arquivos de um usuário.
+
+        Args:
+            usuario_id: Id do usuário dono.
+
+        Returns:
+            list[dict]: Metadados dos arquivos.
+        """
         return ArquivoModel.listar(usuario_id)
 
     @staticmethod
     def baixar(arquivo_id: int, usuario_id: int) -> tuple:
+        """Recupera o conteúdo e o nome de um arquivo para download.
+
+        Args:
+            arquivo_id: Id do arquivo.
+            usuario_id: Id do usuário dono.
+
+        Returns:
+            tuple: `(conteudo, nome)` em sucesso; `(None, mensagem)` se o arquivo
+            não for encontrado.
+        """
         arquivo = ArquivoModel.buscar(arquivo_id, usuario_id)
         if not arquivo:
             return None, "Arquivo não encontrado."
@@ -84,6 +157,20 @@ class ArquivoController:
 
     @staticmethod
     def atualizar_metadados(arquivo_id: int, usuario_id: int, nome: str, descricao: str) -> tuple:
+        """Atualiza nome e descrição de um arquivo.
+
+        Garante a extensão `.txt` no nome e rejeita colisão de nome com outro
+        arquivo do mesmo usuário.
+
+        Args:
+            arquivo_id: Id do arquivo a atualizar.
+            usuario_id: Id do usuário dono.
+            nome: Novo nome (recebe `.txt` se faltar).
+            descricao: Nova descrição.
+
+        Returns:
+            tuple[bool, str]: `(sucesso, mensagem)`.
+        """
         nome = nome.strip()
         if not nome:
             return False, "O nome não pode estar vazio."
@@ -102,6 +189,21 @@ class ArquivoController:
 
     @staticmethod
     def substituir_arquivo(arquivo_id: int, usuario_id: int, nome: str, descricao: str, uploaded_file) -> tuple:
+        """Substitui o conteúdo de um arquivo, mantendo seu id.
+
+        Recalcula tamanho, linhas e encoding a partir do novo conteúdo. Garante a
+        extensão `.txt` e rejeita colisão de nome com outro arquivo do usuário.
+
+        Args:
+            arquivo_id: Id do arquivo a substituir.
+            usuario_id: Id do usuário dono.
+            nome: Novo nome; se vazio, usa o nome do arquivo enviado.
+            descricao: Nova descrição.
+            uploaded_file: Objeto de upload com o novo conteúdo `.txt`.
+
+        Returns:
+            tuple[bool, str]: `(sucesso, mensagem)`.
+        """
         if uploaded_file is None:
             return False, "Nenhum arquivo selecionado."
         if not uploaded_file.name.lower().endswith('.txt'):
@@ -129,6 +231,15 @@ class ArquivoController:
 
     @staticmethod
     def deletar(arquivo_id: int, usuario_id: int) -> tuple:
+        """Remove um arquivo do usuário.
+
+        Args:
+            arquivo_id: Id do arquivo a remover.
+            usuario_id: Id do usuário dono.
+
+        Returns:
+            tuple[bool, str]: `(sucesso, mensagem)`.
+        """
         try:
             ArquivoModel.deletar(arquivo_id, usuario_id)
             return True, "Arquivo removido com sucesso."
@@ -139,7 +250,16 @@ class ArquivoController:
 
     @staticmethod
     def carregar_actigrafia(arquivo_id: int, usuario_id: int) -> tuple:
-        """Baixa e processa um arquivo Condor. Retorna (metadata, DataFrame) ou ({}, DataFrame vazio)."""
+        """Baixa e processa um arquivo Condor para análise.
+
+        Args:
+            arquivo_id: Id do arquivo.
+            usuario_id: Id do usuário dono.
+
+        Returns:
+            tuple[dict, pandas.DataFrame]: `(metadata, df)` do parser Condor; ou
+            `({}, DataFrame vazio)` se o arquivo não for encontrado.
+        """
         raw, _ = ArquivoController.baixar(arquivo_id, usuario_id)
         if not raw:
             return {}, pd.DataFrame()
@@ -147,12 +267,27 @@ class ArquivoController:
 
     @staticmethod
     def dias_disponiveis(df: pd.DataFrame) -> list:
-        """Retorna lista ordenada de datas (YYYY-MM-DD) presentes no DataFrame."""
+        """Lista as datas distintas presentes no DataFrame.
+
+        Args:
+            df: DataFrame Condor.
+
+        Returns:
+            list[str]: Datas únicas (``YYYY-MM-DD``) em ordem crescente.
+        """
         return _dias_disponiveis(df)
 
     @staticmethod
     def filtrar_dia(df: pd.DataFrame, data_str: str) -> pd.DataFrame:
-        """Filtra o DataFrame para um único dia."""
+        """Filtra o DataFrame para os registros de um único dia.
+
+        Args:
+            df: DataFrame Condor.
+            data_str: Data alvo no formato ``YYYY-MM-DD``.
+
+        Returns:
+            pandas.DataFrame: Cópia apenas com as linhas do dia indicado.
+        """
         return _filtrar_dia(df, data_str)
 
     @staticmethod
@@ -160,10 +295,22 @@ class ArquivoController:
         arquivo_id: int, usuario_id: int, df: pd.DataFrame,
         incluir_dados: bool = True, extras: dict[str, bytes] | None = None,
     ) -> tuple:
-        """Compacta em um ZIP o .txt (formato Condor original) e o .csv (se incluir_dados)
-        mais quaisquer arquivos extras (ex.: imagens de gráficos).
+        """Monta um ZIP com os dados exportados e/ou arquivos extras.
 
-        Retorna (zip_bytes, nome_arquivo) ou (None, None) se o arquivo original não for encontrado.
+        Quando `incluir_dados`, adiciona o `.txt` (formato Condor reconstruído a
+        partir de `df`) e o `.csv`. Os itens de `extras` (ex.: PNGs de gráficos)
+        são sempre adicionados.
+
+        Args:
+            arquivo_id: Id do arquivo de origem.
+            usuario_id: Id do usuário dono.
+            df: DataFrame com os dados a exportar.
+            incluir_dados: Se True, inclui os arquivos `.txt` e `.csv`.
+            extras: Mapa `nome_no_zip -> conteúdo` de arquivos adicionais.
+
+        Returns:
+            tuple: `(zip_bytes, nome_arquivo)` em sucesso; `(None, None)` se o
+            arquivo de origem não for encontrado.
         """
         raw, nome = ArquivoController.baixar(arquivo_id, usuario_id)
         if not raw:
@@ -183,10 +330,16 @@ class ArquivoController:
 
     @staticmethod
     def gerar_zip(arquivo_ids: list, usuario_id: int) -> tuple:
-        """Compacta os arquivos indicados em um ZIP em memória.
+        """Compacta vários arquivos do usuário em um ZIP em memória.
 
-        Retorna (zip_bytes, nome_arquivo, n_incluidos).
-        Se nenhum arquivo for encontrado, retorna (None, None, 0).
+        Args:
+            arquivo_ids: Ids dos arquivos a incluir.
+            usuario_id: Id do usuário dono.
+
+        Returns:
+            tuple: `(zip_bytes, nome_arquivo, n_incluidos)` em sucesso, com nome
+            baseado em timestamp; `(None, None, 0)` se nenhum arquivo for
+            encontrado.
         """
         buf = io.BytesIO()
         n   = 0

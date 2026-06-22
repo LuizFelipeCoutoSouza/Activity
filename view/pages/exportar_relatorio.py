@@ -1,8 +1,7 @@
-"""
-view/pages/exportar_relatorio.py — Relatórios exportados pelo usuário.
+"""Página de relatórios exportados pelo usuário.
 
-Lista os arquivos .zip gerados em "Análises" e salvos no banco, permitindo
-baixar novamente ou excluir.
+Lista, de forma paginada, os arquivos `.zip` gerados nas páginas de análise e
+salvos no banco, permitindo baixá-los novamente ou excluí-los.
 """
 
 import streamlit as st
@@ -16,6 +15,15 @@ POR_PAGINA = 8
 
 @st.cache_data(ttl=120)
 def _buscar_conteudo(relatorio_id: int, usuario_id: int) -> tuple:
+    """Recupera o conteúdo de um relatório para download (cacheado).
+
+    Args:
+        relatorio_id: Id do relatório.
+        usuario_id: Id do usuário dono.
+
+    Returns:
+        tuple: `(conteudo, nome)`; ou `(None, mensagem)` se não encontrado.
+    """
     return RelatorioController.baixar(relatorio_id, usuario_id)
 
 
@@ -23,6 +31,16 @@ def _buscar_conteudo(relatorio_id: int, usuario_id: int) -> tuple:
 
 @st.dialog("Excluir relatório")
 def _dialogo_excluir(relatorio_id: int, usuario_id: int, nome: str):
+    """Exibe o diálogo de confirmação de exclusão de um relatório.
+
+    Ao confirmar, remove o relatório, limpa o cache de conteúdo e agenda o toast
+    de resultado.
+
+    Args:
+        relatorio_id: Id do relatório a excluir.
+        usuario_id: Id do usuário dono.
+        nome: Nome do relatório, exibido na confirmação.
+    """
     st.write(f"Tem certeza que deseja excluir **{nome}**?")
     st.caption("Esta ação não pode ser desfeita.")
     col1, col2 = st.columns(2)
@@ -40,6 +58,12 @@ def _dialogo_excluir(relatorio_id: int, usuario_id: int, nome: str):
 # ── Página principal ──────────────────────────────────────────────────────────
 
 def exportar_relatorio_page():
+    """Renderiza a página de relatórios exportados.
+
+    Aplica o guard de autenticação, lista os relatórios do usuário de forma
+    paginada e trata o fluxo de confirmação de exclusão. Exibe orientação quando
+    não há relatórios.
+    """
     st.title("📄 Exportar relatório")
     st.divider()
 
@@ -92,6 +116,12 @@ def exportar_relatorio_page():
 # ── Linha de relatório ──────────────────────────────────────────────────────────
 
 def _linha_relatorio(relatorio: dict, usuario_id: int):
+    """Renderiza uma linha da tabela de relatórios (dados + ações).
+
+    Args:
+        relatorio: Dicionário de metadados do relatório.
+        usuario_id: Id do usuário dono, usado para buscar o conteúdo no download.
+    """
     st.divider()
     cols = st.columns([4, 3, 1.5, 1.3, 1.3])
 
@@ -117,6 +147,14 @@ def _linha_relatorio(relatorio: dict, usuario_id: int):
 # ── Helper ────────────────────────────────────────────────────────────────────
 
 def _formatar_bytes(n: int) -> str:
+    """Formata um tamanho em bytes como texto legível (B, KB ou MB).
+
+    Args:
+        n: Tamanho em bytes.
+
+    Returns:
+        str: Tamanho com a unidade apropriada (ex.: ``"1.5 MB"``).
+    """
     if n < 1_024:
         return f"{n} B"
     if n < 1_024 ** 2:

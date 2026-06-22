@@ -15,9 +15,17 @@ pip install -r requirements.txt
 
 # Run the app
 streamlit run app.py
+
+# Ou rodar tudo (app + PostgreSQL) via Docker Compose
+docker compose up --build
 ```
 
-The app expects a local PostgreSQL instance (`localhost:5432`, database `Activity`, user `postgres`, password `postgres`). `init_db()` é chamado na inicialização e cria as seis tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
+A conexão com o banco lê variáveis de ambiente com defaults locais (`DB_HOST=localhost`, `DB_PORT=5432`, `DB_NAME=Activity`, `DB_USER=postgres`, `DB_PASSWORD=postgres` — ver `get_connection()` em `model/database.py`). `init_db()` é chamado na inicialização e cria as seis tabelas com esquema completo via `CREATE TABLE IF NOT EXISTS`.
+
+### Docker
+
+- `Dockerfile` — imagem baseada em `continuumio/miniconda3`; cria um ambiente conda `pyActi39` (Python 3.9, exigido pelo pyActigraphy), instala `numba==0.57.1` antes do `pyActigraphy==1.2.2`, depois `requirements.txt`, e sobe o Streamlit em `0.0.0.0:8501`.
+- `docker-compose.yml` — dois serviços: `db` (`postgres:16`, volume persistente `db_data`, healthcheck `pg_isready`) e `app` (build local, depende de `db` saudável, recebe `DB_HOST=db` e demais credenciais via env).
 
 ## Dependencies
 
@@ -32,7 +40,7 @@ Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
 | `pyActigraphy` | 1.2.2 | Parsing/análise de actigrafia: `BaseRaw`, métricas IS/IV/L5/M10, máscara de inatividade — `construir_raw`/`construir_raw_cached` em `view/ui.py`, usado por `analises.py` e `comparacao.py` |
 | `pandas` | 2.1.4 | DataFrames/séries temporais — usado por `model/condor_parser.py` e pelas páginas de análise/comparação |
 | `plotly` | 6.7.0 | Gráficos interativos (`graph_objects`/`express`) — `grafico_combinado_dia` em `view/ui.py` (usado por `analises.py`), gráfico próprio em `comparacao.py` e `analise_temperatura.py` |
-| `kaleido` | 1.3.0 | Engine de renderização estática do plotly (`fig.to_image`) — exporta gráficos como PNG em `view/pages/analises.py` e `view/pages/analise_temperatura.py` |
+| `kaleido` | 0.2.1 | Engine de renderização estática do plotly (`fig.to_image`) — exporta gráficos como PNG em `view/pages/analises.py` e `view/pages/analise_temperatura.py`. Pinado em 0.2.1 (versões ≥1.x exigem Chrome/Chromium instalado) |
 | `pillow` | 11.3.0 | Empilha os PNGs diários em uma colagem vertical (`_gerar_colagem_graficos`) em `view/pages/analises.py` |
 
 ## File Structure
@@ -41,6 +49,9 @@ Declared in `requirements.txt`. Instalar com `pip install -r requirements.txt`.
 Activity/
 ├── app.py                          # Entry point: cookie ops, session restore, auth guard, routing
 ├── requirements.txt                # Dependências diretas com versões pinadas
+├── Dockerfile                      # Imagem conda (Python 3.9) que sobe o Streamlit
+├── docker-compose.yml              # Orquestra app + PostgreSQL 16
+├── .dockerignore                   # Exclusões do contexto de build
 ├── .streamlit/
 │   └── config.toml                 # Streamlit theme (light)
 │
@@ -284,7 +295,7 @@ Para adicionar uma nova página autenticada:
 
 ## Database
 
-Conexão hardcoded em `model/database.py` (`localhost:5432`, database `Activity`, user/password `postgres`).
+Conexão em `model/database.py` via `get_connection()`, configurável por variáveis de ambiente (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) com defaults locais (`localhost:5432`, database `Activity`, user/password `postgres`). No Docker Compose, o serviço `app` recebe `DB_HOST=db`.
 
 ### Tabela `usuarios`
 

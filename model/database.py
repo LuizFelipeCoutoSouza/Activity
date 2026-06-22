@@ -1,11 +1,11 @@
-"""
-model/database.py — Conexão com o banco de dados e inicialização do esquema.
+"""Conexão com o banco de dados PostgreSQL e inicialização do esquema.
 
-Expõe:
-  get_connection() — abre e retorna uma conexão psycopg2 com o PostgreSQL.
-  db_cursor(write, dict_row) — context manager que abre cursor, commita/rollback
-                               automaticamente e fecha conexão ao sair.
-  init_db()        — cria as tabelas com o esquema completo (idempotente via IF NOT EXISTS).
+Este módulo é a única fonte de verdade para acesso à conexão. Expõe o utilitário
+de conexão (`get_connection`), o context manager de cursor usado por toda a camada
+de modelos (`db_cursor`) e a rotina idempotente de criação do esquema (`init_db`).
+
+As credenciais são lidas de variáveis de ambiente com defaults voltados ao
+desenvolvimento local (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`).
 """
 
 import os
@@ -16,6 +16,15 @@ from psycopg2.extras import RealDictCursor
 
 
 def get_connection():
+    """Abre e retorna uma conexão psycopg2 com o PostgreSQL.
+
+    Os parâmetros de conexão são lidos das variáveis de ambiente `DB_HOST`,
+    `DB_NAME`, `DB_USER`, `DB_PASSWORD` e `DB_PORT`, com defaults locais.
+
+    Returns:
+        psycopg2.extensions.connection: Conexão bruta com o banco. Cabe ao
+        chamador fechá-la (ou usar `db_cursor`, que cuida disso).
+    """
     return psycopg2.connect(
         host=os.environ.get("DB_HOST", "localhost"),
         database=os.environ.get("DB_NAME", "Activity"),
@@ -27,11 +36,19 @@ def get_connection():
 
 @contextmanager
 def db_cursor(write: bool = False, dict_row: bool = False):
-    """
-    Context manager de cursor psycopg2.
+    """Fornece um cursor psycopg2 com gestão automática de transação e recursos.
 
-    write=True  → commita no sucesso, rollback na exceção.
-    dict_row=True → cursor com RealDictCursor (retorna dicts).
+    No fim do bloco, comita (se `write`), faz rollback em caso de exceção e
+    sempre fecha cursor e conexão.
+
+    Args:
+        write: Se True, comita ao sair com sucesso e faz rollback se uma exceção
+            for levantada dentro do bloco. Use para INSERT/UPDATE/DELETE.
+        dict_row: Se True, usa `RealDictCursor`, fazendo o cursor retornar cada
+            linha como dicionário em vez de tupla.
+
+    Yields:
+        psycopg2.extensions.cursor: Cursor pronto para executar comandos SQL.
     """
     conn = get_connection()
     kw = {"cursor_factory": RealDictCursor} if dict_row else {}
@@ -50,6 +67,13 @@ def db_cursor(write: bool = False, dict_row: bool = False):
 
 
 def init_db():
+    """Cria as tabelas do esquema caso ainda não existam.
+
+    Operação idempotente: todas as tabelas (`usuarios`, `arquivos`, `sessoes`,
+    `pacientes`, `paciente_arquivos` e `relatorios`) são criadas via
+    `CREATE TABLE IF NOT EXISTS`, podendo ser chamada com segurança a cada
+    inicialização da aplicação.
+    """
     conn = get_connection()
     cursor = conn.cursor()
 

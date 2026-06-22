@@ -1,8 +1,8 @@
-"""
-view/pages/registro_de_pacientes.py — Gerenciamento de pacientes.
+"""Página de gerenciamento de pacientes.
 
-Funcionalidades: cadastro, listagem paginada com busca, edição,
-exclusão e vinculação de arquivos de actigrafia.
+CRUD completo de pacientes com listagem paginada e busca por nome/e-mail.
+Cadastro e edição ocorrem em um diálogo com abas (dados e arquivos vinculados),
+respeitando a regra "um arquivo pertence a no máximo um paciente".
 """
 
 from __future__ import annotations
@@ -22,6 +22,12 @@ POR_PAGINA  = 8
 # ── Entrada principal ─────────────────────────────────────────────────────────
 
 def registro_de_pacientes_page():
+    """Renderiza a página de registro de pacientes.
+
+    Aplica o guard de autenticação, exibe métricas-resumo (pacientes e arquivos
+    atribuídos/sem paciente), abre o diálogo de cadastro/edição quando sinalizado
+    no estado da sessão e mostra a listagem com busca e paginação.
+    """
     st.title("👥 Registro de pacientes")
 
     usuario_id = get_usuario_id()
@@ -99,6 +105,16 @@ def registro_de_pacientes_page():
 
 @st.dialog("Paciente", width="large")
 def _dialogo_paciente(paciente_id: int | None, usuario_id: int):
+    """Exibe o diálogo de cadastro ou edição de paciente, com duas abas.
+
+    A aba **Dados** edita os campos do paciente; a aba **Arquivos vinculados**
+    (apenas em edição) sincroniza os vínculos via multiselect. Opera em modo de
+    criação quando `paciente_id` é None.
+
+    Args:
+        paciente_id: Id do paciente a editar, ou None para cadastrar um novo.
+        usuario_id: Id do usuário dono.
+    """
     is_novo = paciente_id is None
     st.subheader("Novo paciente" if is_novo else "Editar paciente")
 
@@ -222,6 +238,15 @@ def _dialogo_paciente(paciente_id: int | None, usuario_id: int):
 # ── Linha de paciente ─────────────────────────────────────────────────────────
 
 def _linha_paciente(p: dict, usuario_id: int):
+    """Renderiza uma linha da tabela de pacientes, com ações de editar/excluir.
+
+    A exclusão usa confirmação inline controlada por `confirm_del_pac` no estado
+    da sessão.
+
+    Args:
+        p: Dicionário de dados do paciente.
+        usuario_id: Id do usuário dono.
+    """
     st.divider()
     cols = st.columns([3, 1.5, 0.8, 2.5, 1.5, 0.8, 2])
 
@@ -259,6 +284,14 @@ def _linha_paciente(p: dict, usuario_id: int):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _idade(data_nascimento) -> int | None:
+    """Calcula a idade em anos completos a partir de uma data de nascimento.
+
+    Args:
+        data_nascimento: Objeto `date` de nascimento, ou valor falsy.
+
+    Returns:
+        int | None: Idade em anos, ou None se a data não for informada.
+    """
     if not data_nascimento:
         return None
     hoje = date.today()
